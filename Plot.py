@@ -9,11 +9,11 @@ def signals_to_scale(edf_gazex_data, meg_gazex_data):
     axs[1].cla()
     axs[0].plot(edf_gazex_data)
     axs[0].set_title('EDF')
-    axs[0].set_xlabel('Time [s]')
+    axs[0].set_xlabel('Samples')
     axs[0].set_ylabel('Pixels')
     axs[1].plot(meg_gazex_data)
     axs[1].set_title('MEG')
-    axs[1].set_xlabel('Time [s]')
+    axs[1].set_xlabel('Samples')
     axs[1].set_ylabel('Pixels')
     fig.tight_layout()
 
