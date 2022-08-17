@@ -1,12 +1,12 @@
 import matplotlib.pyplot as plt
-import Paths
+import paths
 import pathlib
 import nibabel as nib
 from nibabel.viewers import OrthoSlicer3D
 import os
 from scipy import ndimage
 
-mri_path = Paths.get().mri_path()
+mri_path = paths.get().mri_path()
 subject_id = '15909001'
 
 subj_path = pathlib.Path(os.path.join(mri_path, subject_id))

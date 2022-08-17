@@ -1,15 +1,15 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import Paths
-import Load
+import paths
+import load
 
 # Define file paths
-behav_data_path = Paths.get().beh_path()
+behav_data_path = paths.get().beh_path()
 block_change_trials = [29,  59,  89, 119, 149, 179]
 # block_change_trials = [29,  59]
 ##
-subject = Load.subject('15912001')
+subject = load.subject('15912001')
 # Load file
 df_fran = subject.beh_data()
 
@@ -150,7 +150,7 @@ fig.tight_layout()
 
 ##
 # Load suject
-subject = Load.subject('11535009')
+subject = load.subject('11535009')
 # Load file
 df_test = subject.beh_data()
 columns = ['Nstim', 'searchimage', 'corrAns_reminder_text_2.started', 'fixation_target.started', 'target.started', 'fixation_target_2.started', 'search_img_2.started', 'key_resp.rt']

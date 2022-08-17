@@ -3,17 +3,18 @@ import numpy as np
 import pickle
 import os
 
-import Load
-import Plot
+from paths import paths
+import load
+import plot
+import functions
 
 
 #---------------- Paths ----------------#
-Preproc_data_path = 'Save/Preprocesed_Data/'
-
+Preproc_data_path = paths().preproc_path()
 
 #---------------- Load data ----------------#
 # Define subject
-subject = Load.subject(1)
+subject = load.subject(1)
 
 # Load edf data
 et_data_edf = subject.et_data()
@@ -42,14 +43,14 @@ meg_gazey_data = et_channels_meg[1]
 meg_pupils_data = et_channels_meg[2]
 
 #---------------- Reescaling based on eyemap matching ----------------#
-# Set Gaze y eyemap offsets
-# This value is due to the fact that y eyemap goes approximately 5500 samples after the x eyemap
+# Set Gaze "y" Eyemap offsets
+# This value is due to the fact that "y" Eyemap goes approximately 5500 samples after the "x" Eyemap
 y_offset = 5500
 
 Scaled = False
 while not Scaled:
     # Plot EDF and MEG signals to select ranges for scaling
-    fig, axs = Plot.signals_to_scale(edf_gazex_data=edf_gazex_data, meg_gazex_data=meg_gazex_data)
+    fig, axs = plot.get_intervals_signals(reference_signal=edf_gazex_data, signal_to_scale=meg_gazex_data)
 
     # Get plot lims for scaling signals in those ranges
     eyemap_start_edf, eyemap_end_edf = (int(lim) for lim in axs[0].get_xlim())
@@ -59,31 +60,33 @@ while not Scaled:
     for meg_gaze_data, edf_gaze_data, offset, title in zip((meg_gazex_data, meg_gazey_data, meg_pupils_data),
                                                     (edf_gazex_data, edf_gazey_data, edf_pupils_data),
                                                     (0, y_offset, 0), ('Gaze x', 'Gaze y', 'Pupils')):
-        # Re-scale MEG ET data
+
+        # Get intervals to scale from.
+        # Due to different sampling rates, computing meg offset based on edf offset for y Eyemap
         meg_offset = int(offset * raw.info['sfreq'] / edf_data_srate)
-        meg_gaze_data -= np.nanmin(meg_gaze_data[eyemap_start_meg + meg_offset: eyemap_end_meg + meg_offset])
-        meg_gaze_data /= np.nanmax(meg_gaze_data[eyemap_start_meg + meg_offset: eyemap_end_meg + meg_offset])
-        meg_gaze_data *= (
-                np.nanmax(edf_gaze_data[eyemap_start_edf + offset: eyemap_end_edf + offset]) - np.nanmin(
-            edf_gaze_data[eyemap_start_edf + offset: eyemap_end_edf + offset]))
-        meg_gaze_data += np.nanmin(edf_gaze_data[eyemap_start_edf + offset: eyemap_end_edf + offset])
+        eyemap_interval_edf = (eyemap_start_edf + offset, eyemap_end_edf + offset)
+        eyemap_interval_meg = (eyemap_start_meg + meg_offset, eyemap_end_meg + meg_offset)
+
+        # Re-scale MEG ET data
+        functions.scale_from_interval(signal_to_scale=meg_gaze_data, scaled_signal=edf_gaze_data,
+                                      interval_signal=eyemap_interval_meg, interval_ref=eyemap_interval_edf)
 
         # Plot scaled signals
-        Plot.scaled_et(edf_time=edf_time, meg_data=meg_gaze_data, edf_data=edf_gaze_data,
+        plot.scaled_et(edf_time=edf_time, meg_data=meg_gaze_data, edf_data=edf_gaze_data,
                        eyemap_start_edf=eyemap_start_edf+offset, eyemap_end_edf=eyemap_end_edf+offset,
                        eyemap_start_meg=eyemap_start_meg+meg_offset, eyemap_end_meg=eyemap_end_meg+meg_offset,
                        title=title, xlabel='Pixels')
 
     # Check Scaling
     # Plot for choosing different time in signal and check scaling
-    fig, axs = Plot.signals_to_scale(edf_gazex_data=edf_gazex_data, meg_gazex_data=meg_gazex_data)
+    fig, axs = plot.signals_to_scale(edf_gazex_data=edf_gazex_data, meg_gazex_data=meg_gazex_data)
 
     # Get plot lims for plotting both signals on same plot to check scaling
     eyemap_start_edf, eyemap_end_edf = (int(lim) for lim in axs[0].get_xlim())
     eyemap_start_meg, eyemap_end_meg = (int(lim) for lim in axs[1].get_xlim())
 
     # Plot scaled signals
-    Plot.scaled_et(edf_time=edf_time, meg_data=meg_gazex_data, edf_data=edf_gazex_data,
+    plot.scaled_et(edf_time=edf_time, meg_data=meg_gazex_data, edf_data=edf_gazex_data,
                    eyemap_start_edf=eyemap_start_edf, eyemap_end_edf=eyemap_end_edf,
                    eyemap_start_meg=eyemap_start_meg, eyemap_end_meg=eyemap_end_meg,
                    title='Gaze x', xlabel='Pixels')

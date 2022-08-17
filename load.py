@@ -1,4 +1,4 @@
-import Paths
+from paths import paths
 
 import mne
 import os
@@ -8,38 +8,67 @@ import numpy as np
 
 
 class subject:
+    """
+    Class containing subjects data.
+
+    Parameters
+    ----------
+    subject: {'int', 'str'}, default=None
+        Subject id (str) or number (int). If None, takes the first subject.
+
+    Attributes
+    -------
+    bad_channels: list
+        List of bad channels.
+    beh_path: str
+        Path to the behavioural data.
+    ctf_path: str
+        Path to the MEG data.
+    et_path: str
+        Path to the Eye-Tracker data.
+    mri_path: str
+        Path to the MRI data.
+    opt_path: str
+        Path to the Digitalization data.
+    subject_id: str
+        Subject id.
+    """
 
     def __init__(self, subject=None):
         # Define ctf data path and files path
-        self.ctf_path = Paths.get().ctf_path()
-        self.et_path = Paths.get().et_path()
-        self.beh_path = Paths.get().beh_path()
-        self.mri_path = Paths.get().mri_path()
-        self.opt_path = Paths.get().opt_path()
+        self.ctf_path = paths().ctf_path()
+        self.et_path = paths().et_path()
+        self.beh_path = paths().beh_path()
+        self.mri_path = paths().mri_path()
+        self.opt_path = paths().opt_path()
 
         # Select subject
-        self.subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', 'BACK_NOISE']
+        subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', 'BACK_NOISE']
         # Subjects bad channels
-        self.subjects_bad_channels = [['MLT11-4123', 'MLT21-4123'], [], [], [], [], []]
+        subjects_bad_channels = [['MLT11-4123', 'MLT21-4123'], [], [], [], [], []]
 
         # Select 1st subject by default
         if subject == None:
-            self.subject_id = self.subjects_ids[0]
-            self.bad_channels = self.subjects_bad_channels[0]
+            self.subject_id = subjects_ids[0]
+            self.bad_channels = subjects_bad_channels[0]
         # Select subject by index
         elif type(subject) == int:
-            self.subject_id = self.subjects_ids[subject]
-            self.bad_channels = self.subjects_bad_channels[subject]
+            self.subject_id = subjects_ids[subject]
+            self.bad_channels = subjects_bad_channels[subject]
         # Select subject by id
-        elif type(subject) == str and (subject in self.subjects_ids):
+        elif type(subject) == str and (subject in subjects_ids):
             self.subject_id = subject
-            self.bad_channels = self.subjects_bad_channels[self.subjects_ids.index(subject)]
+            self.bad_channels = subjects_bad_channels[subjects_ids.index(subject)]
         else:
             print('Subject not found.')
 
 
     # MEG data
     def ctf_data(self):
+        """
+        MEG data for parent subject as Raw instance of MNE.
+        """
+
         print('\nLoading MEG data')
         # get subject path
         subj_path = pathlib.Path(os.path.join(self.ctf_path, self.subject_id))
@@ -66,6 +95,39 @@ class subject:
 
     # ET data
     def et_data(self):
+        """
+        Eye-Tracker data for parent subject as dict containing pandas DataFrames.
+
+        Attributes
+        -------
+        asc: DataFrame
+            Entire asc file data.
+        start_time: str
+            Recording start time in ms.
+        samples_start: int
+            Line number in asc file where ET samples start.
+        head: DataFrame
+            asc file header.
+        eye: str
+            Tracked eye.
+        samples: DataFrame
+            ET data. Columns: Time, Gaze x, Gaze y, Pupil size
+        time: Series
+            Data time series. Corresponding to the first columns of the samples DataFrame.
+        fix: DataFrame
+            Fixations.
+        sac: DataFrame:
+            Saccades.
+        blinks: DataFrame
+            Blinks.
+        sync: DataFrame
+            Synchronization messages.
+        msg: DataFrame
+            All Messages recieved by the Eye-Tracker.
+        calibration: Series
+            Calibration messages. First value indicates time of message recieved.
+        """
+
         print('\nLoading ET data')
         # get subject path
         subj_path = pathlib.Path(os.path.join(self.et_path, self.subject_id))
@@ -137,6 +199,9 @@ class subject:
 
     # Behavioural data
     def beh_data(self):
+        """
+        Behavioural data for parent subject as pandas DataFrames.
+        """
         # Get subject path
         subj_path = pathlib.Path(os.path.join(self.beh_path, self.subject_id))
         beh_file = list(subj_path.glob('*{}*[!ORIGINAL].csv'.format(self.subject_id)))[0]

@@ -2,15 +2,15 @@ import os
 
 import matplotlib.pyplot as plt
 import mne
-import Paths
-import Load
+from paths import paths
+import load
 
 # Define Subjects_dir as Freesurfer output folder
-mri_path = Paths.get().mri_path()
+mri_path = paths().mri_path()
 subjects_dir = os.path.join(mri_path, 'FreeSurfer_out')
 os.environ["SUBJECTS_DIR"] = subjects_dir
 # Load one subject
-subject = Load.subject()
+subject = load.subject()
 # PATH TO MRI <-> HEAD TRANSFORMATION (Saved from coreg)
 trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-trans.fif'.format(subject.subject_id))
 fids_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-fiducials.fif'.format(subject.subject_id))
@@ -57,7 +57,7 @@ evoked_std.filter(l_freq=None, h_freq=40., fir_design='firwin')
 evoked_std.plot(window_title='Standard', gfp=True, time_unit='s')
 
 # LOAD BACKGROUND NOISE
-noise = Load.subject('BACK_NOISE')
+noise = load.subject('BACK_NOISE')
 raw_noise = noise.ctf_data()
 raw_noise.pick('meg')
 # COMPUTE COVARIANCE TO WITHDRAW FROM MEG DATA
