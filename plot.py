@@ -53,9 +53,9 @@ def get_intervals_signals(reference_signal, signal_to_scale, fig=None):
     return fig, axs0_interval, axs1_interval
 
 
-def scaled_et(time, scaled_signals, reference_signals, interval_signal=[None, None], interval_ref=[None, None],
-              ref_offset=[0, 5500, 0], signal_offset=[0, 5500*1.2, 0], ylabels=['Gaze x', 'Gaze y', 'Pupil size'],
-              fig=None):
+def scaled_signals(time, scaled_signals, reference_signals, interval_signal=None, interval_ref=None,
+                   ref_offset=[0, 5500, 0], signal_offset=[0, 5500*1.2, 0], ylabels=['Gaze x', 'Gaze y', 'Pupil size'],
+                   fig=None):
     """
     Plot scaled signals in selected interval into one plot for comparison and check scaling.
 
@@ -94,20 +94,26 @@ def scaled_et(time, scaled_signals, reference_signals, interval_signal=[None, No
         num_subplots = len(scaled_signals)
     # If scaled and reference signals match in length, raise warning on the rest of the arguments
     elif len(scaled_signals) == len(reference_signals):
+        num_subplots = len(scaled_signals)
         print(f'Lists: ref_offset, signal_offset, ylabels should have the same size, but have sizes:'
               f' {len(ref_offset)}, {len(signal_offset)}, {len(ylabels)}.\n'
               f'Using default values.')
-        ref_offset = [0, 5500, 0]
-        signal_offset = [0, int(5500 * 1.2), 0]
-        ylabels = ['Gaze x', 'Gaze y', 'Pupil size']
-        num_subplots = len(scaled_signals)
+        ref_offset = [0, 5500, 0][:num_subplots]
+        signal_offset = [0, int(5500 * 1.2), 0][:num_subplots]
+        ylabels = ['Gaze x', 'Gaze y', 'Pupil size'][:num_subplots]
     # If scaled and reference signals do not match in length, raise error
     else:
         raise ValueError(f'Lists: scaled_signal, reference_signal must have the same size, but have sizes: '
                          f'{len(scaled_signals)}, {len(reference_signals)}')
 
+    # Make intervals to list because of indexing further ahead
+    if not interval_signal:
+        interval_signal = [None, None]
+    if not interval_ref:
+        interval_ref = [None, None]
+
     # If figure not provided, create instance of figure
-    if fig == None:
+    if not fig:
         fig, axs = plt.subplots(num_subplots, 1)
     else:
         plt.close(fig)

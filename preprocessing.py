@@ -73,7 +73,7 @@ while not Scaled:
                                       interval_ref=eyemap_interval_edf_offset)
 
     # Plot scaled signals
-    fig2 = plot.scaled_et(time=edf_time, scaled_signals=[meg_gazex_data, meg_gazey_data, meg_pupils_data],
+    fig2 = plot.scaled_signals(time=edf_time, scaled_signals=[meg_gazex_data, meg_gazey_data, meg_pupils_data],
                           reference_signals=[edf_gazex_data, edf_gazey_data, edf_pupils_data],
                           interval_signal=eyemap_interval_meg, interval_ref=eyemap_interval_edf,
                           ref_offset=[0, y_offset, 0], signal_offset=[0, meg_offset, 0],
@@ -85,11 +85,11 @@ while not Scaled:
                                                                                 fig=fig1)
 
     # Plot scaled signals
-    fig2 = plot.scaled_et(time=edf_time, scaled_signals=[meg_gazex_data, meg_gazey_data, meg_pupils_data],
-                          reference_signals=[edf_gazex_data, edf_gazey_data, edf_pupils_data],
-                          interval_signal=eyemap_interval_meg, interval_ref=eyemap_interval_edf,
-                          ref_offset=[0, y_offset, 0], signal_offset=[0, meg_offset, 0],
-                          ylabels=['Gaze x', 'Gaze y', 'Pupil size'], fig=fig2)
+    fig2 = plot.scaled_signals(time=edf_time, scaled_signals=[meg_gazex_data, meg_gazey_data, meg_pupils_data],
+                               reference_signals=[edf_gazex_data, edf_gazey_data, edf_pupils_data],
+                               interval_signal=eyemap_interval_meg, interval_ref=eyemap_interval_edf,
+                               ref_offset=[0, y_offset, 0], signal_offset=[0, meg_offset, 0],
+                               ylabels=['Gaze x', 'Gaze y', 'Pupil size'], fig=fig2)
 
     Answer = False
     while not Answer:
