@@ -73,6 +73,7 @@ class subject:
         # get subject path
         subj_path = pathlib.Path(os.path.join(self.ctf_path, self.subject_id))
         ds_files = list(subj_path.glob('*{}*.ds'.format(self.subject_id)))
+        ds_files.sort()
 
         # Load sesions
         # If more than 1 session concatenate all data to one raw data

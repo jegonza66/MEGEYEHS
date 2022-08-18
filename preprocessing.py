@@ -35,6 +35,7 @@ gazex_ch_name = 'UADC001-4123'
 gazey_ch_name = 'UADC002-4123'
 pupils_ch_name = 'UADC013-4123'
 et_channel_names = [gazex_ch_name, gazey_ch_name, pupils_ch_name]
+print('\nGetting ET channels from MEG')
 et_channels_meg = raw.get_data(picks=et_channel_names)
 
 # Get x, y and pupil size
@@ -103,6 +104,21 @@ while not Scaled:
             print('Please answer y/n')
             Answer = False
 
+## FIXATIONS
+sfixs, ffixs = functions.fixation_detection(x=meg_gazex_data, y=meg_gazey_data, time=raw.times,
+                                          missing=1e6, maxdist=50, mindur=100/1000)
+efixs = [fix[1] for fix in ffixs]
+
+import numpy as np
+import matplotlib.pyplot as plt
+plt.figure()
+plt.title('Fixations detection')
+plt.plot(raw.times, meg_gazex_data)
+plt.vlines(x=sfixs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='black', linestyles='--', label='Fix. start')
+plt.vlines(x=efixs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='red', linestyles='--', label='Fix. end')
+plt.xlabel('Time [s]')
+plt.ylabel('Gaze x')
+plt.legend(loc='upper right')
 
 ##---------------- Save scaled data to meg data ----------------#
 print('Saving scaled et data to meg raw data structure')

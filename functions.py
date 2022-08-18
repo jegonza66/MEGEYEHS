@@ -54,7 +54,7 @@ def fixation_detection(x, y, time, missing=0.0, maxdist=25, mindur=50):
     maxdist	-	maximal inter sample distance in pixels (default = 25)
     mindur	-	minimal duration of a fixation in milliseconds; detected
                 fixation cadidates will be disregarded if they are below
-                this duration (default = 100)
+                this duration (default = 50)
 
     returns
     Sfix, Efix
@@ -83,13 +83,13 @@ def fixation_detection(x, y, time, missing=0.0, maxdist=25, mindur=50):
             # start a new fixation
             si = 0 + i
             fixstart = True
-            sfix.append([time[i]])
+            sfix.append(time[i])
         elif dist > maxdist and fixstart:
             # end the current fixation
             fixstart = False
             # only store the fixation if the duration is ok
-            if time[i - 1] - sfix[-1][0] >= mindur:
-                efix.append([sfix[-1][0], time[i - 1], time[i - 1] - sfix[-1][0], x[si], y[si]])
+            if time[i - 1] - sfix[-1] >= mindur:
+                efix.append([sfix[-1], time[i - 1], time[i - 1] - sfix[-1], x[si], y[si]])
             # delete the last fixation start if it was too short
             else:
                 sfix.pop(-1)
@@ -98,5 +98,5 @@ def fixation_detection(x, y, time, missing=0.0, maxdist=25, mindur=50):
             si += 1
     # add last fixation end (we can lose it if dist > maxdist is false for the last point)
     if len(sfix) > len(efix):
-        efix.append([sfix[-1][0], time[len(x) - 1], time[len(x) - 1] - sfix[-1][0], x[si], y[si]])
+        efix.append([sfix[-1], time[len(x) - 1], time[len(x) - 1] - sfix[-1], x[si], y[si]])
     return sfix, efix
