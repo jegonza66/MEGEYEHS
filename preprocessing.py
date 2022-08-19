@@ -35,8 +35,9 @@ gazex_ch_name = 'UADC001-4123'
 gazey_ch_name = 'UADC002-4123'
 pupils_ch_name = 'UADC013-4123'
 et_channel_names = [gazex_ch_name, gazey_ch_name, pupils_ch_name]
-print('\nGetting ET channels from MEG')
+print('\nGetting ET channels data from MEG')
 et_channels_meg = raw.get_data(picks=et_channel_names)
+print('Done')
 
 # Get x, y and pupil size
 meg_gazex_data = et_channels_meg[0]
@@ -105,12 +106,13 @@ while not Scaled:
             Answer = False
 
 ## FIXATIONS
-sfixs, ffixs = functions.fixation_detection(x=meg_gazex_data, y=meg_gazey_data, time=raw.times,
-                                          missing=1e6, maxdist=50, mindur=100/1000)
-efixs = [fix[1] for fix in ffixs]
-
 import numpy as np
 import matplotlib.pyplot as plt
+
+sfixs, ffixs = functions.fixation_detection(x=meg_gazex_data, y=meg_gazey_data, time=raw.times,
+                                            missing=1e6, maxdist=50, mindur=100/1000)
+efixs = [fix[1] for fix in ffixs]
+
 plt.figure()
 plt.title('Fixations detection')
 plt.plot(raw.times, meg_gazex_data)
@@ -119,6 +121,69 @@ plt.vlines(x=efixs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), co
 plt.xlabel('Time [s]')
 plt.ylabel('Gaze x')
 plt.legend(loc='upper right')
+
+## SACCADES
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import math
+import os
+
+
+eye_data = {'x': meg_gazex_data[500000:1000000], 'y':meg_gazey_data[500000:1000000]}
+df = pd.DataFrame(eye_data)
+
+fname = 'eye_data.csv'
+out_fname = 'results.tsv'
+screen_size = 38
+screen_distance = 58
+screen_resolution = 1920
+px2deg = math.degrees(math.atan2(.5 * screen_size, screen_distance)) / (.5 * screen_resolution)
+sfreq = raw.info['sfreq']
+
+df.to_csv(fname, sep='\t', header=False, index=False)
+# not considering pursuit class
+command = f'remodnav {fname} {out_fname} {px2deg} {sfreq} --savgol-length {0.0195} --min-pursuit-duration {2} ' \
+          f'--min-fixation-duration {0.1}'
+os.system(command)
+
+results = pd.read_csv(out_fname, sep='\t')
+
+
+saccades = results.loc[results['label'] == 'SACC']
+
+
+
+## SACCADES MEDIO PELO
+ssacs, fsacs = functions.saccade_detection(x=meg_gazex_data, y=meg_gazey_data, time=raw.times,
+                                           missing=1e6, minlen=5)
+esacs = [sac[1] for sac in fsacs]
+
+plt.figure()
+plt.title('Fixations detection')
+plt.plot(raw.times, meg_gazex_data)
+plt.vlines(x=ssacs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='black', linestyles='--', label='Sac. start')
+plt.vlines(x=esacs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='red', linestyles='--', label='Sac. end')
+plt.xlabel('Time [s]')
+plt.ylabel('Gaze x')
+plt.legend(loc='upper right')
+
+
+## BLINKS
+import copy
+
+blinks = copy.copy(meg_pupils_data)
+blinks_idx = np.where(blinks < 300)[0]
+
+blinks_start_end = blinks_idx[np.diff(blinks_idx) != 1]
+
+plt.figure()
+plt.plot(meg_pupils_data)
+plt.plot(blinks)
+
+meg_pupils_data[meg_pupils_data > -4] = float('nan')
+# import matplotlib.pyplot as plt
+# plt.plot(meg_gazex_data)
 
 ##---------------- Save scaled data to meg data ----------------#
 print('Saving scaled et data to meg raw data structure')
