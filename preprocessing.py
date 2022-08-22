@@ -10,11 +10,11 @@ import functions
 
 #---------------- Paths ----------------#
 Preproc_data_path = paths().preproc_path()
-
+Results_path = paths().results_path()
 
 #---------------- Load data ----------------#
 # Define subject
-subject = load.subject()
+subject = load.subject(5)
 
 # Load edf data
 et_data_edf = subject.et_data()
@@ -105,6 +105,84 @@ while not Scaled:
             print('Please answer y/n')
             Answer = False
 
+## BLINKS
+import copy
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Copy  pupils data to detect blinks from
+blinks = copy.copy(meg_pupils_data)
+
+# Define blinks as data below some threshold (400)
+blinks_idx = np.where(blinks < 400)[0]
+
+# Samples before and after the threshold as true blink start to remove
+lower_lim = 5
+upper_lim = 8
+
+# Add those samples to the blink indexes to remove
+for i in range(lower_lim):
+    blinks_idx = np.concatenate((blinks_idx, blinks_idx - i))
+    blinks_idx = np.unique(blinks_idx)
+
+for i in range(upper_lim):
+    blinks_idx = np.concatenate((blinks_idx, blinks_idx + i))
+    blinks_idx = np.unique(blinks_idx)
+
+# Change blink values to nan
+blinks[blinks_idx] = float('nan')
+
+# Plot data with and without blinks to compare
+plt.figure()
+plt.plot(meg_pupils_data)
+plt.plot(blinks)
+
+## SACCADES
+import pandas as pd
+import math
+import os
+
+# Remove blinks
+meg_gazex_data[blinks_idx] = float('nan')
+meg_gazey_data[blinks_idx] = float('nan')
+meg_pupils_data[blinks_idx] = float('nan')
+
+# Define data to save to excel file needed to run the saccades detection program Remodnav
+eye_data = {'x': meg_gazex_data[500000:1000000], 'y': meg_gazey_data[500000:1000000]}
+df = pd.DataFrame(eye_data)
+
+# Remodnav parameters
+fname = f'eye_data_{subject.subject_id}.csv'
+out_fname = f'Fix_Sac_detection_{subject.subject_id}.tsv'
+screen_size = 38
+screen_distance = 58
+screen_resolution = 1920
+px2deg = math.degrees(math.atan2(.5 * screen_size, screen_distance)) / (.5 * screen_resolution)
+sfreq = raw.info['sfreq']
+
+# Save csv file
+df.to_csv(fname, sep='\t', header=False, index=False)
+
+# Run Remodnav not considering pursuit class and min fixations 100 ms
+command = f'remodnav {fname} {out_fname} {px2deg} {sfreq} --savgol-length {0.0195} --min-pursuit-duration {2} ' \
+          f'--min-fixation-duration {0.1}'
+os.system(command)
+
+# Read results file with detections
+results = pd.read_csv(out_fname, sep='\t')
+
+# Move eye data, detections file and image to subject results directory
+out_folder = Results_path + 'Preprocessing/' + subject.subject_id + '/'
+os.makedirs(out_folder, exist_ok=True)
+os.rename(fname, out_folder + fname)
+os.rename(out_fname, out_folder + out_fname)
+out_fname = out_fname.replace('tsv', 'png')
+os.rename(out_fname, out_folder + out_fname)
+
+# Get saccades
+saccades = results.loc[results['label'] == 'SACC']
+
+
 ## FIXATIONS
 import numpy as np
 import matplotlib.pyplot as plt
@@ -122,38 +200,6 @@ plt.xlabel('Time [s]')
 plt.ylabel('Gaze x')
 plt.legend(loc='upper right')
 
-## SACCADES
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-import math
-import os
-
-
-eye_data = {'x': meg_gazex_data[500000:1000000], 'y':meg_gazey_data[500000:1000000]}
-df = pd.DataFrame(eye_data)
-
-fname = 'eye_data.csv'
-out_fname = 'results.tsv'
-screen_size = 38
-screen_distance = 58
-screen_resolution = 1920
-px2deg = math.degrees(math.atan2(.5 * screen_size, screen_distance)) / (.5 * screen_resolution)
-sfreq = raw.info['sfreq']
-
-df.to_csv(fname, sep='\t', header=False, index=False)
-# not considering pursuit class
-command = f'remodnav {fname} {out_fname} {px2deg} {sfreq} --savgol-length {0.0195} --min-pursuit-duration {2} ' \
-          f'--min-fixation-duration {0.1}'
-os.system(command)
-
-results = pd.read_csv(out_fname, sep='\t')
-
-
-saccades = results.loc[results['label'] == 'SACC']
-
-
-
 ## SACCADES MEDIO PELO
 ssacs, fsacs = functions.saccade_detection(x=meg_gazex_data, y=meg_gazey_data, time=raw.times,
                                            missing=1e6, minlen=5)
@@ -168,22 +214,6 @@ plt.xlabel('Time [s]')
 plt.ylabel('Gaze x')
 plt.legend(loc='upper right')
 
-
-## BLINKS
-import copy
-
-blinks = copy.copy(meg_pupils_data)
-blinks_idx = np.where(blinks < 300)[0]
-
-blinks_start_end = blinks_idx[np.diff(blinks_idx) != 1]
-
-plt.figure()
-plt.plot(meg_pupils_data)
-plt.plot(blinks)
-
-meg_pupils_data[meg_pupils_data > -4] = float('nan')
-# import matplotlib.pyplot as plt
-# plt.plot(meg_gazex_data)
 
 ##---------------- Save scaled data to meg data ----------------#
 print('Saving scaled et data to meg raw data structure')

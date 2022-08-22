@@ -120,9 +120,36 @@ class paths:
         """
 
         if self.name == 'laptop-5i5qsv76\\joaco\n':
-            preproc_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/MEGEYEHS_Python/Save/Preprocesed_Data/'
+            preproc_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/Save/Preprocesed_Data/'
         elif self.name == 'usuario\n': # Liaa Colores
-            preproc_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/MEGEYEHS_Python/Save/Preprocesed_Data/'
+            preproc_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Save/Preprocesed_Data/'
         else:
-            preproc_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS_Python/Save/Preprocesed_Data/'
+            preproc_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/Save/Preprocesed_Data/'
+
+        # Create directory if it doesn't exist
+        os.makedirs(preproc_path, exist_ok=True)
+
         return preproc_path
+
+
+    def results_path(self):
+        """
+        Paths to the results folder.
+
+        Returns
+        -------
+        results_path: str
+            Path in str format to the folder to store the results.
+        """
+
+        if self.name == 'laptop-5i5qsv76\\joaco\n':
+            results_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/Results/'
+        elif self.name == 'usuario\n': # Liaa Colores
+            results_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Results/'
+        else:
+            results_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/Results/'
+
+        # Create directory if it doesn't exist
+        os.makedirs(results_path, exist_ok=True)
+
+        return results_path
