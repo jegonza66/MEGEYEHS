@@ -1,6 +1,11 @@
 import mne
 import pickle
 import os
+import copy
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import math
 
 from paths import paths
 import load
@@ -106,9 +111,6 @@ while not Scaled:
             Answer = False
 
 ## BLINKS
-import copy
-import matplotlib.pyplot as plt
-import numpy as np
 
 # Copy  pupils data to detect blinks from
 blinks = copy.copy(meg_pupils_data)
@@ -138,9 +140,6 @@ plt.plot(meg_pupils_data)
 plt.plot(blinks)
 
 ## SACCADES
-import pandas as pd
-import math
-import os
 
 # Remove blinks
 meg_gazex_data[blinks_idx] = float('nan')
