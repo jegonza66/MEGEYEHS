@@ -19,7 +19,7 @@ Results_path = paths().results_path()
 
 #---------------- Load data ----------------#
 # Define subject
-subject = load.subject(5)
+subject = load.subject()
 
 # Load edf data
 et_data_edf = subject.et_data()
@@ -113,10 +113,10 @@ while not Scaled:
 ## BLINKS
 
 # Copy  pupils data to detect blinks from
-blinks = copy.copy(meg_pupils_data)
+meg_pupils_data_blinks = copy.copy(meg_pupils_data)
 
-# Define blinks as data below some threshold (400)
-blinks_idx = np.where(blinks < 400)[0]
+# Define blinks as data below some threshold (300)
+blinks_idx = np.where(meg_pupils_data_blinks < 300)[0]
 
 # Samples before and after the threshold as true blink start to remove
 lower_lim = 5
@@ -131,23 +131,37 @@ for i in range(upper_lim):
     blinks_idx = np.concatenate((blinks_idx, blinks_idx + i))
     blinks_idx = np.unique(blinks_idx)
 
-# Change blink values to nan
-blinks[blinks_idx] = float('nan')
+# Remove blinks
+meg_gazex_data_blinks = copy.copy(meg_gazex_data)
+meg_gazey_data_blinks = copy.copy(meg_gazey_data)
+meg_pupils_data_blinks[blinks_idx] = float('nan')
+
+meg_gazex_data_blinks[blinks_idx] = float('nan')
+meg_gazey_data_blinks[blinks_idx] = float('nan')
+meg_pupils_data_blinks[blinks_idx] = float('nan')
 
 # Plot data with and without blinks to compare
 plt.figure()
-plt.plot(meg_pupils_data)
-plt.plot(blinks)
+plt.plot(meg_gazex_data)
+plt.plot(meg_gazex_data_blinks)
 
+plt.figure()
+plt.title('MEG')
+plt.plot(meg_gazey_data, label='Blinks')
+plt.plot(meg_gazey_data_blinks, label='Clean')
+plt.legend()
+
+plt.figure()
+plt.plot(meg_pupils_data)
+plt.plot(meg_pupils_data_blinks)
+
+plt.figure()
+plt.title('EDF')
+plt.plot(edf_gazey_data)
 ## SACCADES
 
-# Remove blinks
-meg_gazex_data[blinks_idx] = float('nan')
-meg_gazey_data[blinks_idx] = float('nan')
-meg_pupils_data[blinks_idx] = float('nan')
-
 # Define data to save to excel file needed to run the saccades detection program Remodnav
-eye_data = {'x': meg_gazex_data[500000:1000000], 'y': meg_gazey_data[500000:1000000]}
+eye_data = {'x': meg_gazex_data_blinks, 'y': meg_gazey_data_blinks}
 df = pd.DataFrame(eye_data)
 
 # Remodnav parameters
