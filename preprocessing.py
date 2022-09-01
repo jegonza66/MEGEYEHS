@@ -136,9 +136,6 @@ while not Scaled:
 # Copy pupils data to detect blinks from
 meg_pupils_data_blinks = copy.copy(meg_pupils_data)
 
-# Define blinks as data below some threshold (300)
-blinks_idx = np.where(meg_pupils_data_blinks < -4.75)[0]
-
 # Define blinks as 1 and non blinks as 0 instead of True False
 blinks = (meg_pupils_data_blinks < -4.75).astype(int)
 
@@ -169,13 +166,7 @@ for actual_blink_idx in actual_blinks:
     meg_gazey_data_blinks[blink_interval] = float('nan')
     meg_pupils_data_blinks[blink_interval] = float('nan')
 
-meg_gazex_data_blinks[blinks_idx] = float('nan')
-meg_gazey_data_blinks[blinks_idx] = float('nan')
-meg_pupils_data_blinks[blinks_idx] = float('nan')
-
-
 # Interpolate fake blinks
-
 
 # Plot data with and without blinks to compare
 plt.figure()
@@ -195,6 +186,16 @@ plt.plot(meg_pupils_data_blinks)
 plt.figure()
 plt.title('EDF')
 plt.plot(edf_gazey_data)
+
+## Old blinks removal
+
+# Define blinks as data below some threshold (300)
+blinks_idx = np.where(meg_pupils_data_blinks < -4.75)[0]
+
+meg_gazex_data_blinks[blinks_idx] = float('nan')
+meg_gazey_data_blinks[blinks_idx] = float('nan')
+meg_pupils_data_blinks[blinks_idx] = float('nan')
+
 
 
 ## SACCADES
