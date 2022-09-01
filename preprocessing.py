@@ -12,7 +12,6 @@ import load
 import plot
 import functions
 
-
 #---------------- Paths ----------------#
 Preproc_data_path = paths().preproc_path()
 Results_path = paths().results_path()
@@ -49,8 +48,31 @@ meg_gazex_data = et_channels_meg[0]
 meg_gazey_data = et_channels_meg[1]
 meg_pupils_data = et_channels_meg[2]
 
+#---------------- Reescaling based on conversion parameters ----------------#
 
-#---------------- Reescaling based on eyemap matching ----------------#
+# Define Parameters
+minvoltage = -5  # from analog.ini analog_dac_range
+maxvoltage = 5  # from analog.ini analog_dac_range
+minrange = -0.2  # from analog.ini analog_x_range to allow for +/- 20# outside display
+maxrange = 1.2  # from analog.ini analog_x_range to allow for +/- 20# outside display
+screenright = 1919  # OPM lab
+screenleft = 0
+screentop = 0
+screenbottom = 1079  # OPM lab
+
+# Scale
+R_h = (meg_gazex_data - minvoltage) / (maxvoltage - minvoltage)  # voltage range proportion
+S_h = R_h * (maxrange - minrange) + minrange  # proportion of screen width or height
+R_v = (meg_gazey_data - minvoltage) / (maxvoltage - minvoltage)
+S_v = R_v * (maxrange - minrange) + minrange
+meg_gazex_data = S_h * (screenright - screenleft + 1) + screenleft
+meg_gazey_data = S_v * (screenbottom - screentop + 1) + screentop
+
+# now overwrites output in Volts to give the output in pixels
+et_channels_meg = [meg_gazex_data, meg_gazey_data, meg_pupils_data]
+
+##---------------- Reescaling based on eyemap matching ----------------#
+
 # Set Gaze "y" Eyemap offsets
 # This value is due to the fact that "y" Eyemap goes approximately 5500 samples after the "x" Eyemap
 y_offset = 5500
@@ -65,9 +87,8 @@ while not Scaled:
 
     print('Scaling MEG Eye-Tracker data')
     for meg_gaze_data, edf_gaze_data, offset, title in zip((meg_gazex_data, meg_gazey_data, meg_pupils_data),
-                                                    (edf_gazex_data, edf_gazey_data, edf_pupils_data),
-                                                    (0, y_offset, 0), ('Gaze x', 'Gaze y', 'Pupils')):
-
+                                                           (edf_gazex_data, edf_gazey_data, edf_pupils_data),
+                                                           (0, y_offset, 0), ('Gaze x', 'Gaze y', 'Pupils')):
         # Due to different sampling rates, computing meg offset based on edf offset for y Eyemap
         meg_offset_y = int(offset * raw.info['sfreq'] / edf_data_srate)
         eyemap_interval_edf_offset = (eyemap_interval_edf[0] + offset, eyemap_interval_edf[1] + offset)
@@ -81,10 +102,10 @@ while not Scaled:
 
     # Plot scaled signals
     fig2 = plot.scaled_signals(time=edf_time, scaled_signals=[meg_gazex_data, meg_gazey_data, meg_pupils_data],
-                          reference_signals=[edf_gazex_data, edf_gazey_data, edf_pupils_data],
-                          interval_signal=eyemap_interval_meg, interval_ref=eyemap_interval_edf,
-                          ref_offset=[0, y_offset, 0], signal_offset=[0, meg_offset, 0],
-                          ylabels=['Gaze x', 'Gaze y', 'Pupil size'])
+                               reference_signals=[edf_gazex_data, edf_gazey_data, edf_pupils_data],
+                               interval_signal=eyemap_interval_meg, interval_ref=eyemap_interval_edf,
+                               ref_offset=[0, y_offset, 0], signal_offset=[0, meg_offset, 0],
+                               ylabels=['Gaze x', 'Gaze y', 'Pupil size'])
 
     # Plotting and choosing different time in signal to check scaling
     fig1, eyemap_interval_edf, eyemap_interval_meg = plot.get_intervals_signals(reference_signal=edf_gazex_data,
@@ -112,33 +133,49 @@ while not Scaled:
 
 ## BLINKS
 
-# Copy  pupils data to detect blinks from
+# Copy pupils data to detect blinks from
 meg_pupils_data_blinks = copy.copy(meg_pupils_data)
 
 # Define blinks as data below some threshold (300)
-blinks_idx = np.where(meg_pupils_data_blinks < 300)[0]
+blinks_idx = np.where(meg_pupils_data_blinks < -4.75)[0]
+
+# Define blinks as 1 and non blinks as 0 instead of True False
+blinks = (meg_pupils_data_blinks < -4.75).astype(int)
+
+# Minimum blink duration
+blink_min_time = 50 # ms
+blink_min_samples = blink_min_time / 1000 * raw.info['sfreq']
+
+# Get blinks start/end samples and duration
+blinks_start = np.where(np.diff(blinks) == 1)[0]
+blinks_end = np.where(np.diff(blinks) == -1)[0]
+blinks_dur = blinks_end - blinks_start
+
+# Get actual and fake blinks based on duration condition
+actual_blinks = np.where(blinks_dur > blink_min_samples)[0]
+fake_blinks = np.where(blinks_dur <= blink_min_samples)[0]
 
 # Samples before and after the threshold as true blink start to remove
 lower_lim = 5
 upper_lim = 8
 
-# Add those samples to the blink indexes to remove
-for i in range(lower_lim):
-    blinks_idx = np.concatenate((blinks_idx, blinks_idx - i))
-    blinks_idx = np.unique(blinks_idx)
-
-for i in range(upper_lim):
-    blinks_idx = np.concatenate((blinks_idx, blinks_idx + i))
-    blinks_idx = np.unique(blinks_idx)
-
 # Remove blinks
 meg_gazex_data_blinks = copy.copy(meg_gazex_data)
 meg_gazey_data_blinks = copy.copy(meg_gazey_data)
-meg_pupils_data_blinks[blinks_idx] = float('nan')
+
+for actual_blink_idx in actual_blinks:
+    blink_interval = np.arange(blinks_start[actual_blink_idx] - lower_lim, blinks_end[actual_blink_idx] + upper_lim)
+    meg_gazex_data_blinks[blink_interval] = float('nan')
+    meg_gazey_data_blinks[blink_interval] = float('nan')
+    meg_pupils_data_blinks[blink_interval] = float('nan')
 
 meg_gazex_data_blinks[blinks_idx] = float('nan')
 meg_gazey_data_blinks[blinks_idx] = float('nan')
 meg_pupils_data_blinks[blinks_idx] = float('nan')
+
+
+# Interpolate fake blinks
+
 
 # Plot data with and without blinks to compare
 plt.figure()
@@ -158,6 +195,8 @@ plt.plot(meg_pupils_data_blinks)
 plt.figure()
 plt.title('EDF')
 plt.plot(edf_gazey_data)
+
+
 ## SACCADES
 
 # Define data to save to excel file needed to run the saccades detection program Remodnav
@@ -195,20 +234,21 @@ os.rename(out_fname, out_folder + out_fname)
 # Get saccades
 saccades = results.loc[results['label'] == 'SACC']
 
-
 ## FIXATIONS
 import numpy as np
 import matplotlib.pyplot as plt
 
 sfixs, ffixs = functions.fixation_detection(x=meg_gazex_data, y=meg_gazey_data, time=raw.times,
-                                            missing=1e6, maxdist=50, mindur=100/1000)
+                                            missing=1e6, maxdist=50, mindur=100 / 1000)
 efixs = [fix[1] for fix in ffixs]
 
 plt.figure()
 plt.title('Fixations detection')
 plt.plot(raw.times, meg_gazex_data)
-plt.vlines(x=sfixs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='black', linestyles='--', label='Fix. start')
-plt.vlines(x=efixs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='red', linestyles='--', label='Fix. end')
+plt.vlines(x=sfixs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='black', linestyles='--',
+           label='Fix. start')
+plt.vlines(x=efixs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='red', linestyles='--',
+           label='Fix. end')
 plt.xlabel('Time [s]')
 plt.ylabel('Gaze x')
 plt.legend(loc='upper right')
@@ -221,12 +261,13 @@ esacs = [sac[1] for sac in fsacs]
 plt.figure()
 plt.title('Fixations detection')
 plt.plot(raw.times, meg_gazex_data)
-plt.vlines(x=ssacs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='black', linestyles='--', label='Sac. start')
-plt.vlines(x=esacs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='red', linestyles='--', label='Sac. end')
+plt.vlines(x=ssacs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='black', linestyles='--',
+           label='Sac. start')
+plt.vlines(x=esacs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='red', linestyles='--',
+           label='Sac. end')
 plt.xlabel('Time [s]')
 plt.ylabel('Gaze x')
 plt.legend(loc='upper right')
-
 
 ##---------------- Save scaled data to meg data ----------------#
 print('Saving scaled et data to meg raw data structure')
@@ -240,8 +281,7 @@ for ch_name, new_name in zip(raw_et.ch_names, ['ET_gaze_x', 'ET_gaze_y', 'ET_pup
 # save to original raw structure
 raw.load_data()
 raw.add_channels([raw_et])
-del(raw_et)
-
+del (raw_et)
 
 ##---------------- Save preprocesed data ----------------#
 print('Saving preprocesed data')
