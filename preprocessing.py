@@ -153,20 +153,28 @@ actual_blinks = np.where(blinks_dur > blink_min_samples)[0]
 fake_blinks = np.where(blinks_dur <= blink_min_samples)[0]
 
 # Samples before and after the threshold as true blink start to remove
-lower_lim = 5
-upper_lim = 8
+start_interval_samples = 8
+end_interval_samples = 12
 
 # Remove blinks
 meg_gazex_data_blinks = copy.copy(meg_gazex_data)
 meg_gazey_data_blinks = copy.copy(meg_gazey_data)
 
 for actual_blink_idx in actual_blinks:
-    blink_interval = np.arange(blinks_start[actual_blink_idx] - lower_lim, blinks_end[actual_blink_idx] + upper_lim)
+    blink_interval = np.arange(blinks_start[actual_blink_idx] - start_interval_samples, blinks_end[actual_blink_idx] + end_interval_samples)
     meg_gazex_data_blinks[blink_interval] = float('nan')
     meg_gazey_data_blinks[blink_interval] = float('nan')
     meg_pupils_data_blinks[blink_interval] = float('nan')
 
-# Interpolate fake blinks
+# Remove fake blinks by interpolation
+for fake_blink_idx in fake_blinks:
+    blink_interval = np.arange(blinks_start[fake_blink_idx] - start_interval_samples, blinks_end[fake_blink_idx] + end_interval_samples)
+    interpolation_x = np.linspace(meg_gazex_data_blinks[blink_interval[0]], meg_gazex_data_blinks[blink_interval[-1]], len(blink_interval))
+    interpolation_y = np.linspace(meg_gazey_data_blinks[blink_interval[0]], meg_gazey_data_blinks[blink_interval[-1]], len(blink_interval))
+    interpolation_pupil = np.linspace(meg_pupils_data_blinks[blink_interval[0]], meg_pupils_data_blinks[blink_interval[-1]], len(blink_interval))
+    meg_gazex_data_blinks[blink_interval] = interpolation_x
+    meg_gazey_data_blinks[blink_interval] = interpolation_y
+    meg_pupils_data_blinks[blink_interval] = interpolation_pupil
 
 # Plot data with and without blinks to compare
 plt.figure()
@@ -187,16 +195,24 @@ plt.figure()
 plt.title('EDF')
 plt.plot(edf_gazey_data)
 
-## Old blinks removal
+## Define trials
 
-# Define blinks as data below some threshold (300)
-blinks_idx = np.where(meg_pupils_data_blinks < -4.75)[0]
+# Get events y meg data
+evt_buttons = raw.annotations.description
+evt_times = raw.annotations.onset
 
-meg_gazex_data_blinks[blinks_idx] = float('nan')
-meg_gazey_data_blinks[blinks_idx] = float('nan')
-meg_pupils_data_blinks[blinks_idx] = float('nan')
+# Drop consecutive events occuring in same trial
+press_min_time = 4 # s
+good_button_idx = np.where(np.diff(evt_times) > press_min_time)[0]
+bad_button_idx = np.where(np.diff(evt_times) < press_min_time)[0]
 
+evt_buttons_good = evt_buttons[good_button_idx]
+evt_times_good = evt_times[good_button_idx]
 
+bad_drops = np.where(np.diff(good_button_idx) > 1)[0] + 1
+
+# Load behavioural data
+bh_data = subject.beh_data()
 
 ## SACCADES
 
@@ -235,40 +251,6 @@ os.rename(out_fname, out_folder + out_fname)
 # Get saccades
 saccades = results.loc[results['label'] == 'SACC']
 
-## FIXATIONS
-import numpy as np
-import matplotlib.pyplot as plt
-
-sfixs, ffixs = functions.fixation_detection(x=meg_gazex_data, y=meg_gazey_data, time=raw.times,
-                                            missing=1e6, maxdist=50, mindur=100 / 1000)
-efixs = [fix[1] for fix in ffixs]
-
-plt.figure()
-plt.title('Fixations detection')
-plt.plot(raw.times, meg_gazex_data)
-plt.vlines(x=sfixs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='black', linestyles='--',
-           label='Fix. start')
-plt.vlines(x=efixs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='red', linestyles='--',
-           label='Fix. end')
-plt.xlabel('Time [s]')
-plt.ylabel('Gaze x')
-plt.legend(loc='upper right')
-
-## SACCADES MEDIO PELO
-ssacs, fsacs = functions.saccade_detection(x=meg_gazex_data, y=meg_gazey_data, time=raw.times,
-                                           missing=1e6, minlen=5)
-esacs = [sac[1] for sac in fsacs]
-
-plt.figure()
-plt.title('Fixations detection')
-plt.plot(raw.times, meg_gazex_data)
-plt.vlines(x=ssacs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='black', linestyles='--',
-           label='Sac. start')
-plt.vlines(x=esacs, ymin=np.min(meg_gazex_data), ymax=np.max(meg_gazex_data), color='red', linestyles='--',
-           label='Sac. end')
-plt.xlabel('Time [s]')
-plt.ylabel('Gaze x')
-plt.legend(loc='upper right')
 
 ##---------------- Save scaled data to meg data ----------------#
 print('Saving scaled et data to meg raw data structure')
