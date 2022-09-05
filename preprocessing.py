@@ -18,7 +18,7 @@ Results_path = paths().results_path()
 
 #---------------- Load data ----------------#
 # Define subject
-subject = load.subject()
+subject = load.subject(1)
 
 # Load edf data
 et_data_edf = subject.et_data()
@@ -48,7 +48,7 @@ meg_gazex_data = et_channels_meg[0]
 meg_gazey_data = et_channels_meg[1]
 meg_pupils_data = et_channels_meg[2]
 
-#---------------- Reescaling based on conversion parameters ----------------#
+##---------------- Reescaling based on conversion parameters ----------------#
 
 # Define Parameters
 minvoltage = -5  # from analog.ini analog_dac_range
@@ -154,7 +154,7 @@ fake_blinks = np.where(blinks_dur <= blink_min_samples)[0]
 
 # Samples before and after the threshold as true blink start to remove
 start_interval_samples = 8
-end_interval_samples = 12
+end_interval_samples = 16
 
 # Remove blinks
 meg_gazex_data_blinks = copy.copy(meg_gazex_data)
@@ -178,8 +178,10 @@ for fake_blink_idx in fake_blinks:
 
 # Plot data with and without blinks to compare
 plt.figure()
-plt.plot(meg_gazex_data)
-plt.plot(meg_gazex_data_blinks)
+plt.title('MEG')
+plt.plot(meg_gazex_data, label='Blinks')
+plt.plot(meg_gazex_data_blinks, label='Clean')
+plt.legend()
 
 plt.figure()
 plt.title('MEG')
@@ -202,19 +204,29 @@ evt_buttons = raw.annotations.description
 evt_times = raw.annotations.onset
 
 # Drop consecutive events occuring in same trial
-press_min_time = 4 # s
+press_min_time = 5 # s
 good_button_idx = np.where(np.diff(evt_times) > press_min_time)[0]
 bad_button_idx = np.where(np.diff(evt_times) < press_min_time)[0]
 
 evt_buttons_good = evt_buttons[good_button_idx]
 evt_times_good = evt_times[good_button_idx]
 
-bad_drops = np.where(np.diff(good_button_idx) > 1)[0] + 1
+bad_drops = np.where(np.diff(good_button_idx) > 2)[0] + 1
+
+total_answers = len(evt_buttons_good) - sum(evt_buttons_good =='green') - sum(evt_buttons_good =='EDGE boundary') - sum(evt_buttons_good =='yellow')
+
 
 # Load behavioural data
 bh_data = subject.beh_data()
 
-## SACCADES
+
+
+
+
+
+
+
+## Fixation and Saccades detection
 
 # Define data to save to excel file needed to run the saccades detection program Remodnav
 eye_data = {'x': meg_gazex_data_blinks, 'y': meg_gazey_data_blinks}
