@@ -9,7 +9,7 @@ behav_data_path = paths.get().beh_path()
 block_change_trials = [29,  59,  89, 119, 149, 179]
 # block_change_trials = [29,  59]
 ##
-subject = load.subject('15912001')
+subject = load.subject('15909001')
 # Load file
 df_fran = subject.beh_data()
 

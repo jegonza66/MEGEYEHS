@@ -18,7 +18,7 @@ Results_path = paths().results_path()
 
 #---------------- Load data ----------------#
 # Define subject
-subject = load.subject(1)
+subject = load.subject()
 
 # Load edf data
 et_data_edf = subject.et_data()
@@ -48,7 +48,7 @@ meg_gazex_data = et_channels_meg[0]
 meg_gazey_data = et_channels_meg[1]
 meg_pupils_data = et_channels_meg[2]
 
-##---------------- Reescaling based on conversion parameters ----------------#
+#---------------- Reescaling based on conversion parameters ----------------#
 
 # Define Parameters
 minvoltage = -5  # from analog.ini analog_dac_range
@@ -176,7 +176,7 @@ for fake_blink_idx in fake_blinks:
     meg_gazey_data_blinks[blink_interval] = interpolation_y
     meg_pupils_data_blinks[blink_interval] = interpolation_pupil
 
-# Plot data with and without blinks to compare
+## Plot data with and without blinks to compare
 plt.figure()
 plt.title('MEG')
 plt.plot(meg_gazex_data, label='Blinks')
@@ -201,11 +201,91 @@ plt.plot(edf_gazey_data)
 
 # Get events y meg data
 evt_buttons = raw.annotations.description
-evt_times = raw.annotations.onset
+evt_times = raw.annotations.onset[(evt_buttons == 'red') | (evt_buttons == 'blue') | (evt_buttons == 'green')]
+evt_buttons = evt_buttons[(evt_buttons == 'red') | (evt_buttons == 'blue') | (evt_buttons == 'green')]
 
-# Drop consecutive events occuring in same trial
-press_min_time = 5 # s
-good_button_idx = np.where(np.diff(evt_times) > press_min_time)[0]
+# Check for first trial after 3 green presses
+greens = []
+for i, button in enumerate(evt_buttons):
+    if button == 'green':
+        greens.append(i)
+        if len(greens) == 3:
+            first_trial = i + 1
+            break
+
+# Get events y meg data
+evt_buttons = raw.annotations.description[first_trial:]
+evt_times = raw.annotations.onset[first_trial:]
+
+# Block splits
+blocks_start_end = np.where(evt_buttons == 'green')[0]
+blocks_start_end = list(np.delete(blocks_start_end, np.where(np.diff(blocks_start_end) < 20)))
+blocks_start_end.insert(0, first_trial)
+blocks_start_end.append(len(evt_buttons))
+blocks_bounds = [(blocks_start_end[i], blocks_start_end[i+1]) for i in range(len(blocks_start_end)-1)]
+
+# Load behavioural data
+bh_data = subject.beh_data()
+bh_data = bh_data.loc[~pd.isna(bh_data['target.started'])].reset_index(drop=True)
+# Search start time
+search_start_key_idx = ['search' in key and 'started' in key for key in bh_data.keys()]
+search_start_key = bh_data.keys()[search_start_key_idx]
+search_start = bh_data[search_start_key].values.ravel()
+# MS duration
+ms_dur = bh_data['stDur'].values
+# Response time
+rt = np.array([value.replace('[]', 'nan') for value in bh_data['rt'].values]).astype(float)
+# Search max duration
+search_max_dur = 10
+
+# Drop consecutive events occurring in same trial
+no_answer = []
+bad_button_times = []
+buttons = []
+button_times = []
+
+##
+for block_num, block_bounds in enumerate(blocks_bounds):
+    print(f'Block: {block_num}')
+    block_start = block_bounds[0]
+    block_end = block_bounds[1]
+
+    block_evt_times = evt_times[block_start:block_end]
+    block_evt_buttons = evt_buttons[block_start:block_end]
+    block_no_answer = []
+
+    block_trials = 30
+    trial = 0
+
+    time_diff =  search_start[block_num*block_trials+trial] + rt[block_num*block_trials+trial] - block_evt_times[trial]
+    block_evt_times += time_diff
+    bh_evt_times = (search_start + rt)[block_num*block_trials:(block_num+1)*block_trials]
+
+    while trial < block_trials:
+        time_delta = block_evt_times[trial+1] - block_evt_times[trial]
+        press_min_time = ms_dur[block_num*block_trials+trial] + 2.75 # fixations duration
+        Null_time = search_start[block_num*block_trials+trial+1] - search_start[block_num*block_trials+trial] - rt[block_num*block_trials+trial]
+
+        print(f'Trial: {trial}\n'
+              f'Time delta: {time_delta}\n'
+              f'Min time: {Null_time}\n'
+              f'Max dur: {Null_time + search_max_dur}')
+        if time_delta < Null_time:
+            bad_button_times.append(block_evt_times[trial+1])
+            block_evt_times = np.delete(block_evt_times, trial+1)
+            block_evt_buttons = np.delete(block_evt_buttons, trial+1)
+            trial -= 1
+        elif time_delta > Null_time + search_max_dur:
+            print(f'No answer')
+            block_no_answer.append(trial)
+        trial += 1
+
+    buttons.append(block_evt_buttons)
+    button_times.append(block_evt_times)
+    no_answer.append(block_no_answer)
+
+##
+good_button_idx = np.where(np.diff(evt_times) >= press_min_time)[0]
 bad_button_idx = np.where(np.diff(evt_times) < press_min_time)[0]
 
 evt_buttons_good = evt_buttons[good_button_idx]
@@ -213,11 +293,8 @@ evt_times_good = evt_times[good_button_idx]
 
 bad_drops = np.where(np.diff(good_button_idx) > 2)[0] + 1
 
-total_answers = len(evt_buttons_good) - sum(evt_buttons_good =='green') - sum(evt_buttons_good =='EDGE boundary') - sum(evt_buttons_good =='yellow')
+total_answers = sum(evt_buttons_good == 'red') + sum(evt_buttons_good == 'blue')
 
-
-# Load behavioural data
-bh_data = subject.beh_data()
 
 
 
