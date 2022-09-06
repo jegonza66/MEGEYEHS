@@ -45,20 +45,25 @@ class subject:
         # Select subject
         subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', 'BACK_NOISE']
         # Subjects bad channels
-        subjects_bad_channels = [['MLT11-4123', 'MLT21-4123'], [], [], [], [], []]
+        subjects_bad_channels = [['MLT11-4123', 'MLT21-4123'], [], [], [], [], [], []]
+        # Subjects groups
+        subjects_groups = ['Balanced', 'Balanced', 'Balanced', 'Counter-balanced', 'Balanced', 'Counter-balanced' 'X']
 
         # Select 1st subject by default
         if subject == None:
             self.subject_id = subjects_ids[0]
             self.bad_channels = subjects_bad_channels[0]
+            self.group = subjects_groups[0]
         # Select subject by index
         elif type(subject) == int:
             self.subject_id = subjects_ids[subject]
             self.bad_channels = subjects_bad_channels[subject]
+            self.group = subjects_groups[subject]
         # Select subject by id
         elif type(subject) == str and (subject in subjects_ids):
             self.subject_id = subject
             self.bad_channels = subjects_bad_channels[subjects_ids.index(subject)]
+            self.group = subjects_groups[subjects_ids.index(subject)]
         else:
             print('Subject not found.')
 
