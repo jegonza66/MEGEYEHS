@@ -19,8 +19,7 @@ mne.gui.coregistration(subject=subject.subject_id, subjects_dir=subjects_dir)
 
 ## VISUALIZE ALIGNMENT FOR COREGISTRATION
 # https://mne.tools/stable/auto_tutorials/inverse/35_dipole_orientations.html#sphx-glr-auto-tutorials-inverse-35-dipole-orientations-py
-raw, raws_list = subject.ctf_data()
-raw = raws_list[-1]
+raw = subject.ctf_data()
 # fid_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-fiducials.fif'.format(subject.subject_id))
 
 surfaces = dict(brain=0.6, outer_skull=0.5, head=0.4)
@@ -35,18 +34,28 @@ mne.viz.set_3d_view(fig, 45, 90, distance=0.6, focalpoint=(0., 0., 0.))
 # https://mne.tools/stable/auto_tutorials/forward/30_forward.html#sphx-glr-auto-tutorials-forward-30-forward-py
 
 # LOAD RAW
-raw, raws_list = subject.ctf_data()
-raw = raws_list[0]
+raw = subject.ctf_data()
+
 # PICK MEG AND STIM CHS
 raw.pick(['meg', 'misc'])
 # Exclude bad channels
 bads = ['MLT11-4123', 'MLT21-4123']
 raw.info['bads'].extend(bads)
+
 # EPOCH DATA BASED ON BUTTON BOX
 reject = dict(mag=4e-12)
-events = mne.find_events(raw, stim_channel='UPPT001')
-epochs = mne.Epochs(raw, events, reject=reject)
-epochs_standard = mne.concatenate_epochs([epochs['1'][range(19)]])
+
+# mapping
+map = {'blue': 1, 'red': 4}
+# Get events from annotations
+events, event_ids = mne.events_from_annotations(raw, event_id=map)
+
+# Get events from stim channel values
+# events = mne.find_events(raw, stim_channel='UPPT001')
+
+# Epoch data
+epochs = mne.Epochs(raw, events, event_id=map, reject=reject)
+epochs_standard = mne.concatenate_epochs([epochs['blue']])
 # AVERAGE EPOCHS TO GET EVOKED
 evoked_std = epochs_standard.average()
 # GET MEG CHS ONLY

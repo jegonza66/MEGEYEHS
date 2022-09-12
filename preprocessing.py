@@ -119,12 +119,6 @@ for fake_blink_idx in fake_blinks:
 
 ##---------------- Defining response events and trials ----------------#
 
-# Get responses button and value in bh data mapping
-if subject.group == 'Balanced':
-    subject.map = {'blue': '1', 'red': '4'}
-elif subject.group == 'Counter-balanced':
-    subject.map = {'blue': '4', 'red': '1'}
-
 # Get events in meg data (only red blue and green)
 evt_buttons = raw.annotations.description
 evt_times = raw.annotations.onset[(evt_buttons == 'red') | (evt_buttons == 'blue') | (evt_buttons == 'green')]
@@ -190,14 +184,14 @@ for block_num, block_bounds in enumerate(blocks_bounds):
         if not np.isnan(bh_evt_times[trial]):
             idx = functions.find_nearest(meg_evt_times, bh_evt_times[trial])
             buttons.append((meg_evt_buttons[idx]))
-            button_times.append(meg_evt_times[idx])
+            button_times.append(meg_evt_times[idx] - time_diff)
             button_trials.append(block_num*block_trials+trial+1)
 
             if (meg_evt_buttons[idx] == 'blue' and responses_block[trial] != subject.map['blue']) or (meg_evt_buttons[idx] == 'red' and responses_block[trial] != subject.map['red']):
                 raise ValueError(f'Different answer in MEG and BH data in trial: {trial}')
 
-            if abs(meg_evt_times[idx] - bh_evt_times[trial]) > 1:
-                print(f'Over 1s difference in Trial: {trial}')
+            if abs(meg_evt_times[idx] - bh_evt_times[trial]) > 0.05:
+                print(f'Over 50ms difference in Trial: {trial}')
 
         else:
             no_answer.append(block_num*block_trials+trial)
@@ -250,6 +244,7 @@ saccades = results.loc[results['label'] == 'SACC'] # Incomplete
 
 
 ##---------------- Save scaled data to meg data ----------------#
+
 print('Saving scaled et data to meg raw data structure')
 # copy raw structure
 raw_et = raw.copy()

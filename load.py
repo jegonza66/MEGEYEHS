@@ -67,6 +67,12 @@ class subject:
         else:
             print('Subject not found.')
 
+        # Mapping between button value and color
+        if self.group == 'Balanced':
+            self.map = {'blue': '1', 'red': '4'}
+        elif self.group == 'Counter-balanced':
+            self.map = {'blue': '4', 'red': '1'}
+
 
     # MEG data
     def ctf_data(self):
