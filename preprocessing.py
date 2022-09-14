@@ -237,7 +237,7 @@ raw.annotations.description = np.array(buttons_meg)
 raw.annotations.onset = np.array(button_times_meg)
 raw.annotations.trials = np.array(button_trials_meg)
 raw.annotations.fix1 = np.array(fix1_times_meg)
-raw.annotations.MS = np.array(MS_times_meg)
+raw.annotations.ms = np.array(MS_times_meg)
 raw.annotations.fix2 = np.array(fix2_times_meg)
 raw.annotations.vs = np.array(search_times_meg)
 
@@ -434,7 +434,7 @@ for trial in range(len(raw.annotations.trials)):
     ymax = plt.gca().get_ylim()[1]
 
     plt.vlines(x=raw.annotations.fix1[trial], ymin=ymin, ymax=ymax, colors='black', linestyles='--', label='Fix')
-    plt.vlines(x=raw.annotations.MS[trial], ymin=ymin, ymax=ymax, colors='red', linestyles='--', label='MS')
+    plt.vlines(x=raw.annotations.ms[trial], ymin=ymin, ymax=ymax, colors='red', linestyles='--', label='MS')
     plt.vlines(x=raw.annotations.fix2[trial], ymin=ymin, ymax=ymax, colors='black', linestyles='--', label='Fix')
     plt.vlines(x=raw.annotations.vs[trial], ymin=ymin, ymax=ymax, colors='green', linestyles='--', label='VS')
 
