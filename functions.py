@@ -58,7 +58,7 @@ def find_nearest(array, value):
 
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
-    return idx
+    return idx, array[idx]
 
 
 def first_trial(evt_buttons):

@@ -13,8 +13,9 @@ import plot
 import functions
 
 #---------------- Paths ----------------#
-Preproc_data_path = paths().preproc_path()
-Results_path = paths().results_path()
+preproc_data_path = paths().preproc_path()
+results_path = paths().results_path()
+plots_path = paths().plots_path()
 
 #---------------- Load data ----------------#
 # Define subject
@@ -44,9 +45,9 @@ et_channels_meg = raw.get_data(picks=et_channel_names)
 print('Done')
 
 # Get x, y and pupil size
-meg_gazex_data = et_channels_meg[0]
-meg_gazey_data = et_channels_meg[1]
-meg_pupils_data = et_channels_meg[2]
+meg_gazex_data_raw = et_channels_meg[0]
+meg_gazey_data_raw = et_channels_meg[1]
+meg_pupils_data_raw = et_channels_meg[2]
 
 #---------------- Reescaling based on conversion parameters ----------------#
 
@@ -61,24 +62,24 @@ screentop = 0
 screenbottom = 1079  # OPM lab
 
 # Scale
-R_h = (meg_gazex_data - minvoltage) / (maxvoltage - minvoltage)  # voltage range proportion
+R_h = (meg_gazex_data_raw - minvoltage) / (maxvoltage - minvoltage)  # voltage range proportion
 S_h = R_h * (maxrange - minrange) + minrange  # proportion of screen width or height
-R_v = (meg_gazey_data - minvoltage) / (maxvoltage - minvoltage)
+R_v = (meg_gazey_data_raw - minvoltage) / (maxvoltage - minvoltage)
 S_v = R_v * (maxrange - minrange) + minrange
-meg_gazex_data = S_h * (screenright - screenleft + 1) + screenleft
-meg_gazey_data = S_v * (screenbottom - screentop + 1) + screentop
+meg_gazex_data_scaled = S_h * (screenright - screenleft + 1) + screenleft
+meg_gazey_data_scaled = S_v * (screenbottom - screentop + 1) + screentop
 
 # now overwrites output in Volts to give the output in pixels
-et_channels_meg = [meg_gazex_data, meg_gazey_data, meg_pupils_data]
+et_channels_meg = [meg_gazex_data_scaled, meg_gazey_data_scaled, meg_pupils_data_raw]
 
 
 ##---------------- Blinks removal and missing signal interpolation ----------------#
 
 # Copy pupils data to detect blinks from
-meg_pupils_data_blinks = copy.copy(meg_pupils_data)
+meg_pupils_data_clean = copy.copy(meg_pupils_data_raw)
 
 # Define blinks as 1 and non blinks as 0 instead of True False
-blinks = (meg_pupils_data_blinks < -4.75).astype(int)
+blinks = (meg_pupils_data_clean < -4.75).astype(int)
 
 # Minimum blink duration
 blink_min_time = 50 # ms
@@ -98,24 +99,24 @@ start_interval_samples = 8
 end_interval_samples = 16
 
 # Remove blinks
-meg_gazex_data_blinks = copy.copy(meg_gazex_data)
-meg_gazey_data_blinks = copy.copy(meg_gazey_data)
+meg_gazex_data_clean = copy.copy(meg_gazex_data_scaled)
+meg_gazey_data_clean = copy.copy(meg_gazey_data_scaled)
 
 for actual_blink_idx in actual_blinks:
     blink_interval = np.arange(blinks_start[actual_blink_idx] - start_interval_samples, blinks_end[actual_blink_idx] + end_interval_samples)
-    meg_gazex_data_blinks[blink_interval] = float('nan')
-    meg_gazey_data_blinks[blink_interval] = float('nan')
-    meg_pupils_data_blinks[blink_interval] = float('nan')
+    meg_gazex_data_clean[blink_interval] = float('nan')
+    meg_gazey_data_clean[blink_interval] = float('nan')
+    meg_pupils_data_clean[blink_interval] = float('nan')
 
 # Remove fake blinks by interpolation
 for fake_blink_idx in fake_blinks:
     blink_interval = np.arange(blinks_start[fake_blink_idx] - start_interval_samples, blinks_end[fake_blink_idx] + end_interval_samples)
-    interpolation_x = np.linspace(meg_gazex_data_blinks[blink_interval[0]], meg_gazex_data_blinks[blink_interval[-1]], len(blink_interval))
-    interpolation_y = np.linspace(meg_gazey_data_blinks[blink_interval[0]], meg_gazey_data_blinks[blink_interval[-1]], len(blink_interval))
-    interpolation_pupil = np.linspace(meg_pupils_data_blinks[blink_interval[0]], meg_pupils_data_blinks[blink_interval[-1]], len(blink_interval))
-    meg_gazex_data_blinks[blink_interval] = interpolation_x
-    meg_gazey_data_blinks[blink_interval] = interpolation_y
-    meg_pupils_data_blinks[blink_interval] = interpolation_pupil
+    interpolation_x = np.linspace(meg_gazex_data_clean[blink_interval[0]], meg_gazex_data_clean[blink_interval[-1]], len(blink_interval))
+    interpolation_y = np.linspace(meg_gazey_data_clean[blink_interval[0]], meg_gazey_data_clean[blink_interval[-1]], len(blink_interval))
+    interpolation_pupil = np.linspace(meg_pupils_data_clean[blink_interval[0]], meg_pupils_data_clean[blink_interval[-1]], len(blink_interval))
+    meg_gazex_data_clean[blink_interval] = interpolation_x
+    meg_gazey_data_clean[blink_interval] = interpolation_y
+    meg_pupils_data_clean[blink_interval] = interpolation_pupil
 
 ##---------------- Defining response events and trials ----------------#
 
@@ -146,66 +147,105 @@ blocks_bounds = [(blocks_start_end[i] + 1, blocks_start_end[i+1]) for i in range
 bh_data = subject.beh_data()
 # Get only trial data rows
 bh_data = bh_data.loc[~pd.isna(bh_data['target.started'])].reset_index(drop=True)
+# Get MS start time
+MS_start = bh_data['target.started'].values.ravel().astype(float)
+# Get fix 1 start time
+fix1_start_key_idx = ['fixation_target.' in key and 'started' in key for key in bh_data.keys()]
+fix1_start_key = bh_data.keys()[fix1_start_key_idx]
+fix1_start = np.array([value.replace('None', f'{MS_start[i]}') for i, value in enumerate(bh_data[fix1_start_key].values.ravel())]).astype(float)
+# Get fix 2 start time
+fix2_start_key_idx = ['fixation_target_2' in key and 'started' in key for key in bh_data.keys()]
+fix2_start_key = bh_data.keys()[fix2_start_key_idx]
+fix2_start = bh_data[fix2_start_key].values.ravel().astype(float)
 # Get Visual search start time
 search_start_key_idx = ['search' in key and 'started' in key for key in bh_data.keys()]
 search_start_key = bh_data.keys()[search_start_key_idx]
-search_start = bh_data[search_start_key].values.ravel()
+search_start = bh_data[search_start_key].values.ravel().astype(float)
 # Get response time
 rt = np.array([value.replace('[]', 'nan') for value in bh_data['rt'].values]).astype(float)
 # Get response
 responses = bh_data['key_resp.keys'].values
 
-# Define varialbes to store data
+# Define variables to store data
 no_answer = []
-buttons = []
-button_times = []
-button_trials = []
+fix1_times_meg = []
+MS_times_meg = []
+fix2_times_meg = []
+search_times_meg = []
+buttons_meg = []
+button_times_meg = []
+button_trials_meg = []
 
 # Define trials block by block
 for block_num, block_bounds in enumerate(blocks_bounds):
-    print(f'Block: {block_num + 1}')
+    print(f'\nBlock: {block_num + 1}')
     block_start = block_bounds[0]
     block_end = block_bounds[1]
     block_trials = 30
 
     # Get events in block from MEG data
-    meg_evt_times = copy.copy(evt_times[block_start:block_end])
-    meg_evt_buttons = copy.copy(evt_buttons[block_start:block_end])
+    meg_evt_block_times = copy.copy(evt_times[block_start:block_end])
+    meg_evt_block_buttons = copy.copy(evt_buttons[block_start:block_end])
+
     # Get events in block from BH data
-    bh_evt_times = (search_start + rt)[block_num * block_trials:(block_num + 1) * block_trials]
+    bh_evt_block_times = (search_start + rt)[block_num * block_trials:(block_num + 1) * block_trials]
     responses_block = responses[block_num * block_trials:(block_num + 1) * block_trials]
 
+    # Get durations in block from BH data
+    fix1_block_dur = (MS_start - fix1_start)[block_num * block_trials:(block_num + 1) * block_trials]
+    MS_block_dur = (fix2_start - MS_start)[block_num * block_trials:(block_num + 1) * block_trials]
+    fix2_block_dur = (search_start - fix2_start)[block_num * block_trials:(block_num + 1) * block_trials]
+    rt_block_times = rt[block_num * block_trials:(block_num + 1) * block_trials]
+
     # Align MEG and BH data in time
-    time_diff = search_start[block_num*block_trials] + rt[block_num*block_trials] - meg_evt_times[0]
-    meg_evt_times += time_diff
+    time_diff = search_start[block_num*block_trials] + rt[block_num*block_trials] - meg_evt_block_times[0]
+    bh_evt_block_times -= time_diff
 
     # Iterate over trials
     for trial in range(block_trials):
-        if not np.isnan(bh_evt_times[trial]):
-            idx = functions.find_nearest(meg_evt_times, bh_evt_times[trial])
-            buttons.append((meg_evt_buttons[idx]))
-            button_times.append(meg_evt_times[idx] - time_diff)
-            button_trials.append(block_num*block_trials+trial+1)
+        if not np.isnan(bh_evt_block_times[trial]):
+            idx, meg_evt_time = functions.find_nearest(meg_evt_block_times, bh_evt_block_times[trial])
 
-            if (meg_evt_buttons[idx] == 'blue' and responses_block[trial] != subject.map['blue']) or (meg_evt_buttons[idx] == 'red' and responses_block[trial] != subject.map['red']):
+            trial_search_time = meg_evt_time - rt_block_times[trial]
+            search_times_meg.append(trial_search_time)
+
+            trial_fix2_times = trial_search_time - fix2_block_dur[trial]
+            fix2_times_meg.append(trial_fix2_times)
+
+            trial_MS_time = trial_fix2_times - MS_block_dur[trial]
+            MS_times_meg.append(trial_MS_time)
+
+            trial_fix1_time = trial_MS_time - fix1_block_dur[trial]
+            fix1_times_meg.append(trial_fix1_time)
+
+            buttons_meg.append((meg_evt_block_buttons[idx]))
+            button_times_meg.append(meg_evt_time)
+            button_trials_meg.append(block_num*block_trials + trial + 1)
+
+            if (meg_evt_block_buttons[idx] == 'blue' and responses_block[trial] != subject.map['blue']) or (meg_evt_block_buttons[idx] == 'red' and responses_block[trial] != subject.map['red']):
                 raise ValueError(f'Different answer in MEG and BH data in trial: {trial}')
 
-            if abs(meg_evt_times[idx] - bh_evt_times[trial]) > 0.05:
+            if abs(meg_evt_time - bh_evt_block_times[trial]) > 0.05:
                 print(f'Over 50ms difference in Trial: {trial}')
 
         else:
+            print(f'No answer in Trial: {trial}')
             no_answer.append(block_num*block_trials+trial)
 
 # Save clean events to MEG data
-raw.annotations.description = np.array(buttons)
-raw.annotations.onset = np.array(button_times)
-raw.annotations.trials = np.array(button_trials)
+raw.annotations.description = np.array(buttons_meg)
+raw.annotations.onset = np.array(button_times_meg)
+raw.annotations.trials = np.array(button_trials_meg)
+raw.annotations.fix1 = np.array(fix1_times_meg)
+raw.annotations.MS = np.array(MS_times_meg)
+raw.annotations.fix2 = np.array(fix2_times_meg)
+raw.annotations.vs = np.array(search_times_meg)
 
 
 ##---------------- Fixations and saccades detection ----------------#
 
 # Define data to save to excel file needed to run the saccades detection program Remodnav
-eye_data = {'x': meg_gazex_data_blinks, 'y': meg_gazey_data_blinks}
+eye_data = {'x': meg_gazex_data_clean, 'y': meg_gazey_data_clean}
 df = pd.DataFrame(eye_data)
 
 # Remodnav parameters
@@ -229,7 +269,7 @@ os.system(command)
 results = pd.read_csv(out_fname, sep='\t')
 
 # Move eye data, detections file and image to subject results directory
-out_folder = Results_path + 'Preprocessing/' + subject.subject_id + '/'
+out_folder = results_path + 'Preprocessing/' + subject.subject_id + '/'
 os.makedirs(out_folder, exist_ok=True)
 # Move et data file
 os.rename(fname, out_folder + fname)
@@ -264,11 +304,11 @@ del (raw_et)
 # But not the 422 channels ~12Gb
 
 print('Saving preprocesed data')
-os.makedirs(Preproc_data_path, exist_ok=True)
-f = open(Preproc_data_path + f'Subject_{subject.subject_id}.pkl', 'wb')
+os.makedirs(preproc_data_path, exist_ok=True)
+f = open(preproc_data_path + f'Subject_{subject.subject_id}.pkl', 'wb')
 pickle.dump(raw, f)
 f.close()
-print(f'Preprocesed data saved to {Preproc_data_path + f"Subject_{subject.subject_id}.pkl"}')
+print(f'Preprocesed data saved to {preproc_data_path + f"Subject_{subject.subject_id}.pkl"}')
 
 
 
@@ -291,10 +331,10 @@ Scaled = False
 while not Scaled:
     # Plot EDF and MEG signals to select ranges for scaling and get plot lims for scaling signals in those ranges
     fig1, eyemap_interval_edf, eyemap_interval_meg = \
-        plot.get_intervals_signals(reference_signal=edf_gazex_data, signal_to_scale=meg_gazex_data)
+        plot.get_intervals_signals(reference_signal=edf_gazex_data, signal_to_scale=meg_gazex_data_raw)
 
     print('Scaling MEG Eye-Tracker data')
-    for meg_gaze_data, edf_gaze_data, offset, title in zip((meg_gazex_data, meg_gazey_data, meg_pupils_data),
+    for meg_gaze_data, edf_gaze_data, offset, title in zip((meg_gazex_data_raw, meg_gazey_data_raw, meg_pupils_data_raw),
                                                            (edf_gazex_data, edf_gazey_data, edf_pupils_data),
                                                            (0, y_offset, 0), ('Gaze x', 'Gaze y', 'Pupils')):
         # Due to different sampling rates, computing meg offset based on edf offset for y Eyemap
@@ -309,7 +349,7 @@ while not Scaled:
                                       interval_ref=eyemap_interval_edf_offset)
 
     # Plot scaled signals
-    fig2 = plot.scaled_signals(time=edf_time, scaled_signals=[meg_gazex_data, meg_gazey_data, meg_pupils_data],
+    fig2 = plot.scaled_signals(time=edf_time, scaled_signals=[meg_gazex_data_raw, meg_gazey_data_raw, meg_pupils_data_raw],
                                reference_signals=[edf_gazex_data, edf_gazey_data, edf_pupils_data],
                                interval_signal=eyemap_interval_meg, interval_ref=eyemap_interval_edf,
                                ref_offset=[0, y_offset, 0], signal_offset=[0, meg_offset, 0],
@@ -317,11 +357,11 @@ while not Scaled:
 
     # Plotting and choosing different time in signal to check scaling
     fig1, eyemap_interval_edf, eyemap_interval_meg = plot.get_intervals_signals(reference_signal=edf_gazex_data,
-                                                                                signal_to_scale=meg_gazex_data,
+                                                                                signal_to_scale=meg_gazex_data_raw,
                                                                                 fig=fig1)
 
     # Plot scaled signals
-    fig2 = plot.scaled_signals(time=edf_time, scaled_signals=[meg_gazex_data, meg_gazey_data, meg_pupils_data],
+    fig2 = plot.scaled_signals(time=edf_time, scaled_signals=[meg_gazex_data_raw, meg_gazey_data_raw, meg_pupils_data_raw],
                                reference_signals=[edf_gazex_data, edf_gazey_data, edf_pupils_data],
                                interval_signal=eyemap_interval_meg, interval_ref=eyemap_interval_edf,
                                ref_offset=[0, y_offset, 0], signal_offset=[0, meg_offset, 0],
@@ -345,32 +385,96 @@ while not Scaled:
 
 plt.figure()
 plt.title('MEG')
-plt.plot(meg_gazex_data, label='Blinks')
-plt.plot(meg_gazex_data_blinks, label='Clean')
+plt.plot(meg_gazex_data_scaled, label='Blinks')
+plt.plot(meg_gazex_data_clean, label='Clean')
 plt.legend()
 
 plt.figure()
 plt.title('MEG')
-plt.plot(meg_gazey_data, label='Blinks')
-plt.plot(meg_gazey_data_blinks, label='Clean')
+plt.plot(meg_gazey_data_scaled, label='Blinks')
+plt.plot(meg_gazey_data_clean, label='Clean')
 plt.legend()
 
 plt.figure()
-plt.plot(meg_pupils_data)
-plt.plot(meg_pupils_data_blinks)
+plt.plot(meg_pupils_data_raw)
+plt.plot(meg_pupils_data_clean)
 
 plt.figure()
 plt.title('EDF')
 plt.plot(edf_gazey_data)
 
 
-## PLOT evts
+## PLOTS
 
+# Evts
 plt.figure()
 plt.title('Behavioural and MEG data mapping')
-plt.plot(meg_evt_times, meg_evt_times, 'o', label='MEG evts')
-plt.plot(bh_evt_times, bh_evt_times, '.', label='BH evts')
+plt.plot(meg_evt_block_times, meg_evt_block_times, 'o', label='MEG evts')
+plt.plot(bh_evt_block_times, bh_evt_block_times, '.', label='BH evts')
 plt.xlabel('time [s]')
 plt.ylabel('time [s]')
 plt.legend()
 plt.savefig('Good_scale.png')
+
+# Scanpaths and screens Trials
+
+save_fig = True
+
+plt.ioff()
+
+for trial in range(len(raw.annotations.trials)):
+    plt.figure()
+    plt.title(f'Trial: {trial}')
+    trial_start_idx = functions.find_nearest(raw.times, raw.annotations.fix1[trial])[0] - 120 * 2
+    trial_end_idx = functions.find_nearest(raw.times, raw.annotations.onset[trial])[0] + 120 * 2
+
+    plt.plot(raw.times[trial_start_idx:trial_end_idx], meg_gazex_data_clean[trial_start_idx:trial_end_idx], label='Gaze x')
+    plt.plot(raw.times[trial_start_idx:trial_end_idx], meg_gazey_data_clean[trial_start_idx:trial_end_idx] - 1000, label='Gaze y')
+    ymin = plt.gca().get_ylim()[0]
+    ymax = plt.gca().get_ylim()[1]
+
+    plt.vlines(x=raw.annotations.fix1[trial], ymin=ymin, ymax=ymax, colors='black', linestyles='--', label='Fix')
+    plt.vlines(x=raw.annotations.MS[trial], ymin=ymin, ymax=ymax, colors='red', linestyles='--', label='MS')
+    plt.vlines(x=raw.annotations.fix2[trial], ymin=ymin, ymax=ymax, colors='black', linestyles='--', label='Fix')
+    plt.vlines(x=raw.annotations.vs[trial], ymin=ymin, ymax=ymax, colors='green', linestyles='--', label='VS')
+
+    plt.xlabel('time [s]')
+    plt.ylabel('Gaze')
+    plt.grid()
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    plt.legend(by_label.values(), by_label.keys(), loc='upper center', ncol=3)
+
+    if save_fig:
+        save_path = plots_path + 'Trials/'
+        os.makedirs(save_path, exist_ok=True)
+
+        plt.savefig(save_path + f'Trial {trial}.png')
+
+
+
+# Scanpaths and screens All
+plt.ion()
+
+plt.figure()
+plt.title(f'All')
+plt.plot(raw.times, meg_gazex_data_clean, label='Gaze x')
+plt.plot(raw.times, meg_gazey_data_clean - 1000, label='Gaze y')
+ymin = plt.gca().get_ylim()[0]
+ymax = plt.gca().get_ylim()[1]
+
+for fix1 in raw.annotations.fix1:
+    plt.vlines(x=fix1, ymin=ymin, ymax=ymax, colors='black', linestyles='--', label='Fix 1')
+for ms in raw.annotations.MS:
+    plt.vlines(x=ms, ymin=ymin, ymax=ymax, colors='red', linestyles='--', label='MS')
+for fix2 in raw.annotations.fix2:
+    plt.vlines(x=fix2, ymin=ymin, ymax=ymax, colors='black', linestyles='--', label='Fix 2')
+for vs in raw.annotations.vs:
+    plt.vlines(x=vs, ymin=ymin, ymax=ymax, colors='green', linestyles='--', label='VS')
+
+plt.xlabel('time [s]')
+plt.ylabel('Gaze')
+
+handles, labels = plt.gca().get_legend_handles_labels()
+by_label = dict(zip(labels, handles))
+plt.legend(by_label.values(), by_label.keys())

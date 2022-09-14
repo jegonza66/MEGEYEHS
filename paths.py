@@ -153,3 +153,25 @@ class paths:
         os.makedirs(results_path, exist_ok=True)
 
         return results_path
+
+    def plots_path(self):
+        """
+        Paths to the plots folder.
+
+        Returns
+        -------
+        plots_path: str
+            Path in str format to the folder to store the results.
+        """
+
+        if self.name == 'laptop-5i5qsv76\\joaco\n':
+            plots_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/Plots/'
+        elif self.name == 'usuario\n': # Liaa Colores
+            plots_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Plots/'
+        else:
+            plots_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/Plots/'
+
+        # Create directory if it doesn't exist
+        os.makedirs(plots_path, exist_ok=True)
+
+        return plots_path
