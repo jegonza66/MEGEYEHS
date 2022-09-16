@@ -188,10 +188,10 @@ class paths:
         """
 
         if self.name == 'laptop-5i5qsv76\\joaco\n':
-            item_pos_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/Data/pos_items_210.mat'
+            item_pos_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/DATA/pos_items_210.mat'
         elif self.name == 'usuario\n': # Liaa Colores
-            item_pos_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Data/pos_items_210.mat'
+            item_pos_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/DATA/pos_items_210.mat'
         else:
-            item_pos_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/Data/pos_items_210.mat'
+            item_pos_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/DATA/pos_items_210.mat'
 
         return item_pos_path

@@ -1,16 +1,15 @@
 import mne
 import os
-import copy
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import math
 import time
 
 from paths import paths
 import load
 import plot
 import functions
+import preproc_functions
 
 #---------------- Paths ----------------#
 preproc_data_path = paths().preproc_path()
@@ -21,389 +20,89 @@ items_pos_path = paths().item_pos_path()
 #---------------- Load data ----------------#
 # Define subject
 subject = load.subject()
-
 # Load Meg data
 raw = subject.ctf_data()
 
-# Get et channels
-gazex_ch_name = 'UADC001-4123'
-gazey_ch_name = 'UADC002-4123'
-pupils_ch_name = 'UADC013-4123'
-et_channel_names = [gazex_ch_name, gazey_ch_name, pupils_ch_name]
+# Get et channels by name [Gaze x, Gaze y, Pupils]
+et_channel_names = ['UADC001-4123', 'UADC002-4123', 'UADC013-4123']
+
 print('\nGetting ET channels data from MEG')
 et_channels_meg = raw.get_data(picks=et_channel_names)
-print('Done')
 
-# Get x, y and pupil size
+# Get separate data from et channels
 meg_gazex_data_raw = et_channels_meg[0]
 meg_gazey_data_raw = et_channels_meg[1]
 meg_pupils_data_raw = et_channels_meg[2]
 
 #---------------- Reescaling based on conversion parameters ----------------#
+meg_gazex_data_scaled, meg_gazey_data_scaled = preproc_functions.reescale_et_channels(meg_gazex_data_raw=meg_gazex_data_raw,
+                                                                                      meg_gazey_data_raw=meg_gazey_data_raw)
 
-print('Rescaling')
-# Define Parameters
-minvoltage = -5  # from analog.ini analog_dac_range
-maxvoltage = 5  # from analog.ini analog_dac_range
-minrange = -0.2  # from analog.ini analog_x_range to allow for +/- 20# outside display
-maxrange = 1.2  # from analog.ini analog_x_range to allow for +/- 20# outside display
-screenright = 1919  # OPM lab
-screenleft = 0
-screentop = 0
-screenbottom = 1079  # OPM lab
-
-# Scale
-R_h = (meg_gazex_data_raw - minvoltage) / (maxvoltage - minvoltage)  # voltage range proportion
-S_h = R_h * (maxrange - minrange) + minrange  # proportion of screen width or height
-R_v = (meg_gazey_data_raw - minvoltage) / (maxvoltage - minvoltage)
-S_v = R_v * (maxrange - minrange) + minrange
-meg_gazex_data_scaled = S_h * (screenright - screenleft + 1) + screenleft
-meg_gazey_data_scaled = S_v * (screenbottom - screentop + 1) + screentop
-
-# now overwrites output in Volts to give the output in pixels
-et_channels_meg = [meg_gazex_data_scaled, meg_gazey_data_scaled, meg_pupils_data_raw]
-
-
-#---------------- Blinks removal and missing signal interpolation ----------------#
-
-print('Removing blinks')
-
-# Copy pupils data to detect blinks from
-meg_pupils_data_clean = copy.copy(meg_pupils_data_raw)
-meg_gazex_data_clean = copy.copy(meg_gazex_data_scaled)
-meg_gazey_data_clean = copy.copy(meg_gazey_data_scaled)
-
-# Define missing values as 1 and non missing as 0 instead of True False
-missing = (meg_pupils_data_clean < -4.6).astype(int)
-
-# Samples before and after the threshold as true blink start to remove
+#---------------- Blinks removal ----------------#
+# Define intervals around blinks to also fill with nan. Due to conversion noice from square signal
+blink_min_dur = 70
 start_interval_samples = 12
 end_interval_samples = 24
 
-# Get missing start/end samples and duration
-missing_start = np.where(np.diff(missing) == 1)[0]
-missing_end = np.where(np.diff(missing) == -1)[0]
-missing_dur = missing_end - missing_start
+meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean = preproc_functions.blinks_to_nan(meg_gazex_data_scaled=meg_gazex_data_scaled,
+                                                                                                    meg_gazey_data_scaled=meg_gazey_data_scaled,
+                                                                                                    meg_pupils_data_raw=meg_pupils_data_raw,
+                                                                                                    start_interval_samples=start_interval_samples,
+                                                                                                    end_interval_samples=end_interval_samples)
 
-# Remove blinks
-# First, fill missing values (and suroundings) with nan
-for i in range(len(missing_start)):
-    blink_interval = np.arange(missing_start[i] - start_interval_samples, missing_end[i] + end_interval_samples)
-    meg_gazex_data_clean[blink_interval] = float('nan')
-    meg_gazey_data_clean[blink_interval] = float('nan')
-    meg_pupils_data_clean[blink_interval] = float('nan')
-
-# Redefine missing values. This way, if multiple missing intervals were close to one an other, they're now one big missing interval
-missing = np.isnan(meg_pupils_data_clean).astype(int)
-
-# Get missing start/end samples and duration
-missing_start = np.where(np.diff(missing) == 1)[0]
-missing_end = np.where(np.diff(missing) == -1)[0]
-missing_dur = missing_end - missing_start
-
-# Minimum blink duration
-blink_min_time = 70  # ms
-# Consider we enlarged the intervals when classifying for real and fake blinks
-blink_min_samples = blink_min_time / 1000 * raw.info['sfreq'] + start_interval_samples + end_interval_samples
-
-# Get actual and fake blinks based on duration condition
-actual_blinks = np.where(missing_dur > blink_min_samples)[0]
-fake_blinks = np.where(missing_dur <= blink_min_samples)[0]
-
-# Interpolate fake blinks
-for fake_blink_idx in fake_blinks:
-    blink_interval = np.arange(missing_start[fake_blink_idx] - start_interval_samples, missing_end[fake_blink_idx] + end_interval_samples)
-
-    interpolation_x = np.linspace(meg_gazex_data_clean[blink_interval[0]], meg_gazex_data_clean[blink_interval[-1]], len(blink_interval))
-    interpolation_y = np.linspace(meg_gazey_data_clean[blink_interval[0]], meg_gazey_data_clean[blink_interval[-1]], len(blink_interval))
-    interpolation_pupil = np.linspace(meg_pupils_data_clean[blink_interval[0]], meg_pupils_data_clean[blink_interval[-1]], len(blink_interval))
-    meg_gazex_data_clean[blink_interval] = interpolation_x
-    meg_gazey_data_clean[blink_interval] = interpolation_y
-    meg_pupils_data_clean[blink_interval] = interpolation_pupil
-
-# plt.figure()
-# plt.title('Gaze x')
-# plt.plot(meg_gazex_data_scaled, label='Blinks')
-# plt.plot(meg_gazex_data_clean, label='Clean')
-# plt.legend()
-#
-# plt.figure()
-# plt.title('Gaze y')
-# plt.plot(meg_gazey_data_scaled, label='Blinks')
-# plt.plot(meg_gazey_data_clean, label='Clean')
-# plt.legend()
-#
-# plt.figure()
-# plt.title('Pupils')
-# plt.plot(meg_pupils_data_raw, label='Blinks')
-# plt.plot(meg_pupils_data_clean, label='Clean')
-# plt.grid()
-# plt.legend()
-
+#---------------- Missing signal interpolation ----------------#
+et_channels_meg = preproc_functions.fake_blink_interpolate(meg_gazex_data_clean=meg_gazex_data_clean,
+                                                           meg_gazey_data_clean=meg_gazey_data_clean,
+                                                           meg_pupils_data_clean=meg_pupils_data_clean,
+                                                           blink_min_dur=blink_min_dur,
+                                                           start_interval_samples=start_interval_samples,
+                                                           end_interval_samples=start_interval_samples,
+                                                           sfreq=raw.info['sfreq'])
 
 #---------------- Defining response events and trials ----------------#
-
-print('Detecting events and defining trials')
-# Get events in meg data (only red blue and green)
-evt_buttons = raw.annotations.description
-evt_times = raw.annotations.onset[(evt_buttons == 'red') | (evt_buttons == 'blue') | (evt_buttons == 'green')]
-evt_buttons = evt_buttons[(evt_buttons == 'red') | (evt_buttons == 'blue') | (evt_buttons == 'green')]
-
-# Check for first trial when first response is not green
-first_trial = functions.first_trial(evt_buttons)
-
-# Drop events before 1st trial
-evt_buttons = evt_buttons[first_trial:]
-evt_times = evt_times[first_trial:]
-
-# Split events into blocks by green press at begening of block
-blocks_start_end = np.where(evt_buttons == 'green')[0]
-# Delete succesive presses of green
-blocks_start_end = list(np.delete(blocks_start_end, np.where(np.diff(blocks_start_end) < 2)))
-# Add first trial idx (0) on first sample (0), as we're gonna
-blocks_start_end.insert(0, -1)
-# Add las trial idx
-blocks_start_end.append(len(evt_buttons))
-# Define starting and ending trial of each block
-blocks_bounds = [(blocks_start_end[i] + 1, blocks_start_end[i+1]) for i in range(len(blocks_start_end)-1)]
-
-# Load behavioural data
-bh_data = subject.beh_data()
-# Get only trial data rows
-bh_data = bh_data.loc[~pd.isna(bh_data['target.started'])].reset_index(drop=True)
-# Get MS start time
-ms_start = bh_data['target.started'].values.ravel().astype(float)
-# Get fix 1 start time
-fix1_start_key_idx = ['fixation_target.' in key and 'started' in key for key in bh_data.keys()]
-fix1_start_key = bh_data.keys()[fix1_start_key_idx]
-fix1_start = np.array([value.replace('None', f'{ms_start[i]}') for i, value in enumerate(bh_data[fix1_start_key].values.ravel())]).astype(float)
-# Get fix 2 start time
-fix2_start_key_idx = ['fixation_target_2' in key and 'started' in key for key in bh_data.keys()]
-fix2_start_key = bh_data.keys()[fix2_start_key_idx]
-fix2_start = bh_data[fix2_start_key].values.ravel().astype(float)
-# Get Visual search start time
-search_start_key_idx = ['search' in key and 'started' in key for key in bh_data.keys()]
-search_start_key = bh_data.keys()[search_start_key_idx]
-search_start = bh_data[search_start_key].values.ravel().astype(float)
-# Get response time
-rt = np.array([value.replace('[]', 'nan') for value in bh_data['rt'].values]).astype(float)
-# Get response
-responses = bh_data['key_resp.keys'].values
-
-# Define variables to store data
-no_answer = []
-fix1_times_meg = []
-ms_times_meg = []
-fix2_times_meg = []
-vs_times_meg = []
-buttons_meg = []
-button_times_meg = []
-button_trials_meg = []
-
-# Define trials block by block
-for block_num, block_bounds in enumerate(blocks_bounds):
-    print(f'\nBlock: {block_num + 1}')
-    block_start = block_bounds[0]
-    block_end = block_bounds[1]
-    block_trials = 30
-
-    # Get events in block from MEG data
-    meg_evt_block_times = copy.copy(evt_times[block_start:block_end])
-    meg_evt_block_buttons = copy.copy(evt_buttons[block_start:block_end])
-
-    # Get events in block from BH data
-    bh_evt_block_times = (search_start + rt)[block_num * block_trials:(block_num + 1) * block_trials]
-    responses_block = responses[block_num * block_trials:(block_num + 1) * block_trials]
-
-    # Get durations in block from BH data
-    fix1_block_dur = (ms_start - fix1_start)[block_num * block_trials:(block_num + 1) * block_trials]
-    ms_block_dur = (fix2_start - ms_start)[block_num * block_trials:(block_num + 1) * block_trials]
-    fix2_block_dur = (search_start - fix2_start)[block_num * block_trials:(block_num + 1) * block_trials]
-    rt_block_times = rt[block_num * block_trials:(block_num + 1) * block_trials]
-
-    # Align MEG and BH data in time
-    time_diff = search_start[block_num*block_trials] + rt[block_num*block_trials] - meg_evt_block_times[0]
-    bh_evt_block_times -= time_diff
-
-    # Iterate over trials
-    for trial in range(block_trials):
-        if not np.isnan(bh_evt_block_times[trial]):
-            idx, meg_evt_time = functions.find_nearest(meg_evt_block_times, bh_evt_block_times[trial])
-
-            trial_search_time = meg_evt_time - rt_block_times[trial]
-            vs_times_meg.append(trial_search_time)
-
-            trial_fix2_times = trial_search_time - fix2_block_dur[trial]
-            fix2_times_meg.append(trial_fix2_times)
-
-            trial_ms_time = trial_fix2_times - ms_block_dur[trial]
-            ms_times_meg.append(trial_ms_time)
-
-            trial_fix1_time = trial_ms_time - fix1_block_dur[trial]
-            fix1_times_meg.append(trial_fix1_time)
-
-            buttons_meg.append((meg_evt_block_buttons[idx]))
-            button_times_meg.append(meg_evt_time)
-            button_trials_meg.append(int(block_num*block_trials + trial + 1))
-
-            if (meg_evt_block_buttons[idx] == 'blue' and responses_block[trial] != subject.map['blue']) or (meg_evt_block_buttons[idx] == 'red' and responses_block[trial] != subject.map['red']):
-                raise ValueError(f'Different answer in MEG and BH data in trial: {trial}')
-
-            if abs(meg_evt_time - bh_evt_block_times[trial]) > 0.05:
-                print(f'Over 50ms difference in Trial: {trial}')
-
-        else:
-            print(f'No answer in Trial: {trial}')
-            no_answer.append(block_num*block_trials+trial)
-
-# Save clean events to MEG data
-
-raw.annotations.trials = np.array(button_trials_meg)
-raw.annotations.fix1 = np.array(fix1_times_meg)
-raw.annotations.ms = np.array(ms_times_meg)
-raw.annotations.fix2 = np.array(fix2_times_meg)
-raw.annotations.vs = np.array(vs_times_meg)
-raw.annotations.buttons = np.array(buttons_meg)
-raw.annotations.rt = np.array(button_times_meg)
-
-# # Using actual raw data times
-# button_times_true = np.array([functions.find_nearest(raw.times, button_time)[1] for button_time in button_times_meg])
-# fix1_times_true = np.array([functions.find_nearest(raw.times, fix1_time)[1] for fix1_time in fix1_times_meg])
-# fix2_times_true = np.array([functions.find_nearest(raw.times, fix2_time)[1] for fix2_time in fix2_times_meg])
-# ms_times_true = np.array([functions.find_nearest(raw.times, ms_time)[1] for ms_time in ms_times_meg])
-# vs_times_true = np.array([functions.find_nearest(raw.times, vs_time)[1] for vs_time in vs_times_meg])
-#
-# # Save clean events to MEG data
-# raw.annotations.description = np.array(buttons_meg)
-# raw.annotations.onset = np.array(button_times_true)
-# raw.annotations.trials = np.array(button_trials_meg)
-# raw.annotations.fix1 = np.array(fix1_times_true)
-# raw.annotations.ms = np.array(ms_times_true)
-# raw.annotations.fix2 = np.array(fix2_times_true)
-# raw.annotations.vs = np.array(vs_times_true)
-
+bh_data, response_trials_meg, fix1_times_meg, ms_times_meg, fix2_times_meg, vs_times_meg, buttons_meg, response_times_meg = \
+    preproc_functions.define_events_trials(raw=raw, subject=subject)
 
 #---------------- Fixations and saccades detection ----------------#
+fixations, saccades = preproc_functions.fixations_saccades_detection(raw=raw, meg_gazex_data_clean=meg_gazex_data_clean,
+                                                                     meg_gazey_data_clean=meg_gazey_data_clean,
+                                                                     subject=subject)
 
-out_fname = f'Fix_Sac_detection_{subject.subject_id}.tsv'
-out_folder = results_path + 'Preprocessing/' + subject.subject_id + '/'
+#---------------- Fixations classification ----------------#
+fixations = preproc_functions.fixation_classification(bh_data=bh_data, fixations=fixations, fix1_times_meg=fix1_times_meg,
+                                                      response_trials_meg=response_trials_meg, ms_times_meg=ms_times_meg,
+                                                      fix2_times_meg=fix2_times_meg, vs_times_meg=vs_times_meg,
+                                                      response_times_meg=response_times_meg,
+                                                      meg_pupils_data_clean=meg_pupils_data_clean, times=raw.times)
 
-try:
-    # Load pre run saccades and fixation detection
-    print('Loading saccades and fixations detection')
-    results = pd.read_csv(out_folder + out_fname, sep='\t')
-except:
-    #If not pre run data, run
-    print('Running saccades and fixations detection')
+# First fixation delay distribution
+fixations1_fix_screen = fixations.loc[(fixations['screen'].isin(['fix1', 'fix2'])) & (fixations['n_fix'] == 1)]
+plt.hist(fixations1_fix_screen['delay'], bins=15)
+plt.title('1st fixation delay distribution')
+plt.xlabel('Time [s]')
+plt.savefig(plots_path + '1st fix delay dist.png')
 
-    # Define data to save to excel file needed to run the saccades detection program Remodnav
-    eye_data = {'x': meg_gazex_data_clean, 'y': meg_gazey_data_clean}
-    df = pd.DataFrame(eye_data)
 
-    # Remodnav parameters
-    fname = f'eye_data_{subject.subject_id}.csv'
-    screen_size = 38
-    screen_distance = 58
-    screen_resolution = 1920
-    px2deg = math.degrees(math.atan2(.5 * screen_size, screen_distance)) / (.5 * screen_resolution)
-    sfreq = raw.info['sfreq']
+fixations_pupil_s = fixations.loc[(fixations['screen'].isin(['fix1', 'ms', 'fix2'])) & (fixations['n_fix'] == 1)]
 
-    # Save csv file
-    df.to_csv(fname, sep='\t', header=False, index=False)
+pupil_diffs = []
+mss = []
+for trial in response_trials_meg:
+    trial_data = fixations_pupil_s.loc[fixations_pupil_s['trial'] == trial]
 
-    # Run Remodnav not considering pursuit class and min fixations 100 ms
-    command = f'remodnav {fname} {out_fname} {px2deg} {sfreq} --savgol-length {0.0195} --min-pursuit-duration {2} ' \
-              f'--min-fixation-duration {0.1}'
-    os.system(command)
-
-    # Read results file with detections
-    results = pd.read_csv(out_fname, sep='\t')
-
-    # Move eye data, detections file and image to subject results directory
-    os.makedirs(out_folder, exist_ok=True)
-    # Move et data file
-    os.replace(fname, out_folder + fname)
-    # Move results file
-    os.replace(out_fname, out_folder + out_fname)
-    # Move results image
-    out_fname = out_fname.replace('tsv', 'png')
-    os.replace(out_fname, out_folder + out_fname)
-
-# Get saccades and fixations
-saccades = copy.copy(results.loc[results['label'] == 'SACC'])
-fixations = copy.copy(results.loc[results['label'] == 'FIXA'])
-
-# Get mss and target pres/abs from bh data
-mss = bh_data['Nstim'].astype(int)
-pres_abs = bh_data['Tpres'].astype(int)
-corr_ans = bh_data['corr'].astype(int)
-
-# Get MSS, present/absent for every trial
-fix_trial = []
-fix_screen = []
-trial_mss = []
-tgt_pres_abs = []
-trial_correct = []
-
-# Iterate over fixations to classify them
-print('Classifying fixations')
-
-for fix_time in fixations['onset'].values:
-    # find fixation's trial
-    for i, fixation_cross_time in enumerate(fix1_times_meg):
-        if fix_time < fixation_cross_time:
-            i -= 1
-            break
-
-    trial = button_trials_meg[i]
-    trial_idx = trial - 1
-
-    # First fixation cross
-    if fix1_times_meg[i] < fix_time < ms_times_meg[i]:
-        fix_trial.append(trial)
-        fix_screen.append('fix1')
-        trial_mss.append(mss[trial_idx])
-        tgt_pres_abs.append(pres_abs[trial_idx])
-        trial_correct.append(corr_ans[trial_idx])
-
-    # MS
-    elif ms_times_meg[i] < fix_time < fix2_times_meg[i]:
-        fix_trial.append(trial)
-        fix_screen.append('ms')
-        trial_mss.append(mss[trial_idx])
-        tgt_pres_abs.append(pres_abs[trial_idx])
-        trial_correct.append(corr_ans[trial_idx])
-
-    # Second fixations corss
-    elif fix2_times_meg[i] < fix_time < vs_times_meg[i]:
-        fix_trial.append(trial)
-        fix_screen.append('fix2')
-        trial_mss.append(mss[trial_idx])
-        tgt_pres_abs.append(pres_abs[trial_idx])
-        trial_correct.append(corr_ans[trial_idx])
-
-    # VS
-    elif vs_times_meg[i] < fix_time < button_times_meg[i]:
-        fix_trial.append(trial)
-        fix_screen.append('vs')
-        trial_mss.append(mss[trial_idx])
-        tgt_pres_abs.append(pres_abs[trial_idx])
-        trial_correct.append(corr_ans[trial_idx])
-
-    # No trial identified
+    if 'fix1' in trial_data['screen'].values:
+        pupil_diff = trial_data[trial_data['screen'] == 'fix2']['pupil'].values[0] - trial_data[trial_data['screen'] == 'fix1']['pupil'].values[0]
     else:
-        fix_trial.append(None)
-        fix_screen.append(None)
-        trial_mss.append(None)
-        tgt_pres_abs.append(None)
-        trial_correct.append(None)
+        pupil_diff = trial_data[trial_data['screen'] == 'fix2']['pupil'].values[0] - \
+                     trial_data[trial_data['screen'] == 'ms']['pupil'].values[0]
+    pupil_diffs.append(pupil_diff)
+    mss.append(trial_data['mss'].values[0])
 
-fixations['Trial'] = fix_trial
-fixations['Screen'] = fix_screen
-fixations['MSS'] = trial_mss
-fixations['Target'] = tgt_pres_abs
-fixations['Correct'] = trial_correct
-fixations = fixations.astype({'Trial': float, 'MSS': float, 'Target': float})
+plt.plot(mss, pupil_diffs, '.')
+plt.title('1st fixation delay distribution')
+plt.xlabel('MSS')
+plt.ylabel('Pupil size increase (fix point 2 - 1)')
+
 
 
 ## Target vs distractor
@@ -418,12 +117,82 @@ items_pos_type = items_pos_data.dtype  # dtypes of structures are "unsized objec
 #   elements in any particular field. The shape defaults to 2-dimensional.
 # * For convenience make a dictionary of the data using the names from dtypes
 # * Since the structure has only one element, but is 2-D, index it at [0, 0]
+
 ndata = {n: items_pos_data[n] for n in items_pos_type.names}
 # Reconstruct the columns of the data table from just the time series
 # Use the number of intervals to test if a field is a column or metadata
 columns = items_pos_type.names
 # now make a data frame, setting the time stamps as the index
-df = pd.DataFrame(np.concatenate([ndata[c] for c in columns], axis=1), columns=columns)
+items_pos = pd.DataFrame(np.concatenate([ndata[c] for c in columns], axis=1), columns=columns)
+
+for key in items_pos.keys():
+    key_values = [value[0] for value in items_pos[key].values]
+    items_pos[key] = key_values
+
+double_list_keys = list(items_pos.keys())
+remove_keys = ['folder', 'item', 'cmp', 'trialabsent']
+for key in remove_keys:
+    double_list_keys.remove(key)
+
+for key in double_list_keys:
+    key_values = [value[0] for value in items_pos[key].values]
+    items_pos[key] = key_values
+
+
+# iterate over fixations checking for trial number, then check image used, then check in item_pos the position of items and mesure distance
+fixations_vs = fixations.loc[fixations['screen'] == 'vs']
+
+fix_item_distance = []
+fix_target = []
+trial_images = []
+item_images = []
+
+for fix_idx, fix in fixations_vs.iterrows():
+    trial = fix['trial']
+    trial_idx = np.where(np.array(response_trials_meg) == trial)[0]
+
+    fix_x = np.mean([fix['start_x'], fix['end_x']])
+    fix_y = np.mean([fix['start_y'], fix['end_y']])
+
+    trial_image = bh_data['searchimage'][trial_idx].values[0].split('cmp_')[-1].split('.jpg')[0]
+
+    trial_images.append(trial_image)
+
+    # Find item position information for such image
+    trial_items = items_pos.loc[items_pos['folder'] == trial_image]
+    item_images.append(trial_items['folder'])
+
+
+    distances = []
+    targets = []
+    for item_idx, item in trial_items.iterrows():
+
+        item_x = item['center_x']
+        item_y = item['center_y']
+
+        x_dist = abs(fix_x - item_x)
+        y_dist = abs(fix_y - item_y)
+
+        distance = np.sqrt(x_dist**2 + y_dist**2)
+
+        distances.append(distance)
+        targets.append(item['istarget'])
+
+    fixated_item = np.argmin(np.array(distances))
+    item_distance = distances[fixated_item]
+    istarget = targets[fixated_item]
+
+    fix_item_distance.append(item_distance)
+    fix_target.append(istarget)
+
+fixations_vs['distance'] = fix_item_distance
+fixations_vs['fix_target'] = fix_target
+fixations_vs['trial_image'] = trial_images
+fixations_vs['item_image'] = item_images
+
+
+fixations_target = fixations_vs.loc[fixations_vs['fix_target'] == 1]
+
 
 
 
@@ -459,6 +228,9 @@ os.makedirs(preproc_save_path, exist_ok=True)
 preproc_meg_data_fname = f'Subject_{subject.subject_id}_meg.fif'
 raw.save(preproc_save_path + preproc_meg_data_fname)
 print(f'Preprocesed data saved to {preproc_save_path + preproc_meg_data_fname}')
+
+
+
 
 
 
@@ -583,17 +355,19 @@ plt.ylabel('time [s]')
 plt.legend()
 plt.savefig('Good_scale.png')
 
+
 # Scanpaths and screens Trials
 save_fig = True
 plt.ioff()
 time.sleep(1)
 for trial in range(len(raw.annotations.trials)):
     print(f'Trial: {raw.annotations.trials[trial]}')
-    pres_abs_trial = 'Present' if pres_abs[trial] == 1 else 'Absent'
-    correct_trial = 'Correct' if pres_abs[trial] == 1 else 'Incorrect'
+    pres_abs_trial = 'Present' if bh_data['Tpres'].astype(int)[trial] == 1 else 'Absent'
+    correct_trial = 'Correct' if bh_data['corr'].astype(int)[trial] == 1 else 'Incorrect'
+    mss = bh_data['Nstim'][trial]
 
     plt.figure(figsize=(15, 5))
-    plt.title(f'Trial {raw.annotations.trials[trial]} - {pres_abs_trial} - {correct_trial}')
+    plt.title(f'Trial {raw.annotations.trials[trial]} - {pres_abs_trial} - {correct_trial} - MSS: {int(mss)}')
     trial_start_idx = functions.find_nearest(raw.times, raw.annotations.fix1[trial])[0] - 120 * 2
     trial_end_idx = functions.find_nearest(raw.times, raw.annotations.rt[trial])[0] + 120 * 6
 
