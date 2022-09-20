@@ -103,38 +103,55 @@ trial_num = 8
 fixations_t = fixations_vs.loc[fixations_vs['trial'] == trial_num]
 item_pos_t = items_pos.loc[items_pos['folder'] == fixations_t['trial_image'].values[0]]
 
+# Get vs from trial
+vs_start_idx = functions.find_nearest(raw.times, raw.annotations.vs[np.where(raw.annotations.trial==trial_num)[0]])[0]
+vs_end_idx = functions.find_nearest(raw.times, raw.annotations.rt[np.where(raw.annotations.trial==trial_num)[0]])[0]
 
 # Read search image
 img = mpimg.imread(exp_path + 'cmp_' + fixations_t['trial_image'].values[0] + '.jpg')
 
-# Get fixation durations for scatter size
+# Colormap: Get fixation durations for scatter circle size
 sizes = fixations_t['duration']*100
-
 # Define rainwbow cmap for fixations
 cmap = plt.cm.rainbow
-
 # define the bins and normalize
 bounds = np.linspace(0, len(fixations_t['start_x']), len(fixations_t['start_x'])+1)
 norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
 
 # Plot
-fig, axs = plt.subplots(2, gridspec_kw={'height_ratios': [3, 1]})
+fig, axs = plt.subplots(2, gridspec_kw={'height_ratios': [4, 1]}, figsize=(10, 10))
+plt.suptitle(f'Trial {trial_num}')
+
+# Image
 imgplot = axs[0].imshow(img)
-#Plot items
-axs[0].scatter(item_pos_t['center_x'], item_pos_t['center_y'], s=1000, color='grey', alpha=0.3)
+
+# Items circles
+axs[0].scatter(item_pos_t['center_x'], item_pos_t['center_y'], s=1000, color='white', alpha=0.1, zorder=1)
 target = item_pos_t.loc[item_pos_t['istarget'] == 1]
+
+# Target green/red
 if len(target):
-    axs[0].scatter(target['center_x'], target['center_y'], s=1000, color='green', alpha=0.3)
+    axs[0].scatter(target['center_x'], target['center_y'], s=1000, color='green', alpha=0.3, zorder=1)
+# if correct green else red
 
-# Plot fixations
-axs[0].scatter(fixations_t['start_x'] - (1920 - 1280) / 2, fixations_t['start_y'] - (1080 - 1024) / 2, c=fixations_t['n_fix'], s=sizes, cmap=cmap, norm=norm)
-PCM=axs[0].get_children()[2]
-plt.colorbar(PCM, ticks=bounds, ax=axs[0])
+# Scanpath
+axs[0].plot(meg_gazex_data_clean[vs_start_idx:vs_end_idx] - (1920 - 1280) / 2,
+            meg_gazey_data_clean[vs_start_idx:vs_end_idx] - (1080 - 1024) / 2,
+            '--', color='grey', linewidth=0.5, zorder=2)
 
+# Fixations
+axs[0].scatter(fixations_t['start_x'] - (1920 - 1280) / 2, fixations_t['start_y'] - (1080 - 1024) / 2,
+               c=fixations_t['n_fix'], s=sizes, cmap=cmap, norm=norm, zorder=3)
+PCM = axs[0].get_children()[2]
+cb = plt.colorbar(PCM, ticks=bounds, ax=axs[0], shrink=0.91)
+cb.ax.tick_params(labelsize=8)
+cb.set_label('# of fixation')
 
-# Get vs from trial
-vs_start_idx = functions.find_nearest(raw.times, raw.annotations.vs[np.where(raw.annotations.trial==trial_num)[0]])[0]
-vs_end_idx = functions.find_nearest(raw.times, raw.annotations.rt[np.where(raw.annotations.trial==trial_num)[0]])[0]
+# Gaze
+axs[1].plot(raw.times[vs_start_idx:vs_end_idx], meg_gazex_data_clean[vs_start_idx:vs_end_idx], label='X')
+axs[1].plot(raw.times[vs_start_idx:vs_end_idx], meg_gazey_data_clean[vs_start_idx:vs_end_idx], 'black', label='Y')
+axs[1].legend(fontsize=8)
+axs[1].set_ylabel('Gaze')
 
 
 
