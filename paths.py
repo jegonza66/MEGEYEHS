@@ -124,7 +124,7 @@ class paths:
         elif self.name == 'usuario\n': # Liaa Colores
             preproc_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Save/Preprocesed_Data/'
         else:
-            preproc_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/Save/Preprocesed_Data/'
+            preproc_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/Save/Preprocesed_Data/'
 
         # Create directory if it doesn't exist
         os.makedirs(preproc_path, exist_ok=True)
@@ -147,7 +147,7 @@ class paths:
         elif self.name == 'usuario\n': # Liaa Colores
             results_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Results/'
         else:
-            results_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/Results/'
+            results_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/Results/'
 
         # Create directory if it doesn't exist
         os.makedirs(results_path, exist_ok=True)
@@ -169,7 +169,7 @@ class paths:
         elif self.name == 'usuario\n': # Liaa Colores
             plots_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Plots/'
         else:
-            plots_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/Plots/'
+            plots_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/Plots/'
 
         # Create directory if it doesn't exist
         os.makedirs(plots_path, exist_ok=True)
@@ -188,10 +188,30 @@ class paths:
         """
 
         if self.name == 'laptop-5i5qsv76\\joaco\n':
-            item_pos_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/DATA/pos_items_210.mat'
+            item_pos_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/DATA/pos_items_210_target.csv'
         elif self.name == 'usuario\n': # Liaa Colores
-            item_pos_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/DATA/pos_items_210.mat'
+            item_pos_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/DATA/pos_items_210_target.csv'
         else:
-            item_pos_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/DATA/pos_items_210.mat'
+            item_pos_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/DATA/pos_items_210_target.csv'
 
         return item_pos_path
+
+
+    def experiment_path(self):
+        """
+        Paths to the Psychopy experiment directory.
+
+        Returns
+        -------
+        exp_path: str
+            Path in str format to the items positions file.
+        """
+
+        if self.name == 'laptop-5i5qsv76\\joaco\n':
+            exp_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/Psychopy_Experiment/'
+        elif self.name == 'usuario\n': # Liaa Colores
+            exp_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Psychopy_Experiment/'
+        else:
+            exp_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/Psychopy_Experiment/'
+
+        return exp_path

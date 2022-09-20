@@ -2,7 +2,6 @@ import mne
 import os
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import time
 
 from paths import paths
@@ -75,123 +74,102 @@ fixations = preproc_functions.fixation_classification(bh_data=bh_data, fixations
                                                       response_times_meg=response_times_meg,
                                                       meg_pupils_data_clean=meg_pupils_data_clean, times=raw.times)
 
-# First fixation delay distribution
-fixations1_fix_screen = fixations.loc[(fixations['screen'].isin(['fix1', 'fix2'])) & (fixations['n_fix'] == 1)]
-plt.hist(fixations1_fix_screen['delay'], bins=15)
-plt.title('1st fixation delay distribution')
-plt.xlabel('Time [s]')
-plt.savefig(plots_path + '1st fix delay dist.png')
-
-
-fixations_pupil_s = fixations.loc[(fixations['screen'].isin(['fix1', 'ms', 'fix2'])) & (fixations['n_fix'] == 1)]
-
-pupil_diffs = []
-mss = []
-for trial in response_trials_meg:
-    trial_data = fixations_pupil_s.loc[fixations_pupil_s['trial'] == trial]
-
-    if 'fix1' in trial_data['screen'].values:
-        pupil_diff = trial_data[trial_data['screen'] == 'fix2']['pupil'].values[0] - trial_data[trial_data['screen'] == 'fix1']['pupil'].values[0]
-    else:
-        pupil_diff = trial_data[trial_data['screen'] == 'fix2']['pupil'].values[0] - \
-                     trial_data[trial_data['screen'] == 'ms']['pupil'].values[0]
-    pupil_diffs.append(pupil_diff)
-    mss.append(trial_data['mss'].values[0])
-
-plt.plot(mss, pupil_diffs, '.')
-plt.title('1st fixation delay distribution')
-plt.xlabel('MSS')
-plt.ylabel('Pupil size increase (fix point 2 - 1)')
-
-
-
-## Target vs distractor
-import scipy.io
-items_pos = scipy.io.loadmat(items_pos_path)
-items_pos_data = items_pos['pos']
-
-items_pos_type = items_pos_data.dtype  # dtypes of structures are "unsized objects"
-
-# * SciPy reads in structures as structured NumPy arrays of dtype object
-# * The size of the array is the size of the structure array, not the number
-#   elements in any particular field. The shape defaults to 2-dimensional.
-# * For convenience make a dictionary of the data using the names from dtypes
-# * Since the structure has only one element, but is 2-D, index it at [0, 0]
-
-ndata = {n: items_pos_data[n] for n in items_pos_type.names}
-# Reconstruct the columns of the data table from just the time series
-# Use the number of intervals to test if a field is a column or metadata
-columns = items_pos_type.names
-# now make a data frame, setting the time stamps as the index
-items_pos = pd.DataFrame(np.concatenate([ndata[c] for c in columns], axis=1), columns=columns)
-
-for key in items_pos.keys():
-    key_values = [value[0] for value in items_pos[key].values]
-    items_pos[key] = key_values
-
-double_list_keys = list(items_pos.keys())
-remove_keys = ['folder', 'item', 'cmp', 'trialabsent']
-for key in remove_keys:
-    double_list_keys.remove(key)
-
-for key in double_list_keys:
-    key_values = [value[0] for value in items_pos[key].values]
-    items_pos[key] = key_values
-
-
-# iterate over fixations checking for trial number, then check image used, then check in item_pos the position of items and mesure distance
-fixations_vs = fixations.loc[fixations['screen'] == 'vs']
-
-fix_item_distance = []
-fix_target = []
-trial_images = []
-item_images = []
-
-for fix_idx, fix in fixations_vs.iterrows():
-    trial = fix['trial']
-    trial_idx = np.where(np.array(response_trials_meg) == trial)[0]
-
-    fix_x = np.mean([fix['start_x'], fix['end_x']])
-    fix_y = np.mean([fix['start_y'], fix['end_y']])
-
-    trial_image = bh_data['searchimage'][trial_idx].values[0].split('cmp_')[-1].split('.jpg')[0]
-
-    trial_images.append(trial_image)
-
-    # Find item position information for such image
-    trial_items = items_pos.loc[items_pos['folder'] == trial_image]
-    item_images.append(trial_items['folder'])
-
-
-    distances = []
-    targets = []
-    for item_idx, item in trial_items.iterrows():
-
-        item_x = item['center_x']
-        item_y = item['center_y']
-
-        x_dist = abs(fix_x - item_x)
-        y_dist = abs(fix_y - item_y)
-
-        distance = np.sqrt(x_dist**2 + y_dist**2)
-
-        distances.append(distance)
-        targets.append(item['istarget'])
-
-    fixated_item = np.argmin(np.array(distances))
-    item_distance = distances[fixated_item]
-    istarget = targets[fixated_item]
-
-    fix_item_distance.append(item_distance)
-    fix_target.append(istarget)
-
-fixations_vs['distance'] = fix_item_distance
-fixations_vs['fix_target'] = fix_target
-fixations_vs['trial_image'] = trial_images
-fixations_vs['item_image'] = item_images
-
+#---------------- Items classification ----------------#
+fixations_vs, items_pos = preproc_functions.target_vs_distractor(fixations=fixations, items_pos_path=items_pos_path, bh_data=bh_data)
 
 fixations_target = fixations_vs.loc[fixations_vs['fix_target'] == 1]
+
+
+
+
+## Plot image and scanpath
+import matplotlib.image as mpimg
+import matplotlib as mpl
+
+exp_path = paths().experiment_path()
+items_pos.to_csv('pos_items_210_target.csv')
+
+screen_res_x = 1920
+screen_res_y = 1080
+img_res_x = 1280
+img_res_y = 1024
+
+# Get trial
+trial_num = 8
+fixations_t = fixations_vs.loc[fixations_vs['trial'] == trial_num]
+item_pos_t = items_pos.loc[items_pos['folder'] == fixations_t['trial_image'].values[0]]
+
+
+# Read search image
+img = mpimg.imread(exp_path + 'cmp_' + fixations_t['trial_image'].values[0] + '.jpg')
+
+# Get fixation durations for scatter size
+sizes = fixations_t['duration']*100
+
+# Define rainwbow cmap for fixations
+cmap = plt.cm.rainbow
+
+# define the bins and normalize
+bounds = np.linspace(0, len(fixations_t['start_x']), len(fixations_t['start_x'])+1)
+norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+
+# Plot
+plt.figure()
+imgplot = plt.imshow(img)
+
+#Plot items
+plt.scatter(item_pos_t['center_x'], item_pos_t['center_y'], s=1000, color='grey', alpha=0.3)
+target = item_pos_t.loc[item_pos_t['istarget'] == 1]
+if target:
+    plt.scatter(target['center_x'], target['center_y'], s=1000, color='green', alpha=0.3)
+
+# Plot fixations
+plt.scatter(fixations_t['start_x'] - (1920 - 1280) / 2, fixations_t['start_y'] - (1080 - 1024) / 2, c=fixations_t['n_fix'], s=sizes, cmap=cmap, norm=norm)
+plt.colorbar(ticks=bounds)
+
+
+##
+# Scanpaths and screens Trials
+save_fig = True
+plt.ioff()
+time.sleep(1)
+for trial in range(len(raw.annotations.trials)):
+    print(f'Trial: {raw.annotations.trials[trial]}')
+    pres_abs_trial = 'Present' if bh_data['Tpres'].astype(int)[trial] == 1 else 'Absent'
+    correct_trial = 'Correct' if bh_data['corr'].astype(int)[trial] == 1 else 'Incorrect'
+    mss = bh_data['Nstim'][trial]
+
+    plt.figure(figsize=(15, 5))
+    plt.title(f'Trial {raw.annotations.trials[trial]} - {pres_abs_trial} - {correct_trial} - MSS: {int(mss)}')
+    trial_start_idx = functions.find_nearest(raw.times, raw.annotations.fix1[trial])[0] - 120 * 2
+    trial_end_idx = functions.find_nearest(raw.times, raw.annotations.rt[trial])[0] + 120 * 6
+
+    plt.plot(raw.times[trial_start_idx:trial_end_idx], meg_gazex_data_clean[trial_start_idx:trial_end_idx], label='Gaze x')
+    plt.plot(raw.times[trial_start_idx:trial_end_idx], meg_gazey_data_clean[trial_start_idx:trial_end_idx] - 1000, 'black', label='Gaze y')
+    ymin = plt.gca().get_ylim()[0]
+    ymax = plt.gca().get_ylim()[1] + 400
+
+    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.fix1[trial], xmax=raw.annotations.ms[trial], color='grey',
+                alpha=0.4, label='Fix')
+    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.ms[trial], xmax=raw.annotations.fix2[trial], color='red',
+                alpha=0.4, label='MS')
+    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.fix2[trial], xmax=raw.annotations.vs[trial], color='grey',
+                alpha=0.4, label='Fix')
+    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.vs[trial], xmax=raw.annotations.rt[trial], color='green',
+                alpha=0.4, label='VS')
+
+    plt.xlabel('time [s]')
+    plt.ylabel('Gaze')
+    plt.grid()
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    plt.legend(by_label.values(), by_label.keys(), loc='upper right')
+
+    if save_fig:
+        save_path = plots_path + f'Gaze_Trials/{subject.subject_id}/'
+        os.makedirs(save_path, exist_ok=True)
+
+        plt.savefig(save_path + f'Trial {raw.annotations.trials[trial]}.png')
 
 
 
@@ -241,6 +219,34 @@ print(f'Preprocesed data saved to {preproc_save_path + preproc_meg_data_fname}')
 
 
 
+## First fixation delay distribution
+fixations1_fix_screen = fixations.loc[(fixations['screen'].isin(['fix1', 'fix2'])) & (fixations['n_fix'] == 1)]
+plt.hist(fixations1_fix_screen['delay'], bins=15)
+plt.title('1st fixation delay distribution')
+plt.xlabel('Time [s]')
+plt.savefig(plots_path + '1st fix delay dist.png')
+
+
+fixations_pupil_s = fixations.loc[(fixations['screen'].isin(['fix1', 'ms', 'fix2'])) & (fixations['n_fix'] == 1)]
+
+pupil_diffs = []
+mss = []
+for trial in response_trials_meg:
+    trial_data = fixations_pupil_s.loc[fixations_pupil_s['trial'] == trial]
+
+    if 'fix1' in trial_data['screen'].values:
+        pupil_diff = trial_data[trial_data['screen'] == 'fix2']['pupil'].values[0] - trial_data[trial_data['screen'] == 'fix1']['pupil'].values[0]
+    else:
+        pupil_diff = trial_data[trial_data['screen'] == 'fix2']['pupil'].values[0] - \
+                     trial_data[trial_data['screen'] == 'ms']['pupil'].values[0]
+    pupil_diffs.append(pupil_diff)
+    mss.append(trial_data['mss'].values[0])
+
+plt.figure()
+plt.plot(mss, pupil_diffs, '.')
+plt.title('1st fixation delay distribution')
+plt.xlabel('MSS')
+plt.ylabel('Pupil size increase (fix point 2 - 1)')
 
 
 ##---------------- Reescaling based on eyemap matching ----------------#
@@ -340,7 +346,8 @@ plt.legend()
 
 plt.figure()
 plt.title('EDF')
-plt.plot(edf_gazey_data)
+plt.plot(edf_gazex_data, label='EDF')
+plt.plot(meg_gazex_data_clean, label='MEG')
 
 
 ## PLOTS

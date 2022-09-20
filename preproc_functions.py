@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import os
 import math
+import scipy.io
 
 import functions
 from paths import paths
@@ -338,66 +339,67 @@ def fixation_classification(bh_data, fixations, fix1_times_meg, response_trials_
 
     for fix_time in fixations['onset'].values:
         # find fixation's trial
-        for trial_idx, trial_end_time in enumerate(response_times_meg):
+        for response_idx, trial_end_time in enumerate(response_times_meg):
             if fix_time < trial_end_time:
                 break
 
         # Define trial to store screen fixation number
-        trial = response_trials_meg[trial_idx]
+        trial = response_trials_meg[response_idx]
+        trial_idx = trial - 1
         fix_trial.append(trial)
 
         if trial != previous_trial:
             fix_numbers[trial] = {'fix1': 0, 'ms': 0, 'fix2': 0, 'vs': 0}
 
         # First fixation cross
-        if fix1_times_meg[trial_idx] < fix_time < ms_times_meg[trial_idx]:
+        if fix1_times_meg[response_idx] < fix_time < ms_times_meg[response_idx]:
             fix_screen.append('fix1')
             trial_mss.append(mss[trial_idx])
             tgt_pres_abs.append(pres_abs[trial_idx])
             trial_correct.append(corr_ans[trial_idx])
-            fix_delay.append(fix_time - fix1_times_meg[trial_idx])
+            fix_delay.append(fix_time - fix1_times_meg[response_idx])
 
             screen_time_idx = \
-                np.where(np.logical_and(fix1_times_meg[trial_idx] < times, times < ms_times_meg[trial_idx]))[0]
+                np.where(np.logical_and(fix1_times_meg[response_idx] < times, times < ms_times_meg[response_idx]))[0]
             pupil_data_screen = meg_pupils_data_clean[screen_time_idx]
             pupil_size.append(np.nanmean(pupil_data_screen))
 
         # MS
-        elif ms_times_meg[trial_idx] < fix_time < fix2_times_meg[trial_idx]:
+        elif ms_times_meg[response_idx] < fix_time < fix2_times_meg[response_idx]:
             fix_screen.append('ms')
             trial_mss.append(mss[trial_idx])
             tgt_pres_abs.append(pres_abs[trial_idx])
             trial_correct.append(corr_ans[trial_idx])
-            fix_delay.append(fix_time - ms_times_meg[trial_idx])
+            fix_delay.append(fix_time - ms_times_meg[response_idx])
 
             screen_time_idx = \
-                np.where(np.logical_and(ms_times_meg[trial_idx] < times, times < fix2_times_meg[trial_idx]))[0]
+                np.where(np.logical_and(ms_times_meg[response_idx] < times, times < fix2_times_meg[response_idx]))[0]
             pupil_data_screen = meg_pupils_data_clean[screen_time_idx]
             pupil_size.append(np.nanmean(pupil_data_screen))
 
         # Second fixations corss
-        elif fix2_times_meg[trial_idx] < fix_time < vs_times_meg[trial_idx]:
+        elif fix2_times_meg[response_idx] < fix_time < vs_times_meg[response_idx]:
             fix_screen.append('fix2')
             trial_mss.append(mss[trial_idx])
             tgt_pres_abs.append(pres_abs[trial_idx])
             trial_correct.append(corr_ans[trial_idx])
-            fix_delay.append(fix_time - fix2_times_meg[trial_idx])
+            fix_delay.append(fix_time - fix2_times_meg[response_idx])
 
             screen_time_idx = \
-                np.where(np.logical_and(fix2_times_meg[trial_idx] < times, times < vs_times_meg[trial_idx]))[0]
+                np.where(np.logical_and(fix2_times_meg[response_idx] < times, times < vs_times_meg[response_idx]))[0]
             pupil_data_screen = meg_pupils_data_clean[screen_time_idx]
             pupil_size.append(np.nanmean(pupil_data_screen))
 
         # VS
-        elif vs_times_meg[trial_idx] < fix_time < response_times_meg[trial_idx]:
+        elif vs_times_meg[response_idx] < fix_time < response_times_meg[response_idx]:
             fix_screen.append('vs')
             trial_mss.append(mss[trial_idx])
             tgt_pres_abs.append(pres_abs[trial_idx])
             trial_correct.append(corr_ans[trial_idx])
-            fix_delay.append(fix_time - vs_times_meg[trial_idx])
+            fix_delay.append(fix_time - vs_times_meg[response_idx])
 
             screen_time_idx = \
-                np.where(np.logical_and(vs_times_meg[trial_idx] < times, times < response_times_meg[trial_idx]))[0]
+                np.where(np.logical_and(vs_times_meg[response_idx] < times, times < response_times_meg[response_idx]))[0]
             pupil_data_screen = meg_pupils_data_clean[screen_time_idx]
             pupil_size.append(np.nanmean(pupil_data_screen))
 
@@ -428,3 +430,99 @@ def fixation_classification(bh_data, fixations, fix1_times_meg, response_trials_
     fixations = fixations.astype({'trial': float, 'mss': float, 'target_pres': float, 'delay': float, 'n_fix': float, 'pupil': float})
 
     return fixations
+
+
+def target_vs_distractor(fixations, items_pos_path, bh_data):
+
+    print('Classifying target vs distractor')
+    items_pos = pd.read_csv(items_pos_path)
+    # items_pos = scipy.io.loadmat(items_pos_path)
+    # items_pos_data = items_pos['pos']
+    #
+    # items_pos_type = items_pos_data.dtype  # dtypes of structures are "unsized objects"
+    #
+    # # * SciPy reads in structures as structured NumPy arrays of dtype object
+    # # * The size of the array is the size of the structure array, not the number
+    # #   elements in any particular field. The shape defaults to 2-dimensional.
+    # # * For convenience make a dictionary of the data using the names from dtypes
+    # # * Since the structure has only one element, but is 2-D, index it at [0, 0]
+    #
+    # ndata = {n: items_pos_data[n] for n in items_pos_type.names}
+    # # Reconstruct the columns of the data table from just the time series
+    # # Use the number of intervals to test if a field is a column or metadata
+    # columns = items_pos_type.names
+    # # now make a data frame, setting the time stamps as the index
+    # items_pos = pd.DataFrame(np.concatenate([ndata[c] for c in columns], axis=1), columns=columns)
+    #
+    # # Remove values inside list
+    # for key in items_pos.keys():
+    #     key_values = [value[0] for value in items_pos[key].values]
+    #     items_pos[key] = key_values
+    #
+    # # Remove values inside double list
+    # double_list_keys = list(items_pos.keys())
+    # remove_keys = ['folder', 'item', 'cmp', 'trialabsent']
+    # for key in remove_keys:
+    #     double_list_keys.remove(key)
+    #
+    # for key in double_list_keys:
+    #     key_values = [value[0] for value in items_pos[key].values]
+    #     items_pos[key] = key_values
+
+    # Rescale images from original resolution to screen resolution to match fixations scale
+    screen_res_x = 1920
+    screen_res_y = 1080
+    img_res_x = 1280
+    img_res_y = 1024
+
+    items_pos['pos_x_corr'] = items_pos['pos_x'] + (screen_res_x - img_res_x) / 2
+    items_pos['center_x_corr'] = items_pos['center_x'] + (screen_res_x - img_res_x) / 2
+    items_pos['pos_y_corr'] = items_pos['pos_y'] + (screen_res_y - img_res_y) / 2
+    items_pos['center_y_corr'] = items_pos['center_y'] + (screen_res_y - img_res_y) / 2
+
+    # iterate over fixations checking for trial number, then check image used, then check in item_pos the position of items and mesure distance
+    fixations_vs = fixations.loc[fixations['screen'] == 'vs']
+
+    fix_item_distance = []
+    fix_target = []
+    trials_image = []
+
+    for fix_idx, fix in fixations_vs.iterrows():
+        trial = fix['trial']
+        trial_idx = trial - 1
+
+        fix_x = np.mean([fix['start_x'], fix['end_x']])
+        fix_y = np.mean([fix['start_y'], fix['end_y']])
+
+        trial_image = bh_data['searchimage'][trial_idx].split('cmp_')[-1].split('.jpg')[0]
+
+        trials_image.append(trial_image)
+        # Find item position information for such image
+        trial_items = items_pos.loc[items_pos['folder'] == trial_image]
+
+        distances = []
+        targets = []
+        for item_idx, item in trial_items.iterrows():
+            item_x = item['center_x_corr']
+            item_y = item['center_y_corr']
+
+            x_dist = abs(fix_x - item_x)
+            y_dist = abs(fix_y - item_y)
+
+            distance = np.sqrt(x_dist ** 2 + y_dist ** 2)
+
+            distances.append(distance)
+            targets.append(item['istarget'])
+
+        fixated_item = np.argmin(np.array(distances))
+        item_distance = distances[fixated_item]
+        istarget = targets[fixated_item]
+
+        fix_item_distance.append(item_distance)
+        fix_target.append(istarget)
+
+    fixations_vs['distance'] = fix_item_distance
+    fixations_vs['fix_target'] = fix_target
+    fixations_vs['trial_image'] = trials_image
+
+    return fixations_vs, items_pos
