@@ -244,7 +244,7 @@ def define_events_trials(raw, subject):
                 no_answer.append(block_num * block_trials + trial)
 
     # Save clean events to MEG data
-    raw.annotations.trials = np.array(response_trials_meg)
+    raw.annotations.trial = np.array(response_trials_meg)
     raw.annotations.fix1 = np.array(fix1_times_meg)
     raw.annotations.ms = np.array(ms_times_meg)
     raw.annotations.fix2 = np.array(fix2_times_meg)

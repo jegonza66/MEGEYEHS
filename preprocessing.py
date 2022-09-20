@@ -79,6 +79,11 @@ fixations_vs, items_pos = preproc_functions.target_vs_distractor(fixations=fixat
 
 fixations_target = fixations_vs.loc[fixations_vs['fix_target'] == 1]
 
+# Agregar numero de item en fijaciones ademas de tgt no tgt
+
+
+
+
 
 
 
@@ -87,7 +92,6 @@ import matplotlib.image as mpimg
 import matplotlib as mpl
 
 exp_path = paths().experiment_path()
-items_pos.to_csv('pos_items_210_target.csv')
 
 screen_res_x = 1920
 screen_res_y = 1080
@@ -114,18 +118,24 @@ bounds = np.linspace(0, len(fixations_t['start_x']), len(fixations_t['start_x'])
 norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
 
 # Plot
-plt.figure()
-imgplot = plt.imshow(img)
-
+fig, axs = plt.subplots(2, gridspec_kw={'height_ratios': [3, 1]})
+imgplot = axs[0].imshow(img)
 #Plot items
-plt.scatter(item_pos_t['center_x'], item_pos_t['center_y'], s=1000, color='grey', alpha=0.3)
+axs[0].scatter(item_pos_t['center_x'], item_pos_t['center_y'], s=1000, color='grey', alpha=0.3)
 target = item_pos_t.loc[item_pos_t['istarget'] == 1]
-if target:
-    plt.scatter(target['center_x'], target['center_y'], s=1000, color='green', alpha=0.3)
+if len(target):
+    axs[0].scatter(target['center_x'], target['center_y'], s=1000, color='green', alpha=0.3)
 
 # Plot fixations
-plt.scatter(fixations_t['start_x'] - (1920 - 1280) / 2, fixations_t['start_y'] - (1080 - 1024) / 2, c=fixations_t['n_fix'], s=sizes, cmap=cmap, norm=norm)
-plt.colorbar(ticks=bounds)
+axs[0].scatter(fixations_t['start_x'] - (1920 - 1280) / 2, fixations_t['start_y'] - (1080 - 1024) / 2, c=fixations_t['n_fix'], s=sizes, cmap=cmap, norm=norm)
+PCM=axs[0].get_children()[2]
+plt.colorbar(PCM, ticks=bounds, ax=axs[0])
+
+
+# Get vs from trial
+vs_start_idx = functions.find_nearest(raw.times, raw.annotations.vs[np.where(raw.annotations.trial==trial_num)[0]])[0]
+vs_end_idx = functions.find_nearest(raw.times, raw.annotations.rt[np.where(raw.annotations.trial==trial_num)[0]])[0]
+
 
 
 ##
@@ -173,7 +183,6 @@ for trial in range(len(raw.annotations.trials)):
 
 
 
-
 ##---------------- Save scaled data to meg data ----------------#
 
 print('Saving scaled et data to meg raw data structure')
@@ -208,6 +217,9 @@ raw.save(preproc_save_path + preproc_meg_data_fname)
 print(f'Preprocesed data saved to {preproc_save_path + preproc_meg_data_fname}')
 
 
+# evt = mne.events_from_annotations(raw)
+
+
 
 
 
@@ -221,7 +233,7 @@ print(f'Preprocesed data saved to {preproc_save_path + preproc_meg_data_fname}')
 
 ## First fixation delay distribution
 fixations1_fix_screen = fixations.loc[(fixations['screen'].isin(['fix1', 'fix2'])) & (fixations['n_fix'] == 1)]
-plt.hist(fixations1_fix_screen['delay'], bins=15)
+plt.hist(fixations1_fix_screen['delay'], bins=40)
 plt.title('1st fixation delay distribution')
 plt.xlabel('Time [s]')
 plt.savefig(plots_path + '1st fix delay dist.png')
@@ -242,8 +254,9 @@ for trial in response_trials_meg:
     pupil_diffs.append(pupil_diff)
     mss.append(trial_data['mss'].values[0])
 
+import seaborn as sn
 plt.figure()
-plt.plot(mss, pupil_diffs, '.')
+sn.boxplot(mss, pupil_diffs)
 plt.title('1st fixation delay distribution')
 plt.xlabel('MSS')
 plt.ylabel('Pupil size increase (fix point 2 - 1)')
