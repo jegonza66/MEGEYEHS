@@ -52,7 +52,7 @@ class paths:
         return et_path
 
 
-    def beh_path(self):
+    def bh_path(self):
         """
         Paths to participants behavioural data.
 
@@ -63,12 +63,12 @@ class paths:
         """
 
         if self.name == 'laptop-5i5qsv76\\joaco\n':
-            beh_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/DATA/BH_DATA/'
+            bh_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/DATA/BH_DATA/'
         elif self.name == 'usuario\n': # Liaa Colores
-            beh_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/DATA/BH_DATA/'
+            bh_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/DATA/BH_DATA/'
         else:
-            beh_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/DATA/BH_DATA/'
-        return beh_path
+            bh_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/DATA/BH_DATA/'
+        return bh_path
 
 
     def mri_path(self):

@@ -38,16 +38,19 @@ class subject:
         # Define ctf data path and files path
         self.ctf_path = paths().ctf_path()
         self.et_path = paths().et_path()
-        self.beh_path = paths().beh_path()
+        self.bh_path = paths().bh_path()
         self.mri_path = paths().mri_path()
         self.opt_path = paths().opt_path()
 
         # Select subject
-        subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', 'BACK_NOISE']
+        subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001', '16200001',
+                        '16201001', '16256001', '09991040', '10925091', 'BACK_NOISE']
         # Subjects bad channels
-        subjects_bad_channels = [['MLT11-4123', 'MLT21-4123'], [], [], [], [], [], []]
+        subjects_bad_channels = [['MLT11-4123', 'MLT21-4123'], [], [], [], [], [], [], [], [], [], [], [], []]
         # Subjects groups
-        subjects_groups = ['Balanced', 'Balanced', 'Balanced', 'Counter-balanced', 'Balanced', 'Counter-balanced' 'X']
+        subjects_groups = ['Balanced', 'Balanced', 'Balanced', 'Counterbalanced', 'Balanced', 'Counterbalanced',
+                           'Balanced', 'Balanced', 'Balanced', 'Counterbalanced', 'Counterbalanced', 'Counterbalanced',
+                           'X']
 
         # Select 1st subject by default
         if subject == None:
@@ -70,7 +73,7 @@ class subject:
         # Mapping between button value and color
         if self.group == 'Balanced':
             self.map = {'blue': '1', 'red': '4'}
-        elif self.group == 'Counter-balanced':
+        elif self.group == 'Counterbalanced':
             self.map = {'blue': '4', 'red': '1'}
 
 
@@ -210,15 +213,15 @@ class subject:
 
 
     # Behavioural data
-    def beh_data(self):
+    def bh_data(self):
         """
         Behavioural data for parent subject as pandas DataFrames.
         """
         # Get subject path
-        subj_path = pathlib.Path(os.path.join(self.beh_path, self.subject_id))
-        beh_file = list(subj_path.glob('*{}*[!ORIGINAL].csv'.format(self.subject_id)))[0]
+        subj_path = pathlib.Path(os.path.join(self.bh_path, self.subject_id))
+        bh_file = list(subj_path.glob('*.csv'.format(self.subject_id)))[0]
 
         # Load DataFrame
-        df = pd.read_csv(beh_file)
+        df = pd.read_csv(bh_file)
 
         return df

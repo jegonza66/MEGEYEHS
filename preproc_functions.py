@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import os
 import math
-import scipy.io
 
 import functions
 from paths import paths
@@ -153,7 +152,7 @@ def define_events_trials(raw, subject):
     blocks_bounds = [(blocks_start_end[i] + 1, blocks_start_end[i + 1]) for i in range(len(blocks_start_end) - 1)]
 
     # Load behavioural data
-    bh_data = subject.beh_data()
+    bh_data = subject.bh_data()
     # Get only trial data rows
     bh_data = bh_data.loc[~pd.isna(bh_data['target.started'])].reset_index(drop=True)
     # Get MS start time
@@ -264,8 +263,8 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
     if not force_run:
         try:
             # Load pre run saccades and fixation detection
-            print('Loading saccades and fixations detection')
             results = pd.read_csv(out_folder + out_fname, sep='\t')
+            print('Detected saccades and fixations loaded')
         except:
             force_run = True
 
@@ -316,7 +315,7 @@ def fixation_classification(bh_data, fixations, fix1_times_meg, response_trials_
     # Get mss and target pres/abs from bh data
     mss = bh_data['Nstim'].astype(int)
     pres_abs = bh_data['Tpres'].astype(int)
-    corr_ans = bh_data['corr'].astype(int)
+    corr_ans = bh_data['key_resp.corr'].astype(int)
 
     # Get MSS, present/absent for every trial
     fix_trial = []
@@ -419,110 +418,102 @@ def fixation_classification(bh_data, fixations, fix1_times_meg, response_trials_
 
         previous_trial = trial
 
+    fixations['pupil'] = pupil_size
     fixations['trial'] = fix_trial
-    fixations['screen'] = fix_screen
     fixations['mss'] = trial_mss
+    fixations['screen'] = fix_screen
     fixations['target_pres'] = tgt_pres_abs
     fixations['correct'] = trial_correct
-    fixations['delay'] = fix_delay
     fixations['n_fix'] = n_fixs
-    fixations['pupil'] = pupil_size
+    fixations['time'] = fix_delay
+
     fixations = fixations.astype({'trial': float, 'mss': float, 'target_pres': float, 'delay': float, 'n_fix': float, 'pupil': float})
 
     return fixations
 
 
-def target_vs_distractor(fixations, items_pos_path, bh_data):
+def target_vs_distractor(fixations, bh_data, distance_threshold=100, screen_res_x=1920, screen_res_y=1080,
+                         img_res_x=1280, img_res_y=1024):
 
-    print('Classifying target vs distractor')
+    print('Identifying fixated items')
+
+    # Load items data
+    items_pos_path = paths().item_pos_path()
     items_pos = pd.read_csv(items_pos_path)
-    # items_pos = scipy.io.loadmat(items_pos_path)
-    # items_pos_data = items_pos['pos']
-    #
-    # items_pos_type = items_pos_data.dtype  # dtypes of structures are "unsized objects"
-    #
-    # # * SciPy reads in structures as structured NumPy arrays of dtype object
-    # # * The size of the array is the size of the structure array, not the number
-    # #   elements in any particular field. The shape defaults to 2-dimensional.
-    # # * For convenience make a dictionary of the data using the names from dtypes
-    # # * Since the structure has only one element, but is 2-D, index it at [0, 0]
-    #
-    # ndata = {n: items_pos_data[n] for n in items_pos_type.names}
-    # # Reconstruct the columns of the data table from just the time series
-    # # Use the number of intervals to test if a field is a column or metadata
-    # columns = items_pos_type.names
-    # # now make a data frame, setting the time stamps as the index
-    # items_pos = pd.DataFrame(np.concatenate([ndata[c] for c in columns], axis=1), columns=columns)
-    #
-    # # Remove values inside list
-    # for key in items_pos.keys():
-    #     key_values = [value[0] for value in items_pos[key].values]
-    #     items_pos[key] = key_values
-    #
-    # # Remove values inside double list
-    # double_list_keys = list(items_pos.keys())
-    # remove_keys = ['folder', 'item', 'cmp', 'trialabsent']
-    # for key in remove_keys:
-    #     double_list_keys.remove(key)
-    #
-    # for key in double_list_keys:
-    #     key_values = [value[0] for value in items_pos[key].values]
-    #     items_pos[key] = key_values
 
     # Rescale images from original resolution to screen resolution to match fixations scale
-    screen_res_x = 1920
-    screen_res_y = 1080
-    img_res_x = 1280
-    img_res_y = 1024
-
     items_pos['pos_x_corr'] = items_pos['pos_x'] + (screen_res_x - img_res_x) / 2
     items_pos['center_x_corr'] = items_pos['center_x'] + (screen_res_x - img_res_x) / 2
     items_pos['pos_y_corr'] = items_pos['pos_y'] + (screen_res_y - img_res_y) / 2
     items_pos['center_y_corr'] = items_pos['center_y'] + (screen_res_y - img_res_y) / 2
 
     # iterate over fixations checking for trial number, then check image used, then check in item_pos the position of items and mesure distance
-    fixations_vs = fixations.loc[fixations['screen'] == 'vs']
+    fixations_vs = copy.copy(fixations.loc[fixations['screen'] == 'vs'])
 
+    # Define save data variables
+    items = []
     fix_item_distance = []
     fix_target = []
     trials_image = []
 
+     # Iterate over fixations
     for fix_idx, fix in fixations_vs.iterrows():
+
+        # Get fixation trial
         trial = fix['trial']
         trial_idx = trial - 1
 
+        # Get fixations x and y
         fix_x = np.mean([fix['start_x'], fix['end_x']])
         fix_y = np.mean([fix['start_y'], fix['end_y']])
 
+        # Get trial image
         trial_image = bh_data['searchimage'][trial_idx].split('cmp_')[-1].split('.jpg')[0]
-
         trials_image.append(trial_image)
+
         # Find item position information for such image
         trial_items = items_pos.loc[items_pos['folder'] == trial_image]
 
+        # Define trial save variables
         distances = []
-        targets = []
+        target = []
+
+        # Iterate over trial items
         for item_idx, item in trial_items.iterrows():
+            # Item position
             item_x = item['center_x_corr']
             item_y = item['center_y_corr']
 
+            # Fixations to item distance
             x_dist = abs(fix_x - item_x)
             y_dist = abs(fix_y - item_y)
-
             distance = np.sqrt(x_dist ** 2 + y_dist ** 2)
 
             distances.append(distance)
-            targets.append(item['istarget'])
+            target.append(item['istarget'])
 
-        fixated_item = np.argmin(np.array(distances))
-        item_distance = distances[fixated_item]
-        istarget = targets[fixated_item]
+        # Closest item to fixation
+        min_distance = np.min(np.array(distances))
+        min_distance_idx = np.argmin(np.array(distances))
 
+        if min_distance < distance_threshold:
+            item = min_distance_idx
+            item_distance = min_distance
+            istarget = target[min_distance_idx]
+        else:
+            item = None
+            item_distance = None
+            istarget = None
+
+        # Save trial data
+        items.append(item)
         fix_item_distance.append(item_distance)
         fix_target.append(istarget)
 
-    fixations_vs['distance'] = fix_item_distance
+    # Save to fixations_vs df
+    fixations_vs['item'] = items
     fixations_vs['fix_target'] = fix_target
+    fixations_vs['distance'] = fix_item_distance
     fixations_vs['trial_image'] = trials_image
 
     return fixations_vs, items_pos
