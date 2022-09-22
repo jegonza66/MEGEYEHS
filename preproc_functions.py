@@ -133,6 +133,7 @@ def fake_blink_interpolate(meg_gazex_data_clean, meg_gazey_data_clean, meg_pupil
 
 def define_events_trials(raw, subject):
     print('Detecting events and defining trials')
+
     # Get events in meg data (only red blue and green)
     evt_buttons = raw.annotations.description
     evt_times = raw.annotations.onset[(evt_buttons == 'red') | (evt_buttons == 'blue') | (evt_buttons == 'green')]
@@ -147,40 +148,55 @@ def define_events_trials(raw, subject):
 
     # Split events into blocks by green press at begening of block
     blocks_start_end = np.where(evt_buttons == 'green')[0]
+
+    # Add first trial idx (0) on first sample (0) and Add last trial idx in the end
+    blocks_start_end = np.concatenate((np.array([-1]), blocks_start_end, np.array([len(evt_buttons)])))
+
     # Delete succesive presses of green
-    blocks_start_end = list(np.delete(blocks_start_end, np.where(np.diff(blocks_start_end) < 2)))
-    # Add first trial idx (0) on first sample (0), as we're gonna
-    blocks_start_end.insert(0, -1)
-    # Add las trial idx
-    blocks_start_end.append(len(evt_buttons))
+    blocks_start_end = list(np.delete(blocks_start_end, np.where(np.diff(blocks_start_end) < 2)).astype(int))
+
     # Define starting and ending trial of each block
     blocks_bounds = [(blocks_start_end[i] + 1, blocks_start_end[i + 1]) for i in range(len(blocks_start_end) - 1)]
 
     # Load behavioural data
     bh_data = subject.bh_data()
+
     # Get only trial data rows
     bh_data = bh_data.loc[~pd.isna(bh_data['target.started'])].reset_index(drop=True)
+
     # Get MS start time
     ms_start = bh_data['target.started'].values.ravel().astype(float)
+
     # Get fix 1 start time
     fix1_start_key_idx = ['fixation_target.' in key and 'started' in key for key in bh_data.keys()]
-    fix1_start_key = bh_data.keys()[fix1_start_key_idx]
+    fix1_start_key = bh_data.keys()[fix1_start_key_idx][0]
+
     # If there's a missing fix1 screen, the time for that screen would be None, and the column type would be string.
     # If there's not, the type would be float. Change type to string and replace None by the mss screen start time
-    fix1_start = np.array([value.replace('None', f'{ms_start[i]}') for i, value in
-                           enumerate(bh_data[fix1_start_key].astype(str).values.ravel())]).astype(float)
+    if type(bh_data[fix1_start_key][0]) == str:
+        fix1_start = np.array([value.replace('None', f'{ms_start[i]}') for i, value in
+                               enumerate(bh_data[fix1_start_key].values.ravel())]).astype(float)
+    else:
+        fix1_start = bh_data[fix1_start_key].values
+
     # Get fix 2 start time
     fix2_start_key_idx = ['fixation_target_2' in key and 'started' in key for key in bh_data.keys()]
     fix2_start_key = bh_data.keys()[fix2_start_key_idx]
     fix2_start = bh_data[fix2_start_key].values.ravel().astype(float)
+
     # Get Visual search start time
     search_start_key_idx = ['search' in key and 'started' in key for key in bh_data.keys()]
     search_start_key = bh_data.keys()[search_start_key_idx]
     search_start = bh_data[search_start_key].values.ravel().astype(float)
-    # Get response time
-    rt = np.array([value.replace('[]', 'nan') for value in bh_data['key_resp.rt'].astype(str).values]).astype(float)
-    # Get response
+
+    # Get responses
     responses = bh_data['key_resp.keys'].values
+
+    # Get response time
+    rt = copy.copy(bh_data['key_resp.rt'].values)
+    # completed_responses_idx = np.where(pd.isna(bh_data['key_resp.rt']) & (responses != 'None'))[0]
+    # rt.loc[completed_responses_idx] = 10
+    # rt = rt.values
 
     # Define variables to store data
     no_answer = []
@@ -191,6 +207,7 @@ def define_events_trials(raw, subject):
     buttons_meg = []
     response_times_meg = []
     response_trials_meg = []
+    time_differences = []
 
     # Define trials block by block
     for block_num, block_bounds in enumerate(blocks_bounds):
@@ -198,56 +215,119 @@ def define_events_trials(raw, subject):
         block_start = block_bounds[0]
         block_end = block_bounds[1]
         block_trials = 30
+        block_idxs = np.arange(block_num * block_trials, (block_num + 1) * block_trials)
 
         # Get events in block from MEG data
         meg_evt_block_times = copy.copy(evt_times[block_start:block_end])
         meg_evt_block_buttons = copy.copy(evt_buttons[block_start:block_end])
 
-        # Get events in block from BH data
-        bh_evt_block_times = (search_start + rt)[block_num * block_trials:(block_num + 1) * block_trials]
-        responses_block = responses[block_num * block_trials:(block_num + 1) * block_trials]
-
         # Get durations in block from BH data
-        fix1_block_dur = (ms_start - fix1_start)[block_num * block_trials:(block_num + 1) * block_trials]
-        ms_block_dur = (fix2_start - ms_start)[block_num * block_trials:(block_num + 1) * block_trials]
-        fix2_block_dur = (search_start - fix2_start)[block_num * block_trials:(block_num + 1) * block_trials]
-        rt_block_times = rt[block_num * block_trials:(block_num + 1) * block_trials]
+        fix1_block_dur = (ms_start - fix1_start)[block_idxs]
+        ms_block_dur = (fix2_start - ms_start)[block_idxs]
+        fix2_block_dur = (search_start - fix2_start)[block_idxs]
+        rt_block_times = rt[block_idxs]
 
         # Align MEG and BH data in time
-        time_diff = search_start[block_num * block_trials] + rt[block_num * block_trials] - meg_evt_block_times[0]
-        bh_evt_block_times -= time_diff
+        block_data_aligned = False
+        attempts = 0
+        align_sample = 0
+        while not block_data_aligned and attempts < 3:
+            # Save block variables resetting them every attempt
+            no_answer_block = []
+            fix1_times_meg_block = []
+            ms_times_meg_block = []
+            fix2_times_meg_block = []
+            vs_times_meg_block = []
+            buttons_meg_block = []
+            response_times_meg_block = []
+            response_trials_meg_block = []
+            time_diff_block = []
 
-        # Iterate over trials
-        for trial in range(block_trials):
-            if not np.isnan(bh_evt_block_times[trial]):
-                idx, meg_evt_time = functions.find_nearest(meg_evt_block_times, bh_evt_block_times[trial])
+            try:
+                # Get events in block from BH data
+                bh_evt_block_times = (search_start + rt)[block_idxs]
+                responses_block = responses[block_idxs]
 
-                trial_search_time = meg_evt_time - rt_block_times[trial]
-                vs_times_meg.append(trial_search_time)
+                # Realign bh and meg block timelines
+                block_time_realign = search_start[block_num*block_trials] + rt[block_num*block_trials] - meg_evt_block_times[align_sample]
+                bh_evt_block_times = bh_evt_block_times - block_time_realign
 
-                trial_fix2_times = trial_search_time - fix2_block_dur[trial]
-                fix2_times_meg.append(trial_fix2_times)
+                # Iterate over trials
+                for trial in range(block_trials):
+                    if not np.isnan(bh_evt_block_times[trial]):
+                        idx, meg_evt_time = functions.find_nearest(meg_evt_block_times, bh_evt_block_times[trial])
 
-                trial_ms_time = trial_fix2_times - ms_block_dur[trial]
-                ms_times_meg.append(trial_ms_time)
+                        # Esto esta mal, en los trials en los que complete la respuesta a mano, puse un rt de 10 s,
+                        # entonces estoy asumiendo que la vs screen empezó 10 antes del evento del MEG (Falso)
+                        trial_search_time = meg_evt_time - rt_block_times[trial]
+                        vs_times_meg_block.append(trial_search_time)
 
-                trial_fix1_time = trial_ms_time - fix1_block_dur[trial]
-                fix1_times_meg.append(trial_fix1_time)
+                        trial_fix2_times = trial_search_time - fix2_block_dur[trial]
+                        fix2_times_meg_block.append(trial_fix2_times)
 
-                buttons_meg.append((meg_evt_block_buttons[idx]))
-                response_times_meg.append(meg_evt_time)
-                response_trials_meg.append(int(block_num * block_trials + trial + 1))
+                        trial_ms_time = trial_fix2_times - ms_block_dur[trial]
+                        ms_times_meg_block.append(trial_ms_time)
 
-                if (meg_evt_block_buttons[idx] == 'blue' and int(responses_block[trial]) != int(subject.map['blue'])) or (
-                        meg_evt_block_buttons[idx] == 'red' and int(responses_block[trial]) != int(subject.map['red'])):
-                    raise ValueError(f'Different answer in MEG and BH data in trial: {trial}')
+                        trial_fix1_time = trial_ms_time - fix1_block_dur[trial]
+                        fix1_times_meg_block.append(trial_fix1_time)
 
-                if abs(meg_evt_time - bh_evt_block_times[trial]) > 0.05:
-                    print(f'Over 50ms difference in Trial: {trial}')
+                        buttons_meg_block.append((meg_evt_block_buttons[idx]))
+                        response_times_meg_block.append(meg_evt_time)
+                        response_trials_meg_block.append(int(block_num * block_trials + trial + 1))
 
-            else:
-                print(f'No answer in Trial: {trial}')
-                no_answer.append(block_num * block_trials + trial)
+                        time_diff = abs(meg_evt_time - bh_evt_block_times[trial])
+                        time_diff_block.append(time_diff)
+
+                        if (meg_evt_block_buttons[idx] == 'blue' and int(responses_block[trial]) != int(subject.map['blue'])) or (
+                                meg_evt_block_buttons[idx] == 'red' and int(responses_block[trial]) != int(subject.map['red'])):
+                            print(f'Different answer in MEG and BH data in trial: {trial}\n'
+                                  f'Discarding and realingning on following sample\n')
+                            raise ValueError(f'Different answer in MEG and BH data in trial: {trial}')
+
+                        if time_diff > 0.02:# and block_num * block_trials + trial not in completed_responses_idx:
+                            print(f'{round(abs(meg_evt_time - bh_evt_block_times[trial])*1000,1)} ms difference in Trial: {trial}')
+
+                    else:
+                        print(f'No answer in Trial: {trial}')
+                        no_answer_block.append(block_num * block_trials + trial)
+
+                # Define variable of not completed responses times to assess the real time difference
+                # (completed responses might artificially increase this value)
+                # real_time_diff = [element for trial, element in zip(block_idxs, time_diff_block) if trial not in completed_responses_idx]
+                # if np.mean(real_time_diff) > 0.2:
+                if np.mean(time_diff_block) > 0.2:
+                    print(f'Average time difference for this block: {np.mean(time_diff_block)} s\n'
+                          f'Discarding and realingning on following sample\n')
+                    raise ValueError(f'Average time difference for this block over 200 ms')
+
+                else:
+                    block_data_aligned = True
+                    # Append block data to overall data
+                    no_answer.append(no_answer_block)
+                    fix1_times_meg.append(fix1_times_meg_block)
+                    ms_times_meg.append(ms_times_meg_block)
+                    fix2_times_meg.append(fix2_times_meg_block)
+                    vs_times_meg.append(vs_times_meg_block)
+                    buttons_meg.append(buttons_meg_block)
+                    response_times_meg.append(response_times_meg_block)
+                    response_trials_meg.append(response_trials_meg_block)
+                    time_differences.append(time_diff_block)
+            except:
+                align_sample += 1
+                attempts += 1
+
+        if not block_data_aligned:
+            raise ValueError(f'Could not align MEG and BH responses in block {block_num + 1}')
+
+    # flatten variables over blocks
+    response_trials_meg = functions.flatten_list(response_trials_meg)
+    fix1_times_meg = functions.flatten_list(fix1_times_meg)
+    ms_times_meg = functions.flatten_list(ms_times_meg)
+    fix2_times_meg = functions.flatten_list(fix2_times_meg)
+    vs_times_meg = functions.flatten_list(vs_times_meg)
+    buttons_meg = functions.flatten_list(buttons_meg)
+    response_times_meg = functions.flatten_list(response_times_meg)
+    time_differences = functions.flatten_list(time_differences)
 
     # Save clean events to MEG data
     raw.annotations.trial = np.array(response_trials_meg)
@@ -257,8 +337,9 @@ def define_events_trials(raw, subject):
     raw.annotations.vs = np.array(vs_times_meg)
     raw.annotations.buttons = np.array(buttons_meg)
     raw.annotations.rt = np.array(response_times_meg)
+    raw.annotations.time_differences = np.array(time_differences)
 
-    return bh_data, response_trials_meg, fix1_times_meg, ms_times_meg, fix2_times_meg, vs_times_meg, buttons_meg, response_times_meg
+    return bh_data, raw
 
 
 def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean, subject, screen_size=38,
@@ -316,8 +397,15 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
     return fixations, saccades
 
 
-def fixation_classification(bh_data, fixations, fix1_times_meg, response_trials_meg, ms_times_meg, fix2_times_meg,
-                            vs_times_meg, response_times_meg, meg_pupils_data_clean, times):
+def fixation_classification(bh_data, fixations, raw, meg_pupils_data_clean):
+
+    fix1_times_meg = raw.annotations.fix1
+    response_trials_meg = raw.annotations.trial
+    ms_times_meg = raw.annotations.ms
+    fix2_times_meg = raw.annotations.fix2
+    vs_times_meg = raw.annotations.vs
+    response_times_meg = raw.annotations.rt
+    times = raw.times
 
     # Get mss and target pres/abs from bh data
     mss = bh_data['Nstim'].astype(int)
@@ -333,8 +421,6 @@ def fixation_classification(bh_data, fixations, fix1_times_meg, response_trials_
     n_fixs = []
     fix_delay = []
     pupil_size = []
-
-    # Agregar proemdio de tamaño de pupila en c fijacion
 
     # Iterate over fixations to classify them
     print('Classifying fixations')
@@ -434,7 +520,7 @@ def fixation_classification(bh_data, fixations, fix1_times_meg, response_trials_
     fixations['n_fix'] = n_fixs
     fixations['time'] = fix_delay
 
-    fixations = fixations.astype({'trial': float, 'mss': float, 'target_pres': float, 'delay': float, 'n_fix': float, 'pupil': float})
+    fixations = fixations.astype({'trial': float, 'mss': float, 'target_pres': float, 'time': float, 'n_fix': float, 'pupil': float})
 
     return fixations
 

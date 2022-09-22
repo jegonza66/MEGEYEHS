@@ -79,3 +79,8 @@ def first_trial(evt_buttons):
     for i, button in enumerate(evt_buttons):
         if button != 'green':
             return i
+
+
+def flatten_list(ls):
+    flat_list = [element for sublist in ls for element in sublist]
+    return flat_list

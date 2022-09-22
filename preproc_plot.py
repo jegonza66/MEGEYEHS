@@ -149,8 +149,7 @@ def scaled_signals(time, scaled_signals, reference_signals, interval_signal=None
 
 def scanpath(fixations_vs, items_pos, bh_data, raw, gazex, gazey, subject, trial,
              screen_res_x=1920, screen_res_y=1080, img_res_x=1280, img_res_y=1024, display_fig=False, save=True):
-
-    print(f'\rTrial {trial}', end='')
+    plt.clf()
     plt.close('all')
 
     # Path to psychopy data
@@ -161,10 +160,8 @@ def scanpath(fixations_vs, items_pos, bh_data, raw, gazex, gazey, subject, trial
     item_pos_t = items_pos.loc[items_pos['folder'] == fixations_t['trial_image'].values[0]]
 
     # Get vs from trial
-    vs_start_idx = \
-    functions.find_nearest(raw.times, raw.annotations.vs[np.where(raw.annotations.trial == trial)[0]])[0]
-    vs_end_idx = functions.find_nearest(raw.times, raw.annotations.rt[np.where(raw.annotations.trial == trial)[0]])[
-        0]
+    vs_start_idx = functions.find_nearest(raw.times, raw.annotations.vs[np.where(raw.annotations.trial == trial)[0]])[0]
+    vs_end_idx = functions.find_nearest(raw.times, raw.annotations.rt[np.where(raw.annotations.trial == trial)[0]])[0]
 
     # Load search image
     img = mpimg.imread(exp_path + 'cmp_' + fixations_t['trial_image'].values[0] + '.jpg')
@@ -188,7 +185,7 @@ def scanpath(fixations_vs, items_pos, bh_data, raw, gazex, gazey, subject, trial
     cmap = plt.cm.rainbow
     # define the bins and normalize
     fix_num = fixations_t['n_fix'].values.astype(int)
-    bounds = np.linspace(0, fix_num[-1], fix_num[-1] + 1)
+    bounds = np.linspace(1, fix_num[-1]+1, fix_num[-1]+1)
     norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
 
     # Display image True or False
@@ -258,8 +255,8 @@ def scanpath(fixations_vs, items_pos, bh_data, raw, gazex, gazey, subject, trial
 
 
     PCM = ax6.get_children()[0]  # When the fixations dots for color mappable were ploted (first)
-    cb = plt.colorbar(PCM, ax=ax6, ticks=[fix_num[0] - 1 / 2, int(fix_num[-1] / 2) - 1 / 2, fix_num[-1] - 1 / 2])
-    cb.ax.set_yticklabels([fix_num[0], int(fix_num[-1] / 2), fix_num[-1]])
+    cb = plt.colorbar(PCM, ax=ax6, ticks=[fix_num[0] + 1/2, fix_num[int(len(fix_num)/2)]+1/2, fix_num[-1]+1/2])
+    cb.ax.set_yticklabels([fix_num[0], fix_num[int(len(fix_num)/2)], fix_num[-1]])
     cb.ax.tick_params(labelsize=10)
     cb.set_label('# of fixation', fontsize=13)
 
@@ -277,9 +274,9 @@ def scanpath(fixations_vs, items_pos, bh_data, raw, gazex, gazey, subject, trial
         plt.savefig(save_path + f'svg/Trial{trial}.svg')
 
 
-def trial_gaze(raw, bh_data, gazex, gazey, subject, trial, display_fig=False, save=True):
 
-    print(f'\rTrial {trial}', end='')
+def trial_gaze(raw, bh_data, gazex, gazey, subject, trial, display_fig=False, save=True):
+    plt.clf()
     plt.close('all')
 
     if display_fig:
@@ -304,17 +301,17 @@ def trial_gaze(raw, bh_data, gazex, gazey, subject, trial, display_fig=False, sa
     plt.title(f'Trial {trial} - {pres_abs_trial} - {correct_trial} - MSS: {int(mss)}')
 
     # Gazes
-    plt.plot(raw.times[trial_start_idx:trial_end_idx], gazex[trial_start_idx:trial_end_idx], label='Gaze x')
-    plt.plot(raw.times[trial_start_idx:trial_end_idx], gazey[trial_start_idx:trial_end_idx] - 1000, 'black', label='Gaze y')
+    plt.plot(raw.times[trial_start_idx:trial_end_idx], gazex[trial_start_idx:trial_end_idx], label='X')
+    plt.plot(raw.times[trial_start_idx:trial_end_idx], gazey[trial_start_idx:trial_end_idx] - 1000, 'black', label='Y')
 
     # Screens
-    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.fix1[trial_idx_annot], xmax=raw.annotations.ms[trial_idx_annot], color='grey',
+    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.fix1[trial_idx_annot][0], xmax=raw.annotations.ms[trial_idx_annot][0], color='grey',
                 alpha=0.4, label='Fix')
-    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.ms[trial_idx_annot], xmax=raw.annotations.fix2[trial_idx_annot], color='red',
+    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.ms[trial_idx_annot][0], xmax=raw.annotations.fix2[trial_idx_annot][0], color='red',
                 alpha=0.4, label='MS')
-    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.fix2[trial_idx_annot], xmax=raw.annotations.vs[trial_idx_annot], color='grey',
+    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.fix2[trial_idx_annot][0], xmax=raw.annotations.vs[trial_idx_annot][0], color='grey',
                 alpha=0.4, label='Fix')
-    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.vs[trial_idx_annot], xmax=raw.annotations.rt[trial_idx_annot], color='green',
+    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.vs[trial_idx_annot][0], xmax=raw.annotations.rt[trial_idx_annot][0], color='green',
                 alpha=0.4, label='VS')
 
     plt.xlabel('time [s]')
@@ -340,7 +337,7 @@ def first_fixation_delay(fixations, subject, display_fig=True, save=True):
 
     fixations1_fix_screen = fixations.loc[(fixations['screen'].isin(['fix1', 'fix2'])) & (fixations['n_fix'] == 1)]
     plt.figure()
-    plt.hist(fixations1_fix_screen['delay'], bins=40)
+    plt.hist(fixations1_fix_screen['time'], bins=40)
     plt.title('1st fixation delay distribution')
     plt.xlabel('Time [s]')
 
@@ -365,13 +362,16 @@ def pupil_size_increase(fixations, response_trials_meg, subject, display_fig=Tru
     for trial in response_trials_meg:
         trial_data = fixations_pupil_s.loc[fixations_pupil_s['trial'] == trial]
 
-        if 'fix1' in trial_data['screen'].values:
-            pupil_diff = trial_data[trial_data['screen'] == 'fix2']['pupil'].values[0] - trial_data[trial_data['screen'] == 'fix1']['pupil'].values[0]
-        else:
-            pupil_diff = trial_data[trial_data['screen'] == 'fix2']['pupil'].values[0] - \
-                         trial_data[trial_data['screen'] == 'ms']['pupil'].values[0]
-        pupil_diffs.append(pupil_diff)
-        mss.append(trial_data['mss'].values[0])
+        try:
+            if 'fix1' in trial_data['screen'].values:
+                pupil_diff = trial_data[trial_data['screen'] == 'fix2']['pupil'].values[0] - trial_data[trial_data['screen'] == 'fix1']['pupil'].values[0]
+            else:
+                pupil_diff = trial_data[trial_data['screen'] == 'fix2']['pupil'].values[0] - \
+                             trial_data[trial_data['screen'] == 'ms']['pupil'].values[0]
+            pupil_diffs.append(pupil_diff)
+            mss.append(trial_data['mss'].values[0])
+        except:
+            print(f'No fix or mss data in trial {trial}')
 
     plt.figure()
     sn.boxplot(x=mss, y=pupil_diffs)
