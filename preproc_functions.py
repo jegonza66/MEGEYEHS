@@ -74,7 +74,12 @@ def blinks_to_nan(meg_pupils_data_raw, meg_gazex_data_scaled, meg_gazey_data_sca
     # Get missing start/end samples and duration
     missing_start = np.where(np.diff(missing) == 1)[0]
     missing_end = np.where(np.diff(missing) == -1)[0]
-    missing_dur = missing_end - missing_start
+
+    # Take samples according to start or end with missing data (missing_start and end would have different sizes)
+    if missing[0] == 1:
+        missing_end = missing_end[1:]
+    if missing[-1] == 1:
+        missing_start = missing_start[:-1]
 
     # Remove blinks
     # First, fill missing values (and suroundings) with nan
@@ -160,8 +165,10 @@ def define_events_trials(raw, subject):
     # Get fix 1 start time
     fix1_start_key_idx = ['fixation_target.' in key and 'started' in key for key in bh_data.keys()]
     fix1_start_key = bh_data.keys()[fix1_start_key_idx]
+    # If there's a missing fix1 screen, the time for that screen would be None, and the column type would be string.
+    # If there's not, the type would be float. Change type to string and replace None by the mss screen start time
     fix1_start = np.array([value.replace('None', f'{ms_start[i]}') for i, value in
-                           enumerate(bh_data[fix1_start_key].values.ravel())]).astype(float)
+                           enumerate(bh_data[fix1_start_key].astype(str).values.ravel())]).astype(float)
     # Get fix 2 start time
     fix2_start_key_idx = ['fixation_target_2' in key and 'started' in key for key in bh_data.keys()]
     fix2_start_key = bh_data.keys()[fix2_start_key_idx]
@@ -171,7 +178,7 @@ def define_events_trials(raw, subject):
     search_start_key = bh_data.keys()[search_start_key_idx]
     search_start = bh_data[search_start_key].values.ravel().astype(float)
     # Get response time
-    rt = np.array([value.replace('[]', 'nan') for value in bh_data['rt'].values]).astype(float)
+    rt = np.array([value.replace('[]', 'nan') for value in bh_data['key_resp.rt'].astype(str).values]).astype(float)
     # Get response
     responses = bh_data['key_resp.keys'].values
 
@@ -231,8 +238,8 @@ def define_events_trials(raw, subject):
                 response_times_meg.append(meg_evt_time)
                 response_trials_meg.append(int(block_num * block_trials + trial + 1))
 
-                if (meg_evt_block_buttons[idx] == 'blue' and responses_block[trial] != subject.map['blue']) or (
-                        meg_evt_block_buttons[idx] == 'red' and responses_block[trial] != subject.map['red']):
+                if (meg_evt_block_buttons[idx] == 'blue' and int(responses_block[trial]) != int(subject.map['blue'])) or (
+                        meg_evt_block_buttons[idx] == 'red' and int(responses_block[trial]) != int(subject.map['red'])):
                     raise ValueError(f'Different answer in MEG and BH data in trial: {trial}')
 
                 if abs(meg_evt_time - bh_evt_block_times[trial]) > 0.05:

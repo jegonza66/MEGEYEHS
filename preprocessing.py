@@ -10,7 +10,7 @@ import preproc_functions
 
 #---------------- Load data ----------------#
 # Define subject
-subject = load.subject()
+subject = load.subject(2)
 # Load Meg data
 raw = subject.ctf_data()
 
