@@ -330,7 +330,7 @@ def trial_gaze(raw, bh_data, gazex, gazey, subject, trial, display_fig=False, sa
         plt.savefig(save_path + f'svg/Trial {trial}.svg')
 
 
-def first_fixation_delay(fixations, subject, display_fig=True, save=True):
+def first_fixation_delay(fixations, subject, display_fig=False, save=True):
 
     if display_fig:
         plt.ion()
@@ -349,7 +349,7 @@ def first_fixation_delay(fixations, subject, display_fig=True, save=True):
         plt.savefig(save_path + f'{subject.subject_id} 1st fix delay dist.png')
 
 
-def pupil_size_increase(fixations, response_trials_meg, subject, display_fig=True, save=True):
+def pupil_size_increase(fixations, response_trials_meg, subject, display_fig=False, save=True):
 
     if display_fig:
         plt.ion()
@@ -384,6 +384,7 @@ def pupil_size_increase(fixations, response_trials_meg, subject, display_fig=Tru
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
         os.makedirs(save_path, exist_ok=True)
         plt.savefig(save_path + f'{subject.subject_id} Pupil size increase.png')
+
 
 def performance(subject, display=False, save=True):
 
