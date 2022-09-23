@@ -59,7 +59,7 @@ def preprocess(subject):
     #---------------- Fixations and saccades detection ----------------#
     fixations, saccades = preproc_functions.fixations_saccades_detection(raw=raw, meg_gazex_data_clean=meg_gazex_data_clean,
                                                                          meg_gazey_data_clean=meg_gazey_data_clean,
-                                                                         subject=subject, force_run=True)
+                                                                         subject=subject)
 
     #---------------- Fixations classification ----------------#
     fixations = preproc_functions.fixation_classification(bh_data=bh_data, fixations=fixations, raw=raw,
