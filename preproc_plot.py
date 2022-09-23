@@ -270,7 +270,7 @@ def scanpath(fixations_vs, items_pos, bh_data, raw, gazex, gazey, subject, trial
     ax7.set_xlabel('Time [s]')
 
     if save:
-        save_path = paths().plots_path() + subject.subject_id + f'/Scanpaths/'
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + f'/Scanpaths/'
         os.makedirs(save_path + 'svg/', exist_ok=True)
         plt.savefig(save_path + f'Trial{trial}.png')
         plt.savefig(save_path + f'svg/Trial{trial}.svg')
@@ -324,7 +324,7 @@ def trial_gaze(raw, bh_data, gazex, gazey, subject, trial, display_fig=False, sa
     plt.legend(by_label.values(), by_label.keys(), loc='upper right')
 
     if save:
-        save_path = paths().plots_path() + subject.subject_id + f'/Gaze_Trials/'
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + f'/Gaze_Trials/'
         os.makedirs(save_path + 'svg/', exist_ok=True)
         plt.savefig(save_path + f'Trial {trial}.png')
         plt.savefig(save_path + f'svg/Trial {trial}.svg')
@@ -344,7 +344,7 @@ def first_fixation_delay(fixations, subject, display_fig=True, save=True):
     plt.xlabel('Time [s]')
 
     if save:
-        save_path = paths().plots_path() + subject.subject_id + '/'
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
         os.makedirs(save_path, exist_ok=True)
         plt.savefig(save_path + f'{subject.subject_id} 1st fix delay dist.png')
 
@@ -381,7 +381,7 @@ def pupil_size_increase(fixations, response_trials_meg, subject, display_fig=Tru
     plt.ylabel('Pupil size increase (fix point 2 - 1)')
 
     if save:
-        save_path = paths().plots_path() + subject.subject_id + '/'
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
         os.makedirs(save_path, exist_ok=True)
         plt.savefig(save_path + f'{subject.subject_id} Pupil size increase.png')
 
@@ -439,6 +439,6 @@ def performance(subject, display=False, save=True):
     axs[1].set_xticks([1, 2, 4])
 
     if save:
-        save_path = paths().plots_path() + subject.subject_id
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id
         os.makedirs(save_path, exist_ok=True)
         plt.savefig(paths().plots_path() + subject.subject_id + '/Performance_MEG.png')
