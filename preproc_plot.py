@@ -441,4 +441,4 @@ def performance(subject, display=False, save=True):
     if save:
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id
         os.makedirs(save_path, exist_ok=True)
-        plt.savefig(paths().plots_path() + subject.subject_id + '/Performance_MEG.png')
+        plt.savefig(save_path + '/Performance_MEG.png')
