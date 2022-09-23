@@ -59,7 +59,7 @@ def preprocess(subject):
     #---------------- Fixations and saccades detection ----------------#
     fixations, saccades = preproc_functions.fixations_saccades_detection(raw=raw, meg_gazex_data_clean=meg_gazex_data_clean,
                                                                          meg_gazey_data_clean=meg_gazey_data_clean,
-                                                                         subject=subject)
+                                                                         subject=subject, force_run=True)
 
     #---------------- Fixations classification ----------------#
     fixations = preproc_functions.fixation_classification(bh_data=bh_data, fixations=fixations, raw=raw,
@@ -72,6 +72,7 @@ def preprocess(subject):
     #---------------- Save fix time distribution, pupils size vs mss, scanpath and trial gaze figures ----------------#
     preproc_plot.first_fixation_delay(fixations=fixations, subject=subject)
     preproc_plot.pupil_size_increase(fixations=fixations, response_trials_meg=raw.annotations.trial, subject=subject)
+    preproc_plot.performance(subject=subject)
 
     print('Plotting scanpaths and trials gaze screens')
     for trial in raw.annotations.trial:
@@ -139,5 +140,5 @@ def preprocess(subject):
     print(f'Preprocessed data saved to {preproc_save_path}')
 
 
-for subject in [5]:
+for subject in [2, 3, 4, 5]:
     preprocess(subject)

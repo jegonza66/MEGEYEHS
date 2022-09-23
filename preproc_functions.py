@@ -68,8 +68,11 @@ def blinks_to_nan(meg_pupils_data_raw, meg_gazex_data_scaled, meg_gazey_data_sca
     meg_gazey_data_clean = copy.copy(meg_gazey_data_scaled)
     meg_pupils_data_clean = copy.copy(meg_pupils_data_raw)
 
+    # Check for peaks in pupils signal
+    pupils_diff = np.concatenate((np.array([float('nan')]), np.diff(meg_pupils_data_clean)))
+
     # Define missing values as 1 and non missing as 0 instead of True False
-    missing = (meg_pupils_data_clean < -4.6).astype(int)
+    missing = ((meg_pupils_data_clean < -4.6) | (abs(pupils_diff) > 0.1)).astype(int)
 
     # Get missing start/end samples and duration
     missing_start = np.where(np.diff(missing) == 1)[0]
@@ -234,7 +237,7 @@ def define_events_trials(raw, subject):
         block_data_aligned = False
         attempts = 0
         align_sample = 0
-        while not block_data_aligned and attempts < 10:
+        while not block_data_aligned and attempts < 5:
             # Save block variables resetting them every attempt
             no_answer_block = []
             fix1_times_meg_block = []
