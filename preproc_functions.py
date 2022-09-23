@@ -155,6 +155,9 @@ def define_events_trials(raw, subject):
     # Delete succesive presses of green
     blocks_start_end = list(np.delete(blocks_start_end, np.where(np.diff(blocks_start_end) < 2)).astype(int))
 
+    # Delete blocks shorter than 30 trials
+    blocks_start_end = list(np.delete(blocks_start_end, np.where(np.diff(blocks_start_end) < 30)).astype(int))
+
     # Define starting and ending trial of each block
     blocks_bounds = [(blocks_start_end[i] + 1, blocks_start_end[i + 1]) for i in range(len(blocks_start_end) - 1)]
 
@@ -231,7 +234,7 @@ def define_events_trials(raw, subject):
         block_data_aligned = False
         attempts = 0
         align_sample = 0
-        while not block_data_aligned and attempts < 3:
+        while not block_data_aligned and attempts < 10:
             # Save block variables resetting them every attempt
             no_answer_block = []
             fix1_times_meg_block = []
