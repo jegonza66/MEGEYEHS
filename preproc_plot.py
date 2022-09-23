@@ -442,4 +442,3 @@ def performance(subject, display=False, save=True):
         save_path = paths().plots_path() + subject.subject_id
         os.makedirs(save_path, exist_ok=True)
         plt.savefig(paths().plots_path() + subject.subject_id + '/Performance_MEG.png')
-        plt.savefig(paths().plots_path() + subject.subject_id + '/Performance_MEG.svg')

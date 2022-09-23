@@ -140,5 +140,5 @@ def preprocess(subject):
     print(f'Preprocessed data saved to {preproc_save_path}')
 
 
-for subject in [2, 3, 4, 5]:
+for subject in [1, 2, 3, 4, 5]:
     preprocess(subject)

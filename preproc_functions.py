@@ -158,8 +158,8 @@ def define_events_trials(raw, subject):
     # Delete succesive presses of green
     blocks_start_end = list(np.delete(blocks_start_end, np.where(np.diff(blocks_start_end) < 2)).astype(int))
 
-    # Delete blocks shorter than 30 trials
-    blocks_start_end = list(np.delete(blocks_start_end, np.where(np.diff(blocks_start_end) < 30)).astype(int))
+    # Delete blocks shorter than 20 trials
+    blocks_start_end = list(np.delete(blocks_start_end, np.where(np.diff(blocks_start_end) < 20)).astype(int))
 
     # Define starting and ending trial of each block
     blocks_bounds = [(blocks_start_end[i] + 1, blocks_start_end[i + 1]) for i in range(len(blocks_start_end) - 1)]
