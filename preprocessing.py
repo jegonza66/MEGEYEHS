@@ -1,6 +1,7 @@
 import mne
 import os
 import numpy as np
+import pickle
 
 from paths import paths
 import load
@@ -53,7 +54,7 @@ def preprocess(subject):
                                                                sfreq=raw.info['sfreq'])
 
     #---------------- Defining response events and trials ----------------#
-    bh_data, raw = preproc_functions.define_events_trials(raw=raw, subject=subject)
+    bh_data, raw, subject = preproc_functions.define_events_trials(raw=raw, subject=subject)
 
     #---------------- Fixations and saccades detection ----------------#
     fixations, saccades = preproc_functions.fixations_saccades_detection(raw=raw, meg_gazex_data_clean=meg_gazex_data_clean,
@@ -83,7 +84,7 @@ def preprocess(subject):
                                 subject=subject, trial=trial)
 
     #---------------- Add scaled data to meg data ----------------#
-    print('Saving scaled et data to meg raw data structure')
+    print('\nSaving scaled et data to meg raw data structure')
     # copy raw structure
     raw_et = raw.copy()
     # make new raw structure from et channels only
@@ -103,6 +104,9 @@ def preprocess(subject):
     print('Adding new ET channels')
     raw.add_channels([raw_et])
     del (raw_et)
+    # Correct raw.annotations length
+    raw.annotations.ch_names = raw.annotations.ch_names[:len(raw.annotations.description)]
+    raw.annotations.duration = raw.annotations.duration[:len(raw.annotations.description)]
 
     #---------------- Save preprocesed data ----------------#
     print('Saving preprocessed data')
@@ -111,9 +115,19 @@ def preprocess(subject):
     preproc_save_path = preproc_data_path + subject.subject_id + '/'
     os.makedirs(preproc_save_path, exist_ok=True)
 
-    # Save fixations
-    fixations.to_csv(preproc_save_path + 'fixations.csv')
-    fixations_vs.to_csv(preproc_save_path + 'fixations_vs.csv')
+    # Add data to subject class
+    subject.bh_data = bh_data
+    subject.fixations = fixations
+    subject.fixations_vs = fixations_vs
+    subject.saccades = saccades
+
+    f = open(preproc_save_path + 'Subject_data.pkl', 'wb')
+    pickle.dump(subject, f)
+    f.close()
+
+    # # Save fixations
+    # fixations.to_csv(preproc_save_path + 'fixations.csv')
+    # fixations_vs.to_csv(preproc_save_path + 'fixations_vs.csv')
 
     # Save MEG
     preproc_meg_data_fname = f'Subject_{subject.subject_id}_meg.fif'
@@ -125,5 +139,5 @@ def preprocess(subject):
     print(f'Preprocessed data saved to {preproc_save_path}')
 
 
-for subject in range(6):
+for subject in [2, 3, 4, 5]:
     preprocess(subject)

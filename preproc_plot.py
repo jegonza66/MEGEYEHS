@@ -161,7 +161,7 @@ def scanpath(fixations_vs, items_pos, bh_data, raw, gazex, gazey, subject, trial
 
     # Get vs from trial
     vs_start_idx = functions.find_nearest(raw.times, raw.annotations.vs[np.where(raw.annotations.trial == trial)[0]])[0]
-    vs_end_idx = functions.find_nearest(raw.times, raw.annotations.rt[np.where(raw.annotations.trial == trial)[0]])[0]
+    vs_end_idx = functions.find_nearest(raw.times, raw.annotations.onset[np.where(raw.annotations.trial == trial)[0]])[0]
 
     # Load search image
     img = mpimg.imread(exp_path + 'cmp_' + fixations_t['trial_image'].values[0] + '.jpg')
@@ -294,7 +294,7 @@ def trial_gaze(raw, bh_data, gazex, gazey, subject, trial, display_fig=False, sa
     trial_idx_annot = np.where(raw.annotations.trial == trial)[0]
     trial_start_idx = \
     functions.find_nearest(raw.times, raw.annotations.fix1[trial_idx_annot])[0] - 120 * 2
-    trial_end_idx = functions.find_nearest(raw.times, raw.annotations.rt[trial_idx_annot])[0] + 120 * 6
+    trial_end_idx = functions.find_nearest(raw.times, raw.annotations.onset[trial_idx_annot])[0] + 120 * 6
 
     # Plot
     plt.figure(figsize=(15, 5))
@@ -311,7 +311,7 @@ def trial_gaze(raw, bh_data, gazex, gazey, subject, trial, display_fig=False, sa
                 alpha=0.4, label='MS')
     plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.fix2[trial_idx_annot][0], xmax=raw.annotations.vs[trial_idx_annot][0], color='grey',
                 alpha=0.4, label='Fix')
-    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.vs[trial_idx_annot][0], xmax=raw.annotations.rt[trial_idx_annot][0], color='green',
+    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.vs[trial_idx_annot][0], xmax=raw.annotations.onset[trial_idx_annot][0], color='green',
                 alpha=0.4, label='VS')
 
     plt.xlabel('time [s]')

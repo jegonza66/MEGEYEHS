@@ -257,8 +257,19 @@ def define_events_trials(raw, subject):
                     if not np.isnan(bh_evt_block_times[trial]):
                         idx, meg_evt_time = functions.find_nearest(meg_evt_block_times, bh_evt_block_times[trial])
 
-                        # Esto esta mal, en los trials en los que complete la respuesta a mano, puse un rt de 10 s,
-                        # entonces estoy asumiendo que la vs screen empezó 10 antes del evento del MEG (Falso)
+                        time_diff = bh_evt_block_times[trial] - meg_evt_time
+                        time_diff_block.append(time_diff)
+
+                        if (meg_evt_block_buttons[idx] == 'blue' and int(responses_block[trial]) != int(subject.map['blue'])) or (
+                                meg_evt_block_buttons[idx] == 'red' and int(responses_block[trial]) != int(subject.map['red'])):
+                            print(f'Different answer in MEG and BH data in trial: {trial}\n'
+                                  f'Discarding and realingning on following sample\n')
+                            raise ValueError(f'Different answer in MEG and BH data in trial: {trial}')
+
+                        if abs(time_diff) > 0.02:# and block_num * block_trials + trial not in completed_responses_idx:
+                            print(f'{round(abs(meg_evt_time - bh_evt_block_times[trial])*1000,1)} ms difference in Trial: {trial}')
+
+                        # Define screen times from MEG response
                         trial_search_time = meg_evt_time - rt_block_times[trial]
                         vs_times_meg_block.append(trial_search_time)
 
@@ -275,17 +286,8 @@ def define_events_trials(raw, subject):
                         response_times_meg_block.append(meg_evt_time)
                         response_trials_meg_block.append(int(block_num * block_trials + trial + 1))
 
-                        time_diff = abs(meg_evt_time - bh_evt_block_times[trial])
-                        time_diff_block.append(time_diff)
-
-                        if (meg_evt_block_buttons[idx] == 'blue' and int(responses_block[trial]) != int(subject.map['blue'])) or (
-                                meg_evt_block_buttons[idx] == 'red' and int(responses_block[trial]) != int(subject.map['red'])):
-                            print(f'Different answer in MEG and BH data in trial: {trial}\n'
-                                  f'Discarding and realingning on following sample\n')
-                            raise ValueError(f'Different answer in MEG and BH data in trial: {trial}')
-
-                        if time_diff > 0.02:# and block_num * block_trials + trial not in completed_responses_idx:
-                            print(f'{round(abs(meg_evt_time - bh_evt_block_times[trial])*1000,1)} ms difference in Trial: {trial}')
+                    # Consider manually completed responses
+                    # elif np.isnan(bh_evt_block_times[trial]) and responses_block[trial] != 'None':
 
                     else:
                         print(f'No answer in Trial: {trial}')
@@ -295,8 +297,8 @@ def define_events_trials(raw, subject):
                 # (completed responses might artificially increase this value)
                 # real_time_diff = [element for trial, element in zip(block_idxs, time_diff_block) if trial not in completed_responses_idx]
                 # if np.mean(real_time_diff) > 0.2:
-                if np.mean(time_diff_block) > 0.2:
-                    print(f'Average time difference for this block: {np.mean(time_diff_block)} s\n'
+                if np.mean(abs(np.array(time_diff_block))) > 0.2:
+                    print(f'Average time difference for this block: {np.mean(abs(np.array(time_diff_block)))} s\n'
                           f'Discarding and realingning on following sample\n')
                     raise ValueError(f'Average time difference for this block over 200 ms')
 
@@ -328,6 +330,7 @@ def define_events_trials(raw, subject):
     buttons_meg = functions.flatten_list(buttons_meg)
     response_times_meg = functions.flatten_list(response_times_meg)
     time_differences = functions.flatten_list(time_differences)
+    no_answer = functions.flatten_list((no_answer))
 
     # Save clean events to MEG data
     raw.annotations.trial = np.array(response_trials_meg)
@@ -335,11 +338,23 @@ def define_events_trials(raw, subject):
     raw.annotations.ms = np.array(ms_times_meg)
     raw.annotations.fix2 = np.array(fix2_times_meg)
     raw.annotations.vs = np.array(vs_times_meg)
-    raw.annotations.buttons = np.array(buttons_meg)
-    raw.annotations.rt = np.array(response_times_meg)
+    raw.annotations.description = np.array(buttons_meg)
+    raw.annotations.onset = np.array(response_times_meg)
     raw.annotations.time_differences = np.array(time_differences)
+    raw.annotations.no_answer = np.array(no_answer)
+    
+    # Save data to subject class
+    subject.trial = np.array(response_trials_meg)
+    subject.fix1 = np.array(fix1_times_meg)
+    subject.ms = np.array(ms_times_meg)
+    subject.fix2 = np.array(fix2_times_meg)
+    subject.vs = np.array(vs_times_meg)
+    subject.description = np.array(buttons_meg)
+    subject.onset = np.array(response_times_meg)
+    subject.time_differences = np.array(time_differences)
+    subject.no_answer = np.array(no_answer)
 
-    return bh_data, raw
+    return bh_data, raw, subject
 
 
 def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean, subject, screen_size=38,
@@ -404,7 +419,7 @@ def fixation_classification(bh_data, fixations, raw, meg_pupils_data_clean):
     ms_times_meg = raw.annotations.ms
     fix2_times_meg = raw.annotations.fix2
     vs_times_meg = raw.annotations.vs
-    response_times_meg = raw.annotations.rt
+    response_times_meg = raw.annotations.onset
     times = raw.times
 
     # Get mss and target pres/abs from bh data
