@@ -197,6 +197,26 @@ class paths:
         return item_pos_path
 
 
+    def new_item_pos_path(self):
+        """
+        Paths to the search updated items positions file.
+
+        Returns
+        -------
+        item_pos_path: str
+            Path in str format to the items positions file.
+        """
+
+        if self.name == 'laptop-5i5qsv76\\joaco\n':
+            new_item_pos_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/DATA/pos_items_210_target_dog_pres.csv'
+        elif self.name == 'usuario\n': # Liaa Colores
+            new_item_pos_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/DATA/pos_items_210_target_dog_pres.csv'
+        else:
+            new_item_pos_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/DATA/pos_items_210_target_dog_pres.csv'
+
+        return new_item_pos_path
+
+
     def experiment_path(self):
         """
         Paths to the Psychopy experiment directory.
