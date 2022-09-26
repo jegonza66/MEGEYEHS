@@ -1,21 +1,23 @@
 import matplotlib.pyplot as plt
-import paths
+
+import load
+from paths import paths
 import pathlib
 import nibabel as nib
 from nibabel.viewers import OrthoSlicer3D
 import os
 from scipy import ndimage
 
-mri_path = paths.get().mri_path()
+mri_path = paths().mri_path()
 subject_id = '15909001'
+subject = load.subject(subject_id)
 
-subj_path = pathlib.Path(os.path.join(mri_path, subject_id))
+subj_path = pathlib.Path(os.path.join(mri_path, subject.subject_id))
 mri_file_path = list(subj_path.glob('*.nii'))[1]
 img = nib.load(mri_file_path)
 hdr = img.header
 hdr.get_xyzt_units()
 img_data = img.get_fdata()
-
 
 ## 3 views plot
 fig, ax = plt.subplots(ncols=3, figsize=(15, 5))
@@ -42,8 +44,8 @@ fig.tight_layout()
 
 
 ## Lateral dinamyc plots
-fig,ax = plt.subplots(1,1)
-im = plt.imshow(img_data[0,:,:], cmap="gray")
+fig, ax = plt.subplots(1, 1)
+im = plt.imshow(img_data[0, :, :], cmap="gray")
 for i in range(img_data.shape[0]):
     rotated_img = ndimage.rotate(img_data[i,:,:], 90)
     im.set_data(rotated_img)
@@ -53,17 +55,18 @@ plt.close()
 
 ## GIF
 filenames = []
-for i in range(img_data.shape[2]):
-    plt.imshow(ndimage.rotate(img_data[:,:,i], 90), cmap="gray")
+plt.ioff()
+for i in range(img_data.shape[0]):
+    plt.imshow(ndimage.rotate(img_data[i,:,:], 90), cmap="gray")
     # create file name and append it to a list
     filename = f'{i}.png'
     filenames.append(filename)
-
     # save frame
     plt.savefig(filename)
     plt.close()
+
 # build gif
-import imageio
+import imageio.v2 as imageio
 with imageio.get_writer('mygif.gif', mode='I') as writer:
     for filename in filenames:
         image = imageio.imread(filename)
@@ -75,14 +78,13 @@ for filename in set(filenames):
 
 ## Visualizations
 import mne
-subject_id = '15909001'
 subjects_dir = os.path.join(mri_path, 'FreeSurfer_out')
 os.environ["SUBJECTS_DIR"] = subjects_dir
 
 ## MNE - Freesurfer
 # https://mne.tools/stable/auto_tutorials/forward/50_background_freesurfer_mne.html#sphx-glr-auto-tutorials-forward-50-background-freesurfer-mne-py
 
-fname = os.path.join(subjects_dir, subject_id, 'surf', 'rh.white')
+fname = os.path.join(subjects_dir, subject.subject_id, 'surf', 'rh.white')
 rr_mm, tris = mne.read_surface(fname)
 print(f'rr_mm.shape == {rr_mm.shape}')
 print(f'tris.shape == {tris.shape}')

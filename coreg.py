@@ -34,7 +34,6 @@ mne.viz.set_3d_view(fig, 45, 90, distance=0.6, focalpoint=(0., 0., 0.))
 # https://mne.tools/stable/auto_tutorials/forward/30_forward.html#sphx-glr-auto-tutorials-forward-30-forward-py
 
 # Load Preprocesed
-subject = load.subject()
 raw = subject.preproc_data()
 
 # PICK MEG AND STIM CHS
@@ -53,7 +52,7 @@ events, event_id = mne.events_from_annotations(raw)
 epochs = mne.Epochs(raw, events, event_id=event_id, reject=reject, event_repeated='merge')
 
 # Select epochs
-epoch_id = 'blue'
+epoch_id = 'fix_vs'
 epoch_keys = [key for key in event_id.keys() if epoch_id in key]
 epochs_standard = mne.concatenate_epochs([epochs[key] for key in epoch_keys])
 # AVERAGE EPOCHS TO GET EVOKED

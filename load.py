@@ -56,7 +56,7 @@ class subject:
         # It could be that the MEG data changed the name it gave to each respone... This doesen't affect anything else but the color name of the responses.
 
         # Subjects item position file
-        subject_item = ['Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old']
+        subject_item = ['Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old']
 
         # Select 1st subject by default
         if subject == None:
