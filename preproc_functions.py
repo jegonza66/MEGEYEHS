@@ -174,21 +174,21 @@ def define_events_trials(raw, subject):
     ms_start = bh_data['target.started'].values.ravel().astype(float)
 
     # Get fix 1 start time
-    fix1_start_key_idx = ['fixation_target.' in key and 'started' in key for key in bh_data.keys()]
-    fix1_start_key = bh_data.keys()[fix1_start_key_idx][0]
+    cross1_start_key_idx = ['fixation_target.' in key and 'started' in key for key in bh_data.keys()]
+    cross1_start_key = bh_data.keys()[cross1_start_key_idx][0]
 
-    # If there's a missing fix1 screen, the time for that screen would be None, and the column type would be string.
+    # If there's a missing cross1 screen, the time for that screen would be None, and the column type would be string.
     # If there's not, the type would be float. Change type to string and replace None by the mss screen start time
-    if type(bh_data[fix1_start_key][0]) == str:
-        fix1_start = np.array([value.replace('None', f'{ms_start[i]}') for i, value in
-                               enumerate(bh_data[fix1_start_key].values.ravel())]).astype(float)
+    if type(bh_data[cross1_start_key][0]) == str:
+        cross1_start = np.array([value.replace('None', f'{ms_start[i]}') for i, value in
+                               enumerate(bh_data[cross1_start_key].values.ravel())]).astype(float)
     else:
-        fix1_start = bh_data[fix1_start_key].values
+        cross1_start = bh_data[cross1_start_key].values
 
     # Get fix 2 start time
-    fix2_start_key_idx = ['fixation_target_2' in key and 'started' in key for key in bh_data.keys()]
-    fix2_start_key = bh_data.keys()[fix2_start_key_idx]
-    fix2_start = bh_data[fix2_start_key].values.ravel().astype(float)
+    cross2_start_key_idx = ['fixation_target_2' in key and 'started' in key for key in bh_data.keys()]
+    cross2_start_key = bh_data.keys()[cross2_start_key_idx]
+    cross2_start = bh_data[cross2_start_key].values.ravel().astype(float)
 
     # Get Visual search start time
     search_start_key_idx = ['search' in key and 'started' in key for key in bh_data.keys()]
@@ -206,14 +206,16 @@ def define_events_trials(raw, subject):
 
     # Define variables to store data
     no_answer = []
-    fix1_times_meg = []
+    cross1_times_meg = []
     ms_times_meg = []
-    fix2_times_meg = []
+    cross2_times_meg = []
     vs_times_meg = []
     buttons_meg = []
     response_times_meg = []
     response_trials_meg = []
     time_differences = []
+    description = []
+    onset = []
 
     # Define trials block by block
     for block_num, block_bounds in enumerate(blocks_bounds):
@@ -228,9 +230,9 @@ def define_events_trials(raw, subject):
         meg_evt_block_buttons = copy.copy(evt_buttons[block_start:block_end])
 
         # Get durations in block from BH data
-        fix1_block_dur = (ms_start - fix1_start)[block_idxs]
-        ms_block_dur = (fix2_start - ms_start)[block_idxs]
-        fix2_block_dur = (search_start - fix2_start)[block_idxs]
+        cross1_block_dur = (ms_start - cross1_start)[block_idxs]
+        ms_block_dur = (cross2_start - ms_start)[block_idxs]
+        cross2_block_dur = (search_start - cross2_start)[block_idxs]
         rt_block_times = rt[block_idxs]
 
         # Align MEG and BH data in time
@@ -240,14 +242,16 @@ def define_events_trials(raw, subject):
         while not block_data_aligned and attempts < 5:
             # Save block variables resetting them every attempt
             no_answer_block = []
-            fix1_times_meg_block = []
+            cross1_times_meg_block = []
             ms_times_meg_block = []
-            fix2_times_meg_block = []
+            cross2_times_meg_block = []
             vs_times_meg_block = []
             buttons_meg_block = []
             response_times_meg_block = []
             response_trials_meg_block = []
             time_diff_block = []
+            description_block = []
+            onset_block = []
 
             try:
                 # Get events in block from BH data
@@ -261,32 +265,47 @@ def define_events_trials(raw, subject):
                 # Iterate over trials
                 for trial in range(block_trials):
                     if not np.isnan(bh_evt_block_times[trial]):
+                        total_trial = int(block_num * block_trials + trial + 1)
+
                         idx, meg_evt_time = functions.find_nearest(meg_evt_block_times, bh_evt_block_times[trial])
+                        onset_block.append(meg_evt_time)
+                        description_block.append(meg_evt_block_buttons[idx])
 
                         time_diff = bh_evt_block_times[trial] - meg_evt_time
                         time_diff_block.append(time_diff)
 
                         if (meg_evt_block_buttons[idx] == 'blue' and int(responses_block[trial]) != int(subject.map['blue'])) or (
                                 meg_evt_block_buttons[idx] == 'red' and int(responses_block[trial]) != int(subject.map['red'])):
-                            print(f'Different answer in MEG and BH data in trial: {trial}\n'
+                            print(f'Different answer in MEG and BH data in trial: {trial+1}\n'
                                   f'Discarding and realingning on following sample\n')
-                            raise ValueError(f'Different answer in MEG and BH data in trial: {trial}')
+                            raise ValueError(f'Different answer in MEG and BH data in trial: {trial+1}')
 
                         if abs(time_diff) > 0.02:# and block_num * block_trials + trial not in completed_responses_idx:
-                            print(f'{round(abs(meg_evt_time - bh_evt_block_times[trial])*1000,1)} ms difference in Trial: {trial}')
+                            print(f'{round(abs(meg_evt_time - bh_evt_block_times[trial])*1000,1)} ms difference in Trial: {trial+1}')
 
                         # Define screen times from MEG response
                         trial_search_time = meg_evt_time - rt_block_times[trial]
                         vs_times_meg_block.append(trial_search_time)
+                        onset_block.append(trial_search_time)
+                        description_block.append(f'vs_t{total_trial}')
 
-                        trial_fix2_times = trial_search_time - fix2_block_dur[trial]
-                        fix2_times_meg_block.append(trial_fix2_times)
+                        trial_cross2_time = trial_search_time - cross2_block_dur[trial]
+                        cross2_times_meg_block.append(trial_cross2_time)
+                        onset_block.append(trial_cross2_time)
+                        description_block.append(f'cross2_t{total_trial}')
 
-                        trial_ms_time = trial_fix2_times - ms_block_dur[trial]
+                        trial_ms_time = trial_cross2_time - ms_block_dur[trial]
                         ms_times_meg_block.append(trial_ms_time)
+                        onset_block.append(trial_ms_time)
+                        description_block.append(f'ms_t{total_trial}')
 
-                        trial_fix1_time = trial_ms_time - fix1_block_dur[trial]
-                        fix1_times_meg_block.append(trial_fix1_time)
+                        trial_cross1_time = trial_ms_time - cross1_block_dur[trial]
+                        cross1_times_meg_block.append(trial_cross1_time)
+
+                        # Save cross1 onset only if there was cross 1 present in that trial
+                        if cross1_block_dur[trial]:
+                            onset_block.append(trial_cross1_time)
+                            description_block.append(f'cross1_t{total_trial}')
 
                         buttons_meg_block.append((meg_evt_block_buttons[idx]))
                         response_times_meg_block.append(meg_evt_time)
@@ -312,14 +331,18 @@ def define_events_trials(raw, subject):
                     block_data_aligned = True
                     # Append block data to overall data
                     no_answer.append(no_answer_block)
-                    fix1_times_meg.append(fix1_times_meg_block)
+                    cross1_times_meg.append(cross1_times_meg_block)
                     ms_times_meg.append(ms_times_meg_block)
-                    fix2_times_meg.append(fix2_times_meg_block)
+                    cross2_times_meg.append(cross2_times_meg_block)
                     vs_times_meg.append(vs_times_meg_block)
                     buttons_meg.append(buttons_meg_block)
                     response_times_meg.append(response_times_meg_block)
                     response_trials_meg.append(response_trials_meg_block)
                     time_differences.append(time_diff_block)
+
+                    # Save annotations from block
+                    description.append(description_block)
+                    onset.append(onset_block)
             except:
                 align_sample += 1
                 attempts += 1
@@ -329,31 +352,27 @@ def define_events_trials(raw, subject):
 
     # flatten variables over blocks
     response_trials_meg = functions.flatten_list(response_trials_meg)
-    fix1_times_meg = functions.flatten_list(fix1_times_meg)
+    cross1_times_meg = functions.flatten_list(cross1_times_meg)
     ms_times_meg = functions.flatten_list(ms_times_meg)
-    fix2_times_meg = functions.flatten_list(fix2_times_meg)
+    cross2_times_meg = functions.flatten_list(cross2_times_meg)
     vs_times_meg = functions.flatten_list(vs_times_meg)
     buttons_meg = functions.flatten_list(buttons_meg)
     response_times_meg = functions.flatten_list(response_times_meg)
     time_differences = functions.flatten_list(time_differences)
-    no_answer = functions.flatten_list((no_answer))
+    no_answer = functions.flatten_list(no_answer)
+
+    description = functions.flatten_list(description)
+    onset = functions.flatten_list(onset)
 
     # Save clean events to MEG data
-    raw.annotations.trial = np.array(response_trials_meg)
-    raw.annotations.fix1 = np.array(fix1_times_meg)
-    raw.annotations.ms = np.array(ms_times_meg)
-    raw.annotations.fix2 = np.array(fix2_times_meg)
-    raw.annotations.vs = np.array(vs_times_meg)
-    raw.annotations.description = np.array(buttons_meg)
-    raw.annotations.onset = np.array(response_times_meg)
-    raw.annotations.time_differences = np.array(time_differences)
-    raw.annotations.no_answer = np.array(no_answer)
+    raw.annotations.description = np.array(description)
+    raw.annotations.onset = np.array(onset)
     
     # Save data to subject class
     subject.trial = np.array(response_trials_meg)
-    subject.fix1 = np.array(fix1_times_meg)
+    subject.cross1 = np.array(cross1_times_meg)
     subject.ms = np.array(ms_times_meg)
-    subject.fix2 = np.array(fix2_times_meg)
+    subject.cross2 = np.array(cross2_times_meg)
     subject.vs = np.array(vs_times_meg)
     subject.description = np.array(buttons_meg)
     subject.onset = np.array(response_times_meg)
@@ -418,14 +437,14 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
     return fixations, saccades
 
 
-def fixation_classification(bh_data, fixations, raw, meg_pupils_data_clean):
+def fixation_classification(subject, bh_data, fixations, raw, meg_pupils_data_clean):
 
-    fix1_times_meg = raw.annotations.fix1
-    response_trials_meg = raw.annotations.trial
-    ms_times_meg = raw.annotations.ms
-    fix2_times_meg = raw.annotations.fix2
-    vs_times_meg = raw.annotations.vs
-    response_times_meg = raw.annotations.onset
+    cross1_times_meg = subject.cross1
+    response_trials_meg = subject.trial
+    ms_times_meg = subject.ms
+    cross2_times_meg = subject.cross2
+    vs_times_meg = subject.vs
+    response_times_meg = subject.onset
     times = raw.times
 
     # Get mss and target pres/abs from bh data
@@ -442,6 +461,8 @@ def fixation_classification(bh_data, fixations, raw, meg_pupils_data_clean):
     n_fixs = []
     fix_delay = []
     pupil_size = []
+    description = []
+    onset = []
 
     # Iterate over fixations to classify them
     print('Classifying fixations')
@@ -462,55 +483,83 @@ def fixation_classification(bh_data, fixations, raw, meg_pupils_data_clean):
         fix_trial.append(trial)
 
         if trial != previous_trial:
-            fix_numbers[trial] = {'fix1': 0, 'ms': 0, 'fix2': 0, 'vs': 0}
+            fix_numbers[trial] = {'cross1': 0, 'ms': 0, 'cross2': 0, 'vs': 0}
 
         # First fixation cross
-        if fix1_times_meg[response_idx] < fix_time < ms_times_meg[response_idx]:
-            fix_screen.append('fix1')
+        if cross1_times_meg[response_idx] < fix_time < ms_times_meg[response_idx]:
+            screen = 'cross1'
+            fix_screen.append(screen)
             trial_mss.append(mss[trial_idx])
             tgt_pres_abs.append(pres_abs[trial_idx])
             trial_correct.append(corr_ans[trial_idx])
-            fix_delay.append(fix_time - fix1_times_meg[response_idx])
+            fix_delay.append(fix_time - cross1_times_meg[response_idx])
+            fix_numbers[trial][screen] += 1
+            n_fixs.append(fix_numbers[trial][screen])
 
+            description.append(f'fix_{screen}_{n_fixs[-1]}')
+            onset.append([fix_time])
+
+            # Average pupil size
             screen_time_idx = \
-                np.where(np.logical_and(fix1_times_meg[response_idx] < times, times < ms_times_meg[response_idx]))[0]
+                np.where(np.logical_and(cross1_times_meg[response_idx] < times, times < ms_times_meg[response_idx]))[0]
             pupil_data_screen = meg_pupils_data_clean[screen_time_idx]
             pupil_size.append(np.nanmean(pupil_data_screen))
 
         # MS
-        elif ms_times_meg[response_idx] < fix_time < fix2_times_meg[response_idx]:
-            fix_screen.append('ms')
+        elif ms_times_meg[response_idx] < fix_time < cross2_times_meg[response_idx]:
+            screen = 'ms'
+            fix_screen.append(screen)
             trial_mss.append(mss[trial_idx])
             tgt_pres_abs.append(pres_abs[trial_idx])
             trial_correct.append(corr_ans[trial_idx])
             fix_delay.append(fix_time - ms_times_meg[response_idx])
+            fix_numbers[trial][screen] += 1
+            n_fixs.append(fix_numbers[trial][screen])
 
+            description.append(f'fix_{screen}_{n_fixs[-1]}')
+            onset.append([fix_time])
+
+            # Average pupil size
             screen_time_idx = \
-                np.where(np.logical_and(ms_times_meg[response_idx] < times, times < fix2_times_meg[response_idx]))[0]
+                np.where(np.logical_and(ms_times_meg[response_idx] < times, times < cross2_times_meg[response_idx]))[0]
             pupil_data_screen = meg_pupils_data_clean[screen_time_idx]
             pupil_size.append(np.nanmean(pupil_data_screen))
 
         # Second fixations corss
-        elif fix2_times_meg[response_idx] < fix_time < vs_times_meg[response_idx]:
-            fix_screen.append('fix2')
+        elif cross2_times_meg[response_idx] < fix_time < vs_times_meg[response_idx]:
+            screen = 'cross2'
+            fix_screen.append(screen)
             trial_mss.append(mss[trial_idx])
             tgt_pres_abs.append(pres_abs[trial_idx])
             trial_correct.append(corr_ans[trial_idx])
-            fix_delay.append(fix_time - fix2_times_meg[response_idx])
+            fix_delay.append(fix_time - cross2_times_meg[response_idx])
+            fix_numbers[trial][screen] += 1
+            n_fixs.append(fix_numbers[trial][screen])
 
+            description.append(f'fix_{screen}_{n_fixs[-1]}')
+            onset.append([fix_time])
+
+            # Average pupil size
             screen_time_idx = \
-                np.where(np.logical_and(fix2_times_meg[response_idx] < times, times < vs_times_meg[response_idx]))[0]
+                np.where(np.logical_and(cross2_times_meg[response_idx] < times, times < vs_times_meg[response_idx]))[0]
             pupil_data_screen = meg_pupils_data_clean[screen_time_idx]
             pupil_size.append(np.nanmean(pupil_data_screen))
 
         # VS
         elif vs_times_meg[response_idx] < fix_time < response_times_meg[response_idx]:
-            fix_screen.append('vs')
+            screen = 'vs'
+            fix_screen.append(screen)
             trial_mss.append(mss[trial_idx])
             tgt_pres_abs.append(pres_abs[trial_idx])
             trial_correct.append(corr_ans[trial_idx])
             fix_delay.append(fix_time - vs_times_meg[response_idx])
+            fix_numbers[trial][screen] += 1
+            n_fixs.append(fix_numbers[trial][screen])
 
+            description.append(f'fix_{screen}_{n_fixs[-1]}')
+            onset.append([fix_time])
+
+            # Average pupil size
             screen_time_idx = \
                 np.where(np.logical_and(vs_times_meg[response_idx] < times, times < response_times_meg[response_idx]))[0]
             pupil_data_screen = meg_pupils_data_clean[screen_time_idx]
@@ -526,10 +575,6 @@ def fixation_classification(bh_data, fixations, raw, meg_pupils_data_clean):
             n_fixs.append(None)
             pupil_size.append(None)
 
-        if fix_screen[-1]:
-            fix_numbers[trial][fix_screen[-1]] += 1
-            n_fixs.append(fix_numbers[trial][fix_screen[-1]])
-
         previous_trial = trial
 
     fixations['pupil'] = pupil_size
@@ -543,16 +588,29 @@ def fixation_classification(bh_data, fixations, raw, meg_pupils_data_clean):
 
     fixations = fixations.astype({'trial': float, 'mss': float, 'target_pres': float, 'time': float, 'n_fix': float, 'pupil': float})
 
-    return fixations
+    # Add vs fixations data to raw annotations
+    raw.annotations.description = np.concatenate((raw.annotations.description, np.array(description)))
+    raw.annotations.onset = np.concatenate((raw.annotations.onset, np.array(functions.flatten_list(onset))))
+
+    # Order raw.annotations chronologically
+    raw_annot = np.array([raw.annotations.onset, raw.annotations.description])
+    raw_annot = raw_annot[:, raw_annot[0].astype(float).argsort()]
+    raw.annotations.onset = raw_annot[0].astype(float)
+    raw.annotations.description = raw_annot[1]
+
+    # Set durations and ch_names length to match the annotations length
+    raw.annotations.duration = np.zeros(len(raw.annotations.description))
+
+    return fixations, raw
 
 
-def target_vs_distractor(fixations, bh_data, distance_threshold=100, screen_res_x=1920, screen_res_y=1080,
+def target_vs_distractor(fixations, bh_data, subject, distance_threshold=100, screen_res_x=1920, screen_res_y=1080,
                          img_res_x=1280, img_res_y=1024):
 
     print('Identifying fixated items')
 
     # Load items data
-    items_pos_path = paths().item_pos_path()
+    items_pos_path = subject.item_pos_path
     items_pos = pd.read_csv(items_pos_path)
 
     # Rescale images from original resolution to screen resolution to match fixations scale
@@ -625,9 +683,9 @@ def target_vs_distractor(fixations, bh_data, distance_threshold=100, screen_res_
         fix_target.append(istarget)
 
     # Save to fixations_vs df
-    fixations_vs['item'] = items
-    fixations_vs['fix_target'] = fix_target
-    fixations_vs['distance'] = fix_item_distance
-    fixations_vs['trial_image'] = trials_image
+    fixations.loc[fixations['screen'] == 'vs', 'item'] = items
+    fixations.loc[fixations['screen'] == 'vs', 'fix_target'] = fix_target
+    fixations.loc[fixations['screen'] == 'vs', 'distance'] = fix_item_distance
+    fixations.loc[fixations['screen'] == 'vs', 'trial_image'] = trials_image
 
-    return fixations_vs, items_pos
+    return fixations, items_pos

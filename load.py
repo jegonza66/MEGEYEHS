@@ -41,6 +41,7 @@ class subject:
         self.bh_path = paths().bh_path()
         self.mri_path = paths().mri_path()
         self.opt_path = paths().opt_path()
+        self.preproc_path = paths().preproc_path()
 
         # Select subject
         subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001', '16200001',
@@ -54,29 +55,37 @@ class subject:
         # Mapping for subject 6 is blue ->1,red->4 as Balanced participants. Still the bh data file clearly says Counterbalanced.
         # It could be that the MEG data changed the name it gave to each respone... This doesen't affect anything else but the color name of the responses.
 
+        # Subjects item position file
+        subject_item = ['Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old']
+
         # Select 1st subject by default
         if subject == None:
             self.subject_id = subjects_ids[0]
-            self.bad_channels = subjects_bad_channels[0]
-            self.group = subjects_groups[0]
         # Select subject by index
         elif type(subject) == int:
             self.subject_id = subjects_ids[subject]
-            self.bad_channels = subjects_bad_channels[subject]
-            self.group = subjects_groups[subject]
         # Select subject by id
         elif type(subject) == str and (subject in subjects_ids):
             self.subject_id = subject
-            self.bad_channels = subjects_bad_channels[subjects_ids.index(subject)]
-            self.group = subjects_groups[subjects_ids.index(subject)]
         else:
             print('Subject not found.')
 
-        # Mapping between button value and color
+        # Define subject group and bad channels by matching id index
+        self.bad_channels = subjects_bad_channels[subjects_ids.index(self.subject_id)]
+        self.group = subjects_groups[subjects_ids.index(self.subject_id)]
+
+        # Defin mapping between button value and color by group
         if self.group == 'Balanced':
             self.map = {'blue': '1', 'red': '4'}
         elif self.group == 'Counterbalanced':
             self.map = {'blue': '4', 'red': '1'}
+
+        # Get items positions file
+        self.item_pos_group = subject_item[subjects_ids.index(self.subject_id)]
+        if self.item_pos_group == 'Old':
+            self.item_pos_path = paths().item_pos_path()
+        else:
+            self.item_pos_path = paths().new_item_pos_path()
 
 
     # MEG data
@@ -227,3 +236,18 @@ class subject:
         df = pd.read_csv(bh_file)
 
         return df
+
+        # MEG data
+    def preproc_data(self):
+        """
+        Preprocessed MEG data for parent subject as raw instance of MNE.
+        """
+
+        print('\nLoading Preprocessed MEG data')
+        # get subject path
+        file_path = pathlib.Path(os.path.join(self.preproc_path, self.subject_id, f'Subject_{self.subject_id}_meg.fif'))
+
+        # Load data
+        fif = mne.io.read_raw_fif(file_path)
+
+        return fif

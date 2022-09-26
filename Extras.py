@@ -18,13 +18,13 @@ bh_data = subject.bh_data()
 vs_time = bh_data['key_resp.started'].values
 
 # Fixatino 1 screen start time
-fix1_time = bh_data['fixation_target_5.started'].values
+cross1_time = bh_data['fixation_target_5.started'].values
 # Fill missing fix 1 screens
-fix1_time[np.where(fix1_time =='None')] = bh_data['fixation_target.started'].values[np.where(fix1_time =='None')]
+cross1_time[np.where(cross1_time =='None')] = bh_data['fixation_target.started'].values[np.where(cross1_time =='None')]
 # get times from trial 2 onwards to calculate inter trial time interval
-fix1_time = np.append(fix1_time, float('nan'))[1:].astype(float)
+cross1_time = np.append(cross1_time, float('nan'))[1:].astype(float)
 
-delay = fix1_time - vs_time
+delay = cross1_time - vs_time
 
 plt.figure()
 plt.title('Delay from VS start to next Trial fixation 1')

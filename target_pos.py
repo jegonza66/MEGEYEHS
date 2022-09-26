@@ -1,4 +1,3 @@
-import scipy.io
 import matplotlib.image as mpimg
 import os
 import numpy as np
@@ -11,38 +10,7 @@ from paths import paths
 import load
 
 items_pos_path = paths().item_pos_path()
-
-items_pos = scipy.io.loadmat(items_pos_path)
-items_pos_data = items_pos['pos']
-
-items_pos_type = items_pos_data.dtype  # dtypes of structures are "unsized objects"
-
-# * SciPy reads in structures as structured NumPy arrays of dtype object
-# * The size of the array is the size of the structure array, not the number
-#   elements in any particular field. The shape defaults to 2-dimensional.
-# * For convenience make a dictionary of the data using the names from dtypes
-# * Since the structure has only one element, but is 2-D, index it at [0, 0]
-
-ndata = {n: items_pos_data[n] for n in items_pos_type.names}
-# Reconstruct the columns of the data table from just the time series
-# Use the number of intervals to test if a field is a column or metadata
-columns = items_pos_type.names
-# now make a data frame, setting the time stamps as the index
-items_pos = pd.DataFrame(np.concatenate([ndata[c] for c in columns], axis=1), columns=columns)
-
-for key in items_pos.keys():
-    key_values = [value[0] for value in items_pos[key].values]
-    items_pos[key] = key_values
-
-double_list_keys = list(items_pos.keys())
-remove_keys = ['folder', 'item', 'cmp', 'trialabsent']
-for key in remove_keys:
-    double_list_keys.remove(key)
-
-for key in double_list_keys:
-    key_values = [value[0] for value in items_pos[key].values]
-    items_pos[key] = key_values
-
+items_pos = pd.read_csv(items_pos_path)
 
 # Complete target pos
 plt.ioff()
@@ -50,7 +18,7 @@ exp_path = paths().experiment_path()
 plots_path = paths().plots_path()
 
 subject = load.subject()
-bh_data = subject.beh_data()
+bh_data = subject.bh_data()
 
 all_targets = bh_data[bh_data['Tpres'] == 1]
 image_names = all_targets['searchimage'].drop_duplicates()

@@ -3,8 +3,6 @@ import numpy as np
 import matplotlib.image as mpimg
 import matplotlib as mpl
 import os
-
-import pandas as pd
 import seaborn as sn
 
 import functions
@@ -149,8 +147,11 @@ def scaled_signals(time, scaled_signals, reference_signals, interval_signal=None
     return fig
 
 
-def scanpath(fixations_vs, items_pos, bh_data, raw, gazex, gazey, subject, trial,
+def scanpath(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial,
              screen_res_x=1920, screen_res_y=1080, img_res_x=1280, img_res_y=1024, display_fig=False, save=True):
+
+    fixations_vs = fixations.loc[fixations['screen'] == 'vs']
+
     plt.clf()
     plt.close('all')
 
@@ -162,8 +163,8 @@ def scanpath(fixations_vs, items_pos, bh_data, raw, gazex, gazey, subject, trial
     item_pos_t = items_pos.loc[items_pos['folder'] == fixations_t['trial_image'].values[0]]
 
     # Get vs from trial
-    vs_start_idx = functions.find_nearest(raw.times, raw.annotations.vs[np.where(raw.annotations.trial == trial)[0]])[0]
-    vs_end_idx = functions.find_nearest(raw.times, raw.annotations.onset[np.where(raw.annotations.trial == trial)[0]])[0]
+    vs_start_idx = functions.find_nearest(raw.times, subject.vs[np.where(subject.trial == trial)[0]])[0]
+    vs_end_idx = functions.find_nearest(raw.times, subject.onset[np.where(subject.trial == trial)[0]])[0]
 
     # Load search image
     img = mpimg.imread(exp_path + 'cmp_' + fixations_t['trial_image'].values[0] + '.jpg')
@@ -293,10 +294,10 @@ def trial_gaze(raw, bh_data, gazex, gazey, subject, trial, display_fig=False, sa
     mss = bh_data['Nstim'][trial_idx_bh]
 
     # Get trial start and end samples
-    trial_idx_annot = np.where(raw.annotations.trial == trial)[0]
+    trial_idx_annot = np.where(subject.trial == trial)[0]
     trial_start_idx = \
-    functions.find_nearest(raw.times, raw.annotations.fix1[trial_idx_annot])[0] - 120 * 2
-    trial_end_idx = functions.find_nearest(raw.times, raw.annotations.onset[trial_idx_annot])[0] + 120 * 6
+    functions.find_nearest(raw.times, subject.cross1[trial_idx_annot])[0] - 120 * 2
+    trial_end_idx = functions.find_nearest(raw.times, subject.onset[trial_idx_annot])[0] + 120 * 6
 
     # Plot
     plt.figure(figsize=(15, 5))
@@ -307,13 +308,13 @@ def trial_gaze(raw, bh_data, gazex, gazey, subject, trial, display_fig=False, sa
     plt.plot(raw.times[trial_start_idx:trial_end_idx], gazey[trial_start_idx:trial_end_idx] - 1000, 'black', label='Y')
 
     # Screens
-    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.fix1[trial_idx_annot][0], xmax=raw.annotations.ms[trial_idx_annot][0], color='grey',
+    plt.axvspan(ymin=0, ymax=1, xmin=subject.cross1[trial_idx_annot][0], xmax=subject.ms[trial_idx_annot][0], color='grey',
                 alpha=0.4, label='Fix')
-    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.ms[trial_idx_annot][0], xmax=raw.annotations.fix2[trial_idx_annot][0], color='red',
+    plt.axvspan(ymin=0, ymax=1, xmin=subject.ms[trial_idx_annot][0], xmax=subject.cross2[trial_idx_annot][0], color='red',
                 alpha=0.4, label='MS')
-    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.fix2[trial_idx_annot][0], xmax=raw.annotations.vs[trial_idx_annot][0], color='grey',
+    plt.axvspan(ymin=0, ymax=1, xmin=subject.cross2[trial_idx_annot][0], xmax=subject.vs[trial_idx_annot][0], color='grey',
                 alpha=0.4, label='Fix')
-    plt.axvspan(ymin=0, ymax=1, xmin=raw.annotations.vs[trial_idx_annot][0], xmax=raw.annotations.onset[trial_idx_annot][0], color='green',
+    plt.axvspan(ymin=0, ymax=1, xmin=subject.vs[trial_idx_annot][0], xmax=subject.onset[trial_idx_annot][0], color='green',
                 alpha=0.4, label='VS')
 
     plt.xlabel('time [s]')
@@ -337,7 +338,7 @@ def first_fixation_delay(fixations, subject, display_fig=False, save=True):
     else:
         plt.ioff()
 
-    fixations1_fix_screen = fixations.loc[(fixations['screen'].isin(['fix1', 'fix2'])) & (fixations['n_fix'] == 1)]
+    fixations1_fix_screen = fixations.loc[(fixations['screen'].isin(['cross1', 'cross2'])) & (fixations['n_fix'] == 1)]
     plt.figure()
     plt.hist(fixations1_fix_screen['time'], bins=40)
     plt.title('1st fixation delay distribution')
@@ -349,25 +350,25 @@ def first_fixation_delay(fixations, subject, display_fig=False, save=True):
         plt.savefig(save_path + f'{subject.subject_id} 1st fix delay dist.png')
 
 
-def pupil_size_increase(fixations, response_trials_meg, subject, display_fig=False, save=True):
+def pupil_size_increase(fixations, subject, display_fig=False, save=True):
 
     if display_fig:
         plt.ion()
     else:
         plt.ioff()
 
-    fixations_pupil_s = fixations.loc[(fixations['screen'].isin(['fix1', 'ms', 'fix2'])) & (fixations['n_fix'] == 1)]
+    fixations_pupil_s = fixations.loc[(fixations['screen'].isin(['cross1', 'ms', 'cross2'])) & (fixations['n_fix'] == 1)]
 
     pupil_diffs = []
     mss = []
-    for trial in response_trials_meg:
+    for trial in subject.trial:
         trial_data = fixations_pupil_s.loc[fixations_pupil_s['trial'] == trial]
 
         try:
-            if 'fix1' in trial_data['screen'].values:
-                pupil_diff = trial_data[trial_data['screen'] == 'fix2']['pupil'].values[0] - trial_data[trial_data['screen'] == 'fix1']['pupil'].values[0]
+            if 'cross1' in trial_data['screen'].values:
+                pupil_diff = trial_data[trial_data['screen'] == 'cross2']['pupil'].values[0] - trial_data[trial_data['screen'] == 'cross1']['pupil'].values[0]
             else:
-                pupil_diff = trial_data[trial_data['screen'] == 'fix2']['pupil'].values[0] - \
+                pupil_diff = trial_data[trial_data['screen'] == 'cross2']['pupil'].values[0] - \
                              trial_data[trial_data['screen'] == 'ms']['pupil'].values[0]
             pupil_diffs.append(pupil_diff)
             mss.append(trial_data['mss'].values[0])

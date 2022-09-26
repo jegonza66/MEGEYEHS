@@ -3,13 +3,15 @@ import os
 import numpy as np
 import pickle
 
+import pandas as pd
+
 from paths import paths
 import load
 import preproc_plot
 import preproc_functions
 
 
-def preprocess(subject):
+def preprocess(subject, plot=False):
 
     #---------------- Load data ----------------#
     # Define subject
@@ -62,27 +64,28 @@ def preprocess(subject):
                                                                          subject=subject)
 
     #---------------- Fixations classification ----------------#
-    fixations = preproc_functions.fixation_classification(bh_data=bh_data, fixations=fixations, raw=raw,
-                                                          meg_pupils_data_clean=meg_pupils_data_clean)
+    fixations, raw = preproc_functions.fixation_classification(subject=subject, bh_data=bh_data, fixations=fixations,
+                                                               raw=raw, meg_pupils_data_clean=meg_pupils_data_clean)
 
     #---------------- Items classification ----------------#
-    fixations_vs, items_pos = preproc_functions.target_vs_distractor(fixations=fixations, bh_data=bh_data,
-                                                                     distance_threshold=100)
+    fixations, items_pos = preproc_functions.target_vs_distractor(fixations=fixations, bh_data=bh_data,
+                                                                  subject=subject, distance_threshold=100)
 
     #---------------- Save fix time distribution, pupils size vs mss, scanpath and trial gaze figures ----------------#
-    preproc_plot.first_fixation_delay(fixations=fixations, subject=subject)
-    preproc_plot.pupil_size_increase(fixations=fixations, response_trials_meg=raw.annotations.trial, subject=subject)
-    preproc_plot.performance(subject=subject)
+    if plot:
+        preproc_plot.first_fixation_delay(fixations=fixations, subject=subject)
+        preproc_plot.pupil_size_increase(fixations=fixations, subject=subject)
+        preproc_plot.performance(subject=subject)
 
-    print('Plotting scanpaths and trials gaze screens')
-    for trial in raw.annotations.trial:
-        print(f'\rTrial {trial}', end='')
+        print('Plotting scanpaths and trials gaze screens')
+        for trial in subject.trial:
+            print(f'\rTrial {trial}', end='')
 
-        preproc_plot.scanpath(fixations_vs=fixations_vs, items_pos=items_pos, bh_data=bh_data, raw=raw,
-                              gazex=meg_gazex_data_clean, gazey=meg_gazey_data_clean, subject=subject, trial=trial)
+            preproc_plot.scanpath(fixations=fixations, items_pos=items_pos, bh_data=bh_data, raw=raw,
+                                  gazex=meg_gazex_data_clean, gazey=meg_gazey_data_clean, subject=subject, trial=trial)
 
-        preproc_plot.trial_gaze(raw=raw, bh_data=bh_data, gazex=meg_gazex_data_clean, gazey=meg_gazey_data_clean,
-                                subject=subject, trial=trial)
+            preproc_plot.trial_gaze(raw=raw, bh_data=bh_data, gazex=meg_gazex_data_clean, gazey=meg_gazey_data_clean,
+                                    subject=subject, trial=trial)
 
     #---------------- Add scaled data to meg data ----------------#
     print('\nSaving scaled et data to meg raw data structure')
@@ -105,9 +108,6 @@ def preprocess(subject):
     print('Adding new ET channels')
     raw.add_channels([raw_et])
     del (raw_et)
-    # Correct raw.annotations length
-    raw.annotations.ch_names = raw.annotations.ch_names[:len(raw.annotations.description)]
-    raw.annotations.duration = raw.annotations.duration[:len(raw.annotations.description)]
 
     #---------------- Save preprocesed data ----------------#
     print('Saving preprocessed data')
@@ -116,29 +116,34 @@ def preprocess(subject):
     preproc_save_path = preproc_data_path + subject.subject_id + '/'
     os.makedirs(preproc_save_path, exist_ok=True)
 
-    # Add data to subject class
+    # Add data to subject class and save
     subject.bh_data = bh_data
     subject.fixations = fixations
-    subject.fixations_vs = fixations_vs
     subject.saccades = saccades
 
     f = open(preproc_save_path + 'Subject_data.pkl', 'wb')
     pickle.dump(subject, f)
     f.close()
 
-    # # Save fixations
-    # fixations.to_csv(preproc_save_path + 'fixations.csv')
-    # fixations_vs.to_csv(preproc_save_path + 'fixations_vs.csv')
+    # Save fixations
+    fixations.to_csv(preproc_save_path + 'fixations.csv')
 
     # Save MEG
     preproc_meg_data_fname = f'Subject_{subject.subject_id}_meg.fif'
     raw.save(preproc_save_path + preproc_meg_data_fname, overwrite=True)
 
     # Save events
-    # evt = mne.events_from_annotations(raw)
+    evt, evt_id = mne.events_from_annotations(raw)
+    preproc_evt_data_fname = f'Subject_{subject.subject_id}_eve.fif'
+    mne.write_events(preproc_save_path + preproc_evt_data_fname, evt, overwrite=True)
+
+    # Save events mapping
+    evt_df = pd.DataFrame([evt_id])
+    preproc_evt_map_fname = f'Subject_{subject.subject_id}_eve_map.csv'
+    evt_df.to_csv(preproc_save_path + preproc_evt_map_fname)
 
     print(f'Preprocessed data saved to {preproc_save_path}')
 
 
-for subject in [1, 2, 3, 4, 5]:
-    preprocess(subject)
+for subject in [0, 1, 2, 3, 4, 5]:
+    preprocess(subject=subject, plot=False)
