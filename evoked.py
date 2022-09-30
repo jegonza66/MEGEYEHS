@@ -58,10 +58,10 @@ for subject in [0, 1, 2, 3, 4, 5]:
 # Compute grand average
 grand_avg = mne.grand_average(evokeds, interpolate_bads=False)
 # Save grand average
-ga_save_path = save_path + f'Evoked/lfreq{l_freq}_hfreq{h_freq}/'
+ga_save_path = save_path + f'Evoked/{epoch_id}_lfreq{l_freq}_hfreq{h_freq}/'
 os.makedirs(evoked_save_path, exist_ok=True)
 grand_avg_data_fname = f'Grand_average_ave.fif'
-evoked.save(evoked_save_path + grand_avg_data_fname, overwrite=True)
+evoked.save(ga_save_path + grand_avg_data_fname, overwrite=True)
 
 # PLOT
 grand_avg.plot(window_title=f'Grand average - {epoch_id}', gfp=True, time_unit='s')

@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import os
 import math
+import mne
 
 import functions
 from paths import paths
@@ -367,6 +368,321 @@ def define_events_trials(raw, subject):
     raw.annotations.description = np.array(description)
     raw.annotations.onset = np.array(onset)
     
+    # Save data to subject class
+    subject.trial = np.array(response_trials_meg)
+    subject.cross1 = np.array(cross1_times_meg)
+    subject.ms = np.array(ms_times_meg)
+    subject.cross2 = np.array(cross2_times_meg)
+    subject.vs = np.array(vs_times_meg)
+    subject.description = np.array(buttons_meg)
+    subject.onset = np.array(response_times_meg)
+    subject.time_differences = np.array(time_differences)
+    subject.no_answer = np.array(no_answer)
+
+    return bh_data, raw, subject
+
+
+def define_events_trials_corr(raw, subject, et_channel_names):
+    print('Detecting events and defining trials by matching signals')
+
+    et_data = subject.et_data()
+
+    et_gazex = et_data['samples'][1]
+    et_gazey = et_data['samples'][2]
+    et_pupils = et_data['samples'][3]
+
+    msg = et_data['msg']
+
+    exp_ini_msg = 'ETSYNC 100'
+    block_start_msg = '!MODE RECORD'
+    eyemap_start_msg = 'ETSYNC 152'
+    eyemap_end_msg = 'ETSYNC 151'
+    cross1_msg = 'ETSYNC 50'
+    ms_start_msg = 'ETSYNC 200'
+    ms_end_msg = 'ETSYNC 201'
+    vs_start_msg = 'ETSYNC 250'
+    vs_end_msg = 'ETSYNC 251'
+    exp_end_msg = 'ETSYNC 255'
+
+    block_start = et_data['msg'].loc[et_data['msg'][1].str.contains(block_start_msg)].index.values[2:]
+    eyemap_start = et_data['msg'].loc[et_data['msg'][1].str.contains(eyemap_start_msg)][1].str.split(' ETSYNC', expand=True)[0].values.astype(int)
+    eyemap_end = et_data['msg'].loc[et_data['msg'][1].str.contains(eyemap_end_msg)][1].str.split(' ETSYNC', expand=True)[0].values.astype(int)
+    cross_1_start = et_data['msg'].loc[et_data['msg'][1].str.contains(cross1_msg)][1].str.split(' ETSYNC', expand=True)[0].values.astype(int)
+    ms_start = et_data['msg'].loc[et_data['msg'][1].str.contains(ms_start_msg)][1].str.split(' ETSYNC', expand=True)[0].values.astype(int)
+    ms_end = et_data['msg'].loc[et_data['msg'][1].str.contains(ms_end_msg)][1].str.split(' ETSYNC', expand=True)[0].values.astype(int)
+    vs_start = et_data['msg'].loc[et_data['msg'][1].str.contains(vs_start_msg)][1].str.split(' ETSYNC', expand=True)[0].values.astype(int)
+    vs_end = et_data['msg'].loc[et_data['msg'][1].str.contains(vs_end_msg)][1].str.split(' ETSYNC', expand=True)[0].values.astype(int)
+
+
+    # copy raw structure
+    print('Extracting ET data and downsampling')
+    raw_et = raw.copy()
+    # make new raw structure from et channels only
+    raw_et.pick(et_channel_names)
+    raw_et.resample(1000)
+
+    meg_et = raw_et.get_data(et_channel_names)
+    meg_gazex = meg_et[0]
+
+    # Get events in meg data (only red blue and green)
+    evt_buttons = raw_et.annotations.description
+    evt_times = raw_et.annotations.onset[(evt_buttons == 'red') | (evt_buttons == 'blue') | (evt_buttons == 'green')]
+    evt_buttons = evt_buttons[(evt_buttons == 'red') | (evt_buttons == 'blue') | (evt_buttons == 'green')]
+
+    # Check for first trial when first response is not green
+    first_trial = functions.first_trial(evt_buttons)
+
+    # Drop events before 1st trial
+    evt_buttons = evt_buttons[first_trial:]
+    evt_times = evt_times[first_trial:]
+
+    # Split events into blocks by green press at begening of block
+    blocks_start_end = np.where(evt_buttons == 'green')[0]
+
+    # Add first trial idx (0) on first sample (0) and Add last trial idx in the end
+    blocks_start_end = np.concatenate((np.array([-1]), blocks_start_end, np.array([len(evt_buttons)-1])))
+
+    # Delete succesive presses of green
+    blocks_start_end = list(np.delete(blocks_start_end, np.where(np.diff(blocks_start_end) < 2)).astype(int))
+
+    # Delete blocks shorter than 20 trials
+    blocks_start_end = list(np.delete(blocks_start_end, np.where(np.diff(blocks_start_end) < 20)).astype(int))
+
+    # Define starting and ending trial of each block
+    blocks_bounds = [(blocks_start_end[i] + 1, blocks_start_end[i + 1]) for i in range(len(blocks_start_end) - 1)]
+
+    blocks_times = [(evt_times[blocks_bounds[i][0]], evt_times[blocks_bounds[i][1]]) for i in range(len(blocks_bounds))]
+
+    blocks_bounds_samples = [(functions.find_nearest(raw_et.times, blocks_times[i][0])[0],
+                              functions.find_nearest(raw_et.times, blocks_times[i][1])[0])
+                             for i in range(len(blocks_bounds))]
+
+    eyemap_delay = 40000
+    end_drop_meg = 70000
+    fig, axs = plt.subplots(2)
+    axs[0].plot(et_gazex[functions.find_nearest(et_data['samples'].index.values, block_start[0])[1]+eyemap_delay:
+                         functions.find_nearest(et_data['samples'].index.values, block_start[1])[1]])
+    axs[1].plot(meg_gazex[blocks_bounds_samples[0][0]:blocks_bounds_samples[0][1]-end_drop_meg])
+
+    x1 = et_gazex[functions.find_nearest(et_data['samples'].index.values, block_start[0])[1]+eyemap_delay:
+                         functions.find_nearest(et_data['samples'].index.values, block_start[1])[1]]
+    x2 = meg_gazex[blocks_bounds_samples[0][0]:blocks_bounds_samples[0][1]]
+
+    foo = np.correlate(et_gazex[np.where(et_data['time'] == block_start[0])[0][0]+eyemap_delay:np.where(et_data['time'] == block_start[1])[0][0]],
+                       meg_gazex[blocks_bounds_samples[0][0]:blocks_bounds_samples[0][1]-end_drop_meg], 'valid')
+
+    df = pd.DataFrame({'x1':x1, 'x2':x2[:len(x1)]})
+    foo = df.corr()
+
+
+    # Load behavioural data
+    bh_data = subject.bh_data()
+
+    # Get only trial data rows
+    bh_data = bh_data.loc[~pd.isna(bh_data['target.started'])].reset_index(drop=True)
+
+    # Get MS start time
+    ms_start = bh_data['target.started'].values.ravel().astype(float)
+
+    # Get fix 1 start time
+    cross1_start_key_idx = ['fixation_target.' in key and 'started' in key for key in bh_data.keys()]
+    cross1_start_key = bh_data.keys()[cross1_start_key_idx][0]
+
+    # If there's a missing cross1 screen, the time for that screen would be None, and the column type would be string.
+    # If there's not, the type would be float. Change type to string and replace None by the mss screen start time
+    if type(bh_data[cross1_start_key][0]) == str:
+        cross1_start = np.array([value.replace('None', f'{ms_start[i]}') for i, value in
+                                 enumerate(bh_data[cross1_start_key].values.ravel())]).astype(float)
+    else:
+        cross1_start = bh_data[cross1_start_key].values
+
+    # Get fix 2 start time
+    cross2_start_key_idx = ['fixation_target_2' in key and 'started' in key for key in bh_data.keys()]
+    cross2_start_key = bh_data.keys()[cross2_start_key_idx]
+    cross2_start = bh_data[cross2_start_key].values.ravel().astype(float)
+
+    # Get Visual search start time
+    search_start_key_idx = ['search' in key and 'started' in key for key in bh_data.keys()]
+    search_start_key = bh_data.keys()[search_start_key_idx]
+    search_start = bh_data[search_start_key].values.ravel().astype(float)
+
+    # Get responses
+    responses = bh_data['key_resp.keys'].values
+
+    # Get response time
+    rt = copy.copy(bh_data['key_resp.rt'].values)
+    # completed_responses_idx = np.where(pd.isna(bh_data['key_resp.rt']) & (responses != 'None'))[0]
+    # rt.loc[completed_responses_idx] = 10
+    # rt = rt.values
+
+    # Define variables to store data
+    no_answer = []
+    cross1_times_meg = []
+    ms_times_meg = []
+    cross2_times_meg = []
+    vs_times_meg = []
+    buttons_meg = []
+    response_times_meg = []
+    response_trials_meg = []
+    time_differences = []
+    description = []
+    onset = []
+
+    # Define trials block by block
+    for block_num, block_bounds in enumerate(blocks_bounds):
+        print(f'\nBlock: {block_num + 1}')
+        block_start = block_bounds[0]
+        block_end = block_bounds[1]
+        block_trials = 30
+        block_idxs = np.arange(block_num * block_trials, (block_num + 1) * block_trials)
+
+        # Get events in block from MEG data
+        meg_evt_block_times = copy.copy(evt_times[block_start:block_end])
+        meg_evt_block_buttons = copy.copy(evt_buttons[block_start:block_end])
+
+        # Get durations in block from BH data
+        cross1_block_dur = (ms_start - cross1_start)[block_idxs]
+        ms_block_dur = (cross2_start - ms_start)[block_idxs]
+        cross2_block_dur = (search_start - cross2_start)[block_idxs]
+        rt_block_times = rt[block_idxs]
+
+        # Align MEG and BH data in time
+        block_data_aligned = False
+        attempts = 0
+        align_sample = 0
+        while not block_data_aligned and attempts < 5:
+            # Save block variables resetting them every attempt
+            no_answer_block = []
+            cross1_times_meg_block = []
+            ms_times_meg_block = []
+            cross2_times_meg_block = []
+            vs_times_meg_block = []
+            buttons_meg_block = []
+            response_times_meg_block = []
+            response_trials_meg_block = []
+            time_diff_block = []
+            description_block = []
+            onset_block = []
+
+            try:
+                # Get events in block from BH data
+                bh_evt_block_times = (search_start + rt)[block_idxs]
+                responses_block = responses[block_idxs]
+
+                # Realign bh and meg block timelines
+                block_time_realign = search_start[block_num * block_trials] + rt[block_num * block_trials] - \
+                                     meg_evt_block_times[align_sample]
+                bh_evt_block_times = bh_evt_block_times - block_time_realign
+
+                # Iterate over trials
+                for trial in range(block_trials):
+                    if not np.isnan(bh_evt_block_times[trial]):
+                        total_trial = int(block_num * block_trials + trial + 1)
+
+                        idx, meg_evt_time = functions.find_nearest(meg_evt_block_times, bh_evt_block_times[trial])
+                        onset_block.append(meg_evt_time)
+                        description_block.append(meg_evt_block_buttons[idx])
+
+                        time_diff = bh_evt_block_times[trial] - meg_evt_time
+                        time_diff_block.append(time_diff)
+
+                        if (meg_evt_block_buttons[idx] == 'blue' and int(responses_block[trial]) != int(
+                                subject.map['blue'])) or (
+                                meg_evt_block_buttons[idx] == 'red' and int(responses_block[trial]) != int(
+                            subject.map['red'])):
+                            print(f'Different answer in MEG and BH data in trial: {trial + 1}\n'
+                                  f'Discarding and realingning on following sample\n')
+                            raise ValueError(f'Different answer in MEG and BH data in trial: {trial + 1}')
+
+                        if abs(time_diff) > 0.02:  # and block_num * block_trials + trial not in completed_responses_idx:
+                            print(
+                                f'{round(abs(meg_evt_time - bh_evt_block_times[trial]) * 1000, 1)} ms difference in Trial: {trial + 1}')
+
+                        # Define screen times from MEG response
+                        trial_search_time = meg_evt_time - rt_block_times[trial]
+                        vs_times_meg_block.append(trial_search_time)
+                        onset_block.append(trial_search_time)
+                        description_block.append(f'vs_t{total_trial}')
+
+                        trial_cross2_time = trial_search_time - cross2_block_dur[trial]
+                        cross2_times_meg_block.append(trial_cross2_time)
+                        onset_block.append(trial_cross2_time)
+                        description_block.append(f'cross2_t{total_trial}')
+
+                        trial_ms_time = trial_cross2_time - ms_block_dur[trial]
+                        ms_times_meg_block.append(trial_ms_time)
+                        onset_block.append(trial_ms_time)
+                        description_block.append(f'ms_t{total_trial}')
+
+                        trial_cross1_time = trial_ms_time - cross1_block_dur[trial]
+                        cross1_times_meg_block.append(trial_cross1_time)
+
+                        # Save cross1 onset only if there was cross 1 present in that trial
+                        if cross1_block_dur[trial]:
+                            onset_block.append(trial_cross1_time)
+                            description_block.append(f'cross1_t{total_trial}')
+
+                        buttons_meg_block.append((meg_evt_block_buttons[idx]))
+                        response_times_meg_block.append(meg_evt_time)
+                        response_trials_meg_block.append(int(block_num * block_trials + trial + 1))
+
+                    # Consider manually completed responses
+                    # elif np.isnan(bh_evt_block_times[trial]) and responses_block[trial] != 'None':
+
+                    else:
+                        print(f'No answer in Trial: {trial}')
+                        no_answer_block.append(block_num * block_trials + trial)
+
+                # Define variable of not completed responses times to assess the real time difference
+                # (completed responses might artificially increase this value)
+                # real_time_diff = [element for trial, element in zip(block_idxs, time_diff_block) if trial not in completed_responses_idx]
+                # if np.mean(real_time_diff) > 0.2:
+                if np.mean(abs(np.array(time_diff_block))) > 0.2:
+                    print(f'Average time difference for this block: {np.mean(abs(np.array(time_diff_block)))} s\n'
+                          f'Discarding and realingning on following sample\n')
+                    raise ValueError(f'Average time difference for this block over 200 ms')
+
+                else:
+                    block_data_aligned = True
+                    # Append block data to overall data
+                    no_answer.append(no_answer_block)
+                    cross1_times_meg.append(cross1_times_meg_block)
+                    ms_times_meg.append(ms_times_meg_block)
+                    cross2_times_meg.append(cross2_times_meg_block)
+                    vs_times_meg.append(vs_times_meg_block)
+                    buttons_meg.append(buttons_meg_block)
+                    response_times_meg.append(response_times_meg_block)
+                    response_trials_meg.append(response_trials_meg_block)
+                    time_differences.append(time_diff_block)
+
+                    # Save annotations from block
+                    description.append(description_block)
+                    onset.append(onset_block)
+            except:
+                align_sample += 1
+                attempts += 1
+
+        if not block_data_aligned:
+            raise ValueError(f'Could not align MEG and BH responses in block {block_num + 1}')
+
+    # flatten variables over blocks
+    response_trials_meg = functions.flatten_list(response_trials_meg)
+    cross1_times_meg = functions.flatten_list(cross1_times_meg)
+    ms_times_meg = functions.flatten_list(ms_times_meg)
+    cross2_times_meg = functions.flatten_list(cross2_times_meg)
+    vs_times_meg = functions.flatten_list(vs_times_meg)
+    buttons_meg = functions.flatten_list(buttons_meg)
+    response_times_meg = functions.flatten_list(response_times_meg)
+    time_differences = functions.flatten_list(time_differences)
+    no_answer = functions.flatten_list(no_answer)
+
+    description = functions.flatten_list(description)
+    onset = functions.flatten_list(onset)
+
+    # Save clean events to MEG data
+    raw.annotations.description = np.array(description)
+    raw.annotations.onset = np.array(onset)
+
     # Save data to subject class
     subject.trial = np.array(response_trials_meg)
     subject.cross1 = np.array(cross1_times_meg)

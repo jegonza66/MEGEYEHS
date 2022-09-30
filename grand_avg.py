@@ -1,5 +1,4 @@
 import load
-import os
 import mne
 
 from paths import paths
