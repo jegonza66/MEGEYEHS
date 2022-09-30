@@ -143,6 +143,8 @@ def preprocess(subject, plot=False):
     evt_df.to_csv(preproc_save_path + preproc_evt_map_fname)
 
     print(f'Preprocessed data saved to {preproc_save_path}')
+    del(raw)
+    del(subject)
 
 
 for subject in [0, 1, 2, 3, 4, 5]:

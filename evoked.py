@@ -31,7 +31,7 @@ for subject in [0, 1, 2, 3, 4, 5]:
     epochs = mne.Epochs(raw, events, event_id=event_id, reject=reject, event_repeated='merge')
 
     # Select epochs
-    epoch_id = 'blue'
+    epoch_id = 'fix_vs'
     epoch_keys = [key for key in event_id.keys() if epoch_id in key]
     epochs = mne.concatenate_epochs([epochs[key] for key in epoch_keys])
     # AVERAGE EPOCHS TO GET EVOKED
@@ -59,7 +59,7 @@ for subject in [0, 1, 2, 3, 4, 5]:
 grand_avg = mne.grand_average(evokeds, interpolate_bads=False)
 # Save grand average
 ga_save_path = save_path + f'Evoked/{epoch_id}_lfreq{l_freq}_hfreq{h_freq}/'
-os.makedirs(evoked_save_path, exist_ok=True)
+os.makedirs(ga_save_path, exist_ok=True)
 grand_avg_data_fname = f'Grand_average_ave.fif'
 evoked.save(ga_save_path + grand_avg_data_fname, overwrite=True)
 

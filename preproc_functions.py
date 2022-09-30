@@ -388,8 +388,7 @@ def define_events_trials_corr(raw, subject, et_channel_names):
     et_data = subject.et_data()
 
     et_gazex = et_data['samples'][1]
-    et_gazey = et_data['samples'][2]
-    et_pupils = et_data['samples'][3]
+
 
     msg = et_data['msg']
 
@@ -457,8 +456,10 @@ def define_events_trials_corr(raw, subject, et_channel_names):
                               functions.find_nearest(raw_et.times, blocks_times[i][1])[0])
                              for i in range(len(blocks_bounds))]
 
-    eyemap_delay = 40000
-    end_drop_meg = 70000
+    eyemap_delay = 30000
+    end_drop_meg = 60000
+
+    import matplotlib.pyplot as plt
     fig, axs = plt.subplots(2)
     axs[0].plot(et_gazex[functions.find_nearest(et_data['samples'].index.values, block_start[0])[1]+eyemap_delay:
                          functions.find_nearest(et_data['samples'].index.values, block_start[1])[1]])
@@ -466,13 +467,32 @@ def define_events_trials_corr(raw, subject, et_channel_names):
 
     x1 = et_gazex[functions.find_nearest(et_data['samples'].index.values, block_start[0])[1]+eyemap_delay:
                          functions.find_nearest(et_data['samples'].index.values, block_start[1])[1]]
-    x2 = meg_gazex[blocks_bounds_samples[0][0]:blocks_bounds_samples[0][1]]
+    x2 = meg_gazex[blocks_bounds_samples[0][0]:blocks_bounds_samples[0][1]-end_drop_meg]
 
-    foo = np.correlate(et_gazex[np.where(et_data['time'] == block_start[0])[0][0]+eyemap_delay:np.where(et_data['time'] == block_start[1])[0][0]],
-                       meg_gazex[blocks_bounds_samples[0][0]:blocks_bounds_samples[0][1]-end_drop_meg], 'valid')
+    start_samples = len(x1)-len(x2)
+    corrs = []
+    for i in range(start_samples):
+        print("\rProgress: {}%".format(int((i + 1) * 100 / start_samples)), end='')
+        df = pd.DataFrame({'x1': x1[i:i+len(x2)], 'x2': x2})
+        corrs.append(df.corr()['x1']['x2'])
 
-    df = pd.DataFrame({'x1':x1, 'x2':x2[:len(x1)]})
-    foo = df.corr()
+    plt.plot(corrs)
+
+    max_sample = np.argmax(corrs)
+
+    samples_lag = eyemap_delay + max_sample
+
+    x1 = et_gazex[functions.find_nearest(et_data['samples'].index.values, block_start[0])[1]:
+                  functions.find_nearest(et_data['samples'].index.values, block_start[1])[1]]
+    x2 = meg_gazex[blocks_bounds_samples[0][0]:blocks_bounds_samples[0][1]-end_drop_meg]
+
+    df = pd.DataFrame({'x1': x1[eyemap_delay + max_sample:eyemap_delay + max_sample + len(x2)],
+                       'x2': x2})
+
+
+    plt.plot(x1[samples_lag+8000:samples_lag+8000 + len(x2)])
+    plt.plot(np.arange(len(x2)), x2*200+1000)
+
 
 
     # Load behavioural data
