@@ -98,15 +98,15 @@ def preprocess(subject, plot=False):
         raw_et.rename_channels({ch_name: new_name})
 
     # Pick data from MEG channels and other channels of interest
-    channel_indices = mne.pick_types(raw.info, meg=True)
-    channel_indices = np.append(channel_indices, mne.pick_channels(raw.info['ch_names'], ['UPPT001']))
-    raw.pick(channel_indices)
+    channel_idx = mne.pick_types(raw.info, meg=True)
+    channel_idx = np.append(channel_idx, mne.pick_channels(raw.info['ch_names'], ['UPPT001', 'UADC001-4123', 'UADC002-4123', 'UADC013-4123']))
+    raw.pick(channel_idx)
 
     # save to original raw structure (requires to load data)
     print('Loading MEG data')
     raw.load_data()
     print('Adding new ET channels')
-    raw.add_channels([raw_et])
+    raw.add_channels([raw_et], force_update_info=True)
     del (raw_et)
 
     #---------------- Save preprocesed data ----------------#

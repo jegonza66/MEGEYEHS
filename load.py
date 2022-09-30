@@ -47,7 +47,7 @@ class subject:
         subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001', '16200001',
                         '16201001', '16256001', '09991040', '10925091', '16263002', '16269001', 'BACK_NOISE']
         # Subjects bad channels
-        subjects_bad_channels = [['MLT11-4123', 'MLT21-4123'], [], [], [], [], [], [], [], [], [], [], [], [], [], []]
+        subjects_bad_channels = [['MLT11-4123', 'MLT21-4123'], ['MRT53-4123'], [], [], [], [], ['MRT53-4123'], [], [], [], [], [], [], [], []]
         # Subjects groups
         subjects_groups = ['Balanced', 'Balanced', 'Balanced', 'Counterbalanced', 'Balanced', 'Balanced', # For some reason participant 6 has the mapping from balanced participants
                            'Balanced', 'Balanced', 'Balanced', 'Counterbalanced', 'Counterbalanced', 'Counterbalanced',
@@ -55,8 +55,6 @@ class subject:
         # Mapping for subject 6 is blue ->1,red->4 as Balanced participants. Still the bh data file clearly says Counterbalanced.
         # It could be that the MEG data changed the name it gave to each respone... This doesen't affect anything else but the color name of the responses.
 
-        # Subjects item position file
-        subject_item = ['Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old', 'Old']
 
         # Select 1st subject by default
         if subject == None:
@@ -79,13 +77,6 @@ class subject:
             self.map = {'blue': '1', 'red': '4'}
         elif self.group == 'Counterbalanced':
             self.map = {'blue': '4', 'red': '1'}
-
-        # Get items positions file
-        self.item_pos_group = subject_item[subjects_ids.index(self.subject_id)]
-        if self.item_pos_group == 'Old':
-            self.item_pos_path = paths().item_pos_path()
-        else:
-            self.item_pos_path = paths().new_item_pos_path()
 
 
     # MEG data

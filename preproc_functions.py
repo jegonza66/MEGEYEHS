@@ -84,8 +84,7 @@ def blinks_to_nan(meg_pupils_data_raw, meg_gazex_data_scaled, meg_gazey_data_sca
     if missing[-1] == 1:
         missing_start = missing_start[:-1]
 
-    # Remove blinks
-    # First, fill missing values (and suroundings) with nan
+    # Remove blinks by filling missing values (and suroundings) with nan
     for i in range(len(missing_start)):
         blink_interval = np.arange(missing_start[i] - start_interval_samples, missing_end[i] + end_interval_samples)
         meg_gazex_data_clean[blink_interval] = float('nan')
@@ -610,7 +609,7 @@ def target_vs_distractor(fixations, bh_data, subject, distance_threshold=100, sc
     print('Identifying fixated items')
 
     # Load items data
-    items_pos_path = subject.item_pos_path
+    items_pos_path = paths().item_pos_path()
     items_pos = pd.read_csv(items_pos_path)
 
     # Rescale images from original resolution to screen resolution to match fixations scale
