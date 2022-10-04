@@ -56,6 +56,9 @@ def preprocess(subject, plot=False):
                                                                sfreq=raw.info['sfreq'])
 
     #---------------- Defining response events and trials ----------------#
+    # if subject.subject_id in subject.missing_bh:
+    #     bh_data, raw, subject = preproc_functions.define_events_trials_ET(raw=raw, subject=subject)
+    # else:
     bh_data, raw, subject = preproc_functions.define_events_trials(raw=raw, subject=subject)
 
     #---------------- Fixations and saccades detection ----------------#

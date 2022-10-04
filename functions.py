@@ -61,6 +61,26 @@ def find_nearest(array, value):
     return idx, array[idx]
 
 
+def find_previous(array, value):
+    """
+    Find the nearest element in an array to a given value
+
+    Parameters
+    ----------
+    array: ndarray
+        The 1D array to look in for the nearest value.
+
+    Returns
+    -------
+    idx: int
+      The index of the element in the array that is nearest to the given value.
+    """
+
+    array = np.asarray(array)
+    idx = np.max(np.where(array - value <= 0)[0])
+    return idx, array[idx]
+
+
 def first_trial(evt_buttons):
     """
     Get event corresponding to last green button press before 1st trial begins

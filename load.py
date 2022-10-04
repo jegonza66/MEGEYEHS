@@ -72,11 +72,14 @@ class subject:
         self.bad_channels = subjects_bad_channels[subjects_ids.index(self.subject_id)]
         self.group = subjects_groups[subjects_ids.index(self.subject_id)]
 
-        # Defin mapping between button value and color by group
+        # Define mapping between button value and color by group
         if self.group == 'Balanced':
             self.map = {'blue': '1', 'red': '4'}
         elif self.group == 'Counterbalanced':
             self.map = {'blue': '4', 'red': '1'}
+
+        ## Define missing bh subjects
+        self.missing_bh = ['16191001', '16200001', '16201001']
 
 
     # MEG data
