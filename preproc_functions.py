@@ -382,7 +382,7 @@ def define_events_trials(raw, subject):
     return bh_data, raw, subject
 
 
-def define_events_trials_ET(raw, subject, et_channel_names):
+def define_events_trials_ET(raw, subject, et_channel_names, force_realign=False):
     print('Detecting events and defining trials by matching signals')
 
     # Load behavioural data
@@ -413,9 +413,10 @@ def define_events_trials_ET(raw, subject, et_channel_names):
     vs_start = et_data['msg'].loc[et_data['msg'][1].str.contains(vs_start_msg)].index.values
     vs_end = et_data['msg'].loc[et_data['msg'][1].str.contains(vs_end_msg)].index.values
 
+    # Add last block end sample
     blocks_start_et = np.concatenate((blocks_start_et,  np.array([vs_end[-1]])))
 
-    # only for me an franccesca
+    # only for me an franccesca because later subjects have blocks loop
     block_start_idx = np.array([0, 30, 60, 90, 120, 150, 180])
     eyemap_start_idx = block_start_idx * 5
     eyemap_start = eyemap_start[eyemap_start_idx]
@@ -467,6 +468,10 @@ def define_events_trials_ET(raw, subject, et_channel_names):
     description = []
     onset = []
 
+    # Save samples shift for each block if no previous data
+    if 'samples_shift' not in subject.__dict__.keys() or force_realign:
+        subject.samples_shift = {}
+
     # Define trials block by block
     for block_num, block_bounds in enumerate(blocks_bounds):
         print(f'\nBlock: {block_num + 1}')
@@ -482,52 +487,66 @@ def define_events_trials_ET(raw, subject, et_channel_names):
         # Check for first trial when first response is not green
         first_trial = functions.first_trial(evt_buttons)
 
-        # Drop parts of the signal that don't match to shorten the correlation values search
-        et_drop = 48500
+        # Align signals
+        if subject.samples_shift == {}:
+            # Drop parts of the signal that don't match to shorten the correlation values search
+            et_drop = 48500
+            meg_start_drop = 30000
 
-        et_gazex_block = et_gazex[functions.find_nearest(et_data['samples'].index.values, blocks_start_et[block_num])[1]+et_drop:
-                             functions.find_nearest(et_data['samples'].index.values, blocks_start_et[block_num+1])[1]-et_drop]
-        meg_gazex_block = meg_gazex[blocks_bounds_samples[block_num][0]:blocks_bounds_samples[block_num][1]]
+            et_gazex_block = et_gazex[functions.find_nearest(et_data['samples'].index.values, blocks_start_et[block_num])[1]+et_drop:
+                                 functions.find_nearest(et_data['samples'].index.values, blocks_start_et[block_num+1])[1]-et_drop]
+            meg_gazex_block = meg_gazex[blocks_bounds_samples[block_num][0]+meg_start_drop:blocks_bounds_samples[block_num][1]]
 
-        # fig, axs = plt.subplots(2)
-        # axs[0].plot(et_gazex_block)
-        # axs[1].plot(meg_gazex_block)
+            # fig, axs = plt.subplots(2)
+            # axs[0].plot(et_gazex_block)
+            # axs[1].plot(meg_gazex_block)
 
-        print('Finding optimal alignment')
-        if len(et_gazex_block) > len(meg_gazex_block):
-            raise ValueError('ET data is longer than MEG data. Please change the meg_drop_start parameter to a smaller one.')
+            print('Finding optimal alignment')
+            if len(et_gazex_block) > len(meg_gazex_block):
+                raise ValueError('ET data is longer than MEG data. Please change the meg_drop_start parameter to a smaller one.')
+            else:
+                start_samples = len(meg_gazex_block) - len(et_gazex_block)
+                corrs = []
+                for i in range(start_samples):
+                    print("\rProgress: {}%".format(int((i + 1) * 100 / start_samples)), end='')
+                    df = pd.DataFrame({'x1': et_gazex_block, 'x2': meg_gazex_block[i:i + len(et_gazex_block)]})
+                    corrs.append(df.corr()['x1']['x2'])
+                print()
+                # Samples lag is the sample number in the MEG data that corresponds to the first et data sample
+                # meg_data[0] = et_data[samples_lag]
+                max_sample = np.argmax(corrs)
+                samples_shift = et_drop + meg_start_drop + max_sample
+                print(f'Max corr: {np.max(corrs)}')
+            # Save samples shift
+            subject.samples_shift[block_num] = samples_shift
+
+            plt.ioff()
+            plt.figure()
+            plt.title(block_num)
+            plt.plot(corrs)
+            save_path = paths().plots_path() + f'Preprocessing/ET_align/{subject.subject_id}/'
+            os.makedirs(save_path, exist_ok=True)
+            plt.savefig(save_path + f'Corr_block{block_num+1}.png')
+
+            plt.figure()
+            plt.title(block_num)
+            plt.plot(np.arange(len(et_gazex_block)), et_gazex_block)
+            plt.plot(np.arange(len(meg_gazex_block[max_sample:max_sample+len(et_gazex_block)])), meg_gazex_block[max_sample:max_sample+len(et_gazex_block)]*200+1000)
+            plt.savefig(save_path + f'Signals_block{block_num + 1}.png')
+
+        # If already previous samples shuift data, use that
         else:
-            start_samples = len(meg_gazex_block) - len(et_gazex_block)
-            corrs = []
-            for i in range(start_samples):
-                print("\rProgress: {}%".format(int((i + 1) * 100 / start_samples)), end='')
-                df = pd.DataFrame({'x1': et_gazex_block, 'x2': meg_gazex_block[i:i + len(et_gazex_block)]})
-                corrs.append(df.corr()['x1']['x2'])
-            print()
-            # Samples lag is the sample number in the MEG data that corresponds to the first et data sample
-            # meg_data[0] = et_data[samples_lag]
-            max_sample = np.argmax(corrs)
-            samples_lag = et_drop + max_sample
-            print(f'Max corr: {np.max(corrs)}')
-
-        plt.figure()
-        plt.title(block_num)
-        plt.plot(corrs)
-
-        plt.figure()
-        plt.title(block_num)
-        plt.plot(np.arange(len(et_gazex_block)), et_gazex_block)
-        plt.plot(np.arange(len(meg_gazex_block[max_sample:max_sample+len(et_gazex_block)])), meg_gazex_block[max_sample:max_sample+len(et_gazex_block)]*200+1000)
+            samples_shift = subject.samples_shift[block_num]
 
         # Define block screen start samples
-        block_start_et = blocks_start_et[block_num] + samples_lag
-        eyemap_start_block = eyemap_start[block_num] + samples_lag
-        eyemap_end_block = eyemap_end[block_num] + samples_lag
-        cross1_start_block = cross1_start[block_idxs] + samples_lag
-        ms_start_block = ms_start[block_idxs] + samples_lag
-        ms_end_block = ms_end[block_idxs] + samples_lag
-        vs_start_block = vs_start[block_idxs] + samples_lag
-        vs_end_block = vs_end[block_idxs] + samples_lag
+        block_start_et = blocks_start_et[block_num] + samples_shift
+        eyemap_start_block = eyemap_start[block_num] + samples_shift
+        eyemap_end_block = eyemap_end[block_num] + samples_shift
+        cross1_start_block = cross1_start[block_idxs] + samples_shift
+        ms_start_block = ms_start[block_idxs] + samples_shift
+        ms_end_block = ms_end[block_idxs] + samples_shift
+        vs_start_block = vs_start[block_idxs] + samples_shift
+        vs_end_block = vs_end[block_idxs] + samples_shift
 
         # Define block screen start times
         block_start_times = raw_et.times[block_start_et] + blocks_times[block_num][0]
@@ -564,24 +583,27 @@ def define_events_trials_ET(raw, subject, et_channel_names):
 
                 # Define screen times from MEG response
                 vs_times_meg_block = copy.copy(vs_start_times) - block_time_realign
-                onset_block.append(vs_times_meg_block)
+                onset_block.append(list(vs_times_meg_block))
                 description_block.append([f'vs_t{total_trial}' for total_trial in range(int(block_num * block_trials +1),
                                                                                         int((block_num + 1) * block_trials +1))])
 
                 cross2_times_meg_block = copy.copy(ms_end_times) - block_time_realign
-                onset_block.append(cross2_times_meg_block)
+                onset_block.append(list(cross2_times_meg_block))
                 description_block.append([f'cross2_t{total_trial}' for total_trial in range(int(block_num * block_trials +1),
                                                                                         int((block_num + 1) * block_trials +1))])
 
                 ms_times_meg_block = copy.copy(ms_start_times) - block_time_realign
-                onset_block.append(ms_times_meg_block)
+                onset_block.append(list(ms_times_meg_block))
                 description_block.append([f'ms_t{total_trial}' for total_trial in range(int(block_num * block_trials +1),
                                                                                         int((block_num + 1) * block_trials +1))])
 
                 cross1_times_meg_block = copy.copy(cross1_start_times) - block_time_realign
-                onset_block.append(cross1_times_meg_block)
+                onset_block.append(list(cross1_times_meg_block))
                 description_block.append([f'cross1_t{total_trial}' for total_trial in range(int(block_num * block_trials +1),
                                                                                         int((block_num + 1) * block_trials +1))])
+                # Flatten lists to append trial data
+                onset_block = functions.flatten_list(onset_block)
+                description_block = functions.flatten_list(description_block)
 
                 # Iterate over trials
                 for trial in range(block_trials):
@@ -734,14 +756,15 @@ def fixation_classification(subject, bh_data, fixations, raw, meg_pupils_data_cl
     corr_ans = bh_data['key_resp.corr'].astype(int)
 
     if subject.subject_id in subject.missing_bh:
-        corr_ans = np.zeros(len(corr_ans))
+        corr_ans = np.zeros(len(corr_ans)).astype(int)
         corr_answers = bh_data['corrAns']
         actual_answers = subject.description
-        for i in range(len(actual_answers)):
-            if int(subject.map[actual_answers[i]]) != corr_answers[i]: # Check if mapping of button corresponds to correct answer
-                corr_ans[i] = 0
+        for i, trial in enumerate(response_trials_meg):
+            trial_idx = trial-1
+            if int(subject.map[actual_answers[i]]) != corr_answers[trial_idx]: # Check if mapping of button corresponds to correct answer
+                corr_ans[trial_idx] = 0
             else:
-                corr_ans[i] = 1
+                corr_ans[trial_idx] = 1
 
     # Get MSS, present/absent for every trial
     fix_trial = []
