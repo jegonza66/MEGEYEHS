@@ -147,8 +147,10 @@ def scaled_signals(time, scaled_signals, reference_signals, interval_signal=None
     return fig
 
 
-def scanpath(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial,
+def scanpath(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial_idx,
              screen_res_x=1920, screen_res_y=1080, img_res_x=1280, img_res_y=1024, display_fig=False, save=True):
+
+    trial = trial_idx + 1
 
     fixations_vs = fixations.loc[fixations['screen'] == 'vs']
 
@@ -163,8 +165,8 @@ def scanpath(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial,
     item_pos_t = items_pos.loc[items_pos['folder'] == fixations_t['trial_image'].values[0]]
 
     # Get vs from trial
-    vs_start_idx = functions.find_nearest(raw.times, subject.vs[np.where(subject.trial == trial)[0]])[0]
-    vs_end_idx = functions.find_nearest(raw.times, subject.onset[np.where(subject.trial == trial)[0]])[0]
+    vs_start_idx = functions.find_nearest(raw.times, subject.vs[trial_idx])[0]
+    vs_end_idx = functions.find_nearest(raw.times, subject.vsend[trial_idx])[0]
 
     # Load search image
     img = mpimg.imread(exp_path + 'cmp_' + fixations_t['trial_image'].values[0] + '.jpg')
@@ -278,7 +280,10 @@ def scanpath(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial,
 
 
 
-def trial_gaze(raw, bh_data, gazex, gazey, subject, trial, display_fig=False, save=True):
+def trial_gaze(raw, bh_data, gazex, gazey, subject, trial_idx, display_fig=False, save=True):
+
+    trial = trial_idx + 1
+
     plt.clf()
     plt.close('all')
 
@@ -288,16 +293,14 @@ def trial_gaze(raw, bh_data, gazex, gazey, subject, trial, display_fig=False, sa
         plt.ioff()
 
     # get trial info from bh data
-    trial_idx_bh = trial - 1
-    pres_abs_trial = 'Present' if bh_data['Tpres'].astype(int)[trial_idx_bh] == 1 else 'Absent'
-    correct_trial = 'Correct' if bh_data['key_resp.corr'].astype(int)[trial_idx_bh] == 1 else 'Incorrect'
-    mss = bh_data['Nstim'][trial_idx_bh]
+    pres_abs_trial = 'Present' if bh_data['Tpres'].astype(int)[trial_idx] == 1 else 'Absent'
+    correct_trial = 'Correct' if bh_data['key_resp.corr'].astype(int)[trial_idx] == 1 else 'Incorrect'
+    mss = bh_data['Nstim'][trial_idx]
 
     # Get trial start and end samples
-    trial_idx_annot = np.where(subject.trial == trial)[0]
     trial_start_idx = \
-    functions.find_nearest(raw.times, subject.cross1[trial_idx_annot])[0] - 120 * 2
-    trial_end_idx = functions.find_nearest(raw.times, subject.onset[trial_idx_annot])[0] + 120 * 6
+    functions.find_nearest(raw.times, subject.cross1[trial_idx])[0] - 120 * 2
+    trial_end_idx = functions.find_nearest(raw.times, subject.vsend[trial_idx])[0] + 120 * 6
 
     # Plot
     plt.figure(figsize=(15, 5))
@@ -308,13 +311,13 @@ def trial_gaze(raw, bh_data, gazex, gazey, subject, trial, display_fig=False, sa
     plt.plot(raw.times[trial_start_idx:trial_end_idx], gazey[trial_start_idx:trial_end_idx] - 1000, 'black', label='Y')
 
     # Screens
-    plt.axvspan(ymin=0, ymax=1, xmin=subject.cross1[trial_idx_annot][0], xmax=subject.ms[trial_idx_annot][0], color='grey',
+    plt.axvspan(ymin=0, ymax=1, xmin=subject.cross1[trial_idx], xmax=subject.ms[trial_idx], color='grey',
                 alpha=0.4, label='Fix')
-    plt.axvspan(ymin=0, ymax=1, xmin=subject.ms[trial_idx_annot][0], xmax=subject.cross2[trial_idx_annot][0], color='red',
+    plt.axvspan(ymin=0, ymax=1, xmin=subject.ms[trial_idx], xmax=subject.cross2[trial_idx], color='red',
                 alpha=0.4, label='MS')
-    plt.axvspan(ymin=0, ymax=1, xmin=subject.cross2[trial_idx_annot][0], xmax=subject.vs[trial_idx_annot][0], color='grey',
+    plt.axvspan(ymin=0, ymax=1, xmin=subject.cross2[trial_idx], xmax=subject.vs[trial_idx], color='grey',
                 alpha=0.4, label='Fix')
-    plt.axvspan(ymin=0, ymax=1, xmin=subject.vs[trial_idx_annot][0], xmax=subject.onset[trial_idx_annot][0], color='green',
+    plt.axvspan(ymin=0, ymax=1, xmin=subject.vs[trial_idx], xmax=subject.vsend[trial_idx], color='green',
                 alpha=0.4, label='VS')
 
     plt.xlabel('time [s]')
@@ -444,3 +447,136 @@ def performance(subject, display=False, save=True):
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id
         os.makedirs(save_path, exist_ok=True)
         plt.savefig(save_path + '/Performance_MEG.png')
+
+
+## OLD out of use
+
+
+def scanpath_BH(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial,
+             screen_res_x=1920, screen_res_y=1080, img_res_x=1280, img_res_y=1024, display_fig=False, save=True):
+
+    fixations_vs = fixations.loc[fixations['screen'] == 'vs']
+
+    plt.clf()
+    plt.close('all')
+
+    # Path to psychopy data
+    exp_path = paths().experiment_path()
+
+    # Get trial
+    fixations_t = fixations_vs.loc[fixations_vs['trial'] == trial]
+    item_pos_t = items_pos.loc[items_pos['folder'] == fixations_t['trial_image'].values[0]]
+
+    # Get vs from trial
+    vs_start_idx = functions.find_nearest(raw.times, subject.vs[np.where(subject.trial == trial)[0]])[0]
+    vs_end_idx = functions.find_nearest(raw.times, subject.onset[np.where(subject.trial == trial)[0]])[0]
+
+    # Load search image
+    img = mpimg.imread(exp_path + 'cmp_' + fixations_t['trial_image'].values[0] + '.jpg')
+
+    # Load targets
+    bh_data_trial = bh_data.loc[bh_data['searchimage'] == 'cmp_' + fixations_t['trial_image'].values[0] + '.jpg']
+    target_keys = ['st1', 'st2', 'st3', 'st4', 'st5']
+    targets = bh_data_trial[target_keys].values[0]
+    st1 = mpimg.imread(exp_path + targets[0])
+    st2 = mpimg.imread(exp_path + targets[1])
+    st3 = mpimg.imread(exp_path + targets[2])
+    st4 = mpimg.imread(exp_path + targets[3])
+    st5 = mpimg.imread(exp_path + targets[4])
+
+    # Load correct vs incorrect
+    correct_ans = bh_data_trial['key_resp.corr'].values
+
+    # Colormap: Get fixation durations for scatter circle size
+    sizes = fixations_t['duration'] * 100
+    # Define rainwbow cmap for fixations
+    cmap = plt.cm.rainbow
+    # define the bins and normalize
+    fix_num = fixations_t['n_fix'].values.astype(int)
+    bounds = np.linspace(1, fix_num[-1]+1, fix_num[-1]+1)
+    norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+
+    # Display image True or False
+    if display_fig:
+        plt.ion()
+    else:
+        plt.ioff()
+
+    plt.figure(figsize=(10, 9))
+    plt.suptitle(f'Subject {subject.subject_id} - Trial {trial}')
+
+    # Items axes
+    ax1 = plt.subplot2grid((5, 5), (0, 0), colspan=1)
+    ax2 = plt.subplot2grid((5, 5), (0, 1), colspan=1)
+    ax3 = plt.subplot2grid((5, 5), (0, 2), colspan=1)
+    ax4 = plt.subplot2grid((5, 5), (0, 3), colspan=1)
+    ax5 = plt.subplot2grid((5, 5), (0, 4), colspan=1)
+
+    # Image axis
+    ax6 = plt.subplot2grid((5, 5), (1, 0), colspan=5, rowspan=3)
+
+    # Remove ticks from items and image axes
+    for ax in plt.gcf().get_axes():
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    # Gaze axis
+    ax7 = plt.subplot2grid((5, 5), (4, 0), colspan=5)
+
+    # Targets
+    for ax, st in zip([ax1, ax2, ax3, ax4, ax5], [st1, st2, st3, st4, st5]):
+        ax.imshow(st)
+
+    # Colour
+    if correct_ans:
+        for spine in ax5.spines.values():
+            spine.set_color('green')
+            spine.set_linewidth(3)
+    else:
+        for spine in ax5.spines.values():
+            spine.set_color('red')
+            spine.set_linewidth(3)
+
+    # Fixations
+    ax6.scatter(fixations_t['start_x'] - (screen_res_x - img_res_x) / 2,
+                fixations_t['start_y'] - (screen_res_y - img_res_y) / 2,
+                c=fix_num, s=sizes, cmap=cmap, norm=norm, zorder=3)
+
+    # Image
+    ax6.imshow(img, zorder=0)
+
+    # Items circles
+    ax6.scatter(item_pos_t['center_x'], item_pos_t['center_y'], s=1000, color='grey', alpha=0.5, zorder=1)
+    target = item_pos_t.loc[item_pos_t['istarget'] == 1]
+
+    # Target green/red
+    if len(target):
+        if correct_ans:
+            ax6.scatter(target['center_x'], target['center_y'], s=1000, color='green', alpha=0.3, zorder=1)
+        else:
+            ax6.scatter(target['center_x'], target['center_y'], s=1000, color='red', alpha=0.3, zorder=1)
+
+    # Scanpath
+    ax6.plot(gazex[vs_start_idx:vs_end_idx] - (1920 - 1280) / 2,
+             gazey[vs_start_idx:vs_end_idx] - (1080 - 1024) / 2,
+             '--', color='black', zorder=2)
+
+
+    PCM = ax6.get_children()[0]  # When the fixations dots for color mappable were ploted (first)
+    cb = plt.colorbar(PCM, ax=ax6, ticks=[fix_num[0] + 1/2, fix_num[int(len(fix_num)/2)]+1/2, fix_num[-1]+1/2])
+    cb.ax.set_yticklabels([fix_num[0], fix_num[int(len(fix_num)/2)], fix_num[-1]])
+    cb.ax.tick_params(labelsize=10)
+    cb.set_label('# of fixation', fontsize=13)
+
+    # Gaze
+    ax7.plot(raw.times[vs_start_idx:vs_end_idx], gazex[vs_start_idx:vs_end_idx], label='X')
+    ax7.plot(raw.times[vs_start_idx:vs_end_idx], gazey[vs_start_idx:vs_end_idx], 'black', label='Y')
+    ax7.legend(fontsize=8)
+    ax7.set_ylabel('Gaze')
+    ax7.set_xlabel('Time [s]')
+
+    if save:
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + f'/Scanpaths/'
+        os.makedirs(save_path + 'svg/', exist_ok=True)
+        plt.savefig(save_path + f'Trial{trial}.png')
+        plt.savefig(save_path + f'svg/Trial{trial}.svg')

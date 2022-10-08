@@ -56,11 +56,8 @@ def preprocess(subject, plot=False):
                                                                sfreq=raw.info['sfreq'])
 
     #---------------- Defining response events and trials ----------------#
-    # if subject.subject_id in subject.missing_bh:
-    #     bh_data, raw, subject = preproc_functions.define_events_trials_ET(raw=raw, subject=subject,
-    #                                                                       et_channel_names=et_channel_names)
-    # else:
-    bh_data, raw, subject = preproc_functions.define_events_trials(raw=raw, subject=subject)
+    bh_data, raw, subject = preproc_functions.define_events_trials(raw=raw, subject=subject,
+                                                                      et_channel_names=et_channel_names)
 
     #---------------- Fixations and saccades detection ----------------#
     fixations, saccades = preproc_functions.fixations_saccades_detection(raw=raw, meg_gazex_data_clean=meg_gazex_data_clean,
@@ -68,8 +65,8 @@ def preprocess(subject, plot=False):
                                                                          subject=subject)
 
     #---------------- Fixations classification ----------------#
-    fixations, raw = preproc_functions.fixation_classification(subject=subject, bh_data=bh_data, fixations=fixations,
-                                                               raw=raw, meg_pupils_data_clean=meg_pupils_data_clean)
+    fixations, raw = preproc_functions.fixation_classification_ET(subject=subject, bh_data=bh_data, fixations=fixations,
+                                                                  raw=raw, meg_pupils_data_clean=meg_pupils_data_clean)
 
     #---------------- Items classification ----------------#
     fixations, items_pos = preproc_functions.target_vs_distractor(fixations=fixations, bh_data=bh_data,
@@ -82,14 +79,14 @@ def preprocess(subject, plot=False):
         preproc_plot.performance(subject=subject)
 
         print('Plotting scanpaths and trials gaze screens')
-        for trial in subject.trial:
-            print(f'\rTrial {trial}', end='')
+        for trial_idx in range(len(bh_data)):
+            print(f'\rTrial {trial_idx + 1}', end='')
 
             preproc_plot.scanpath(fixations=fixations, items_pos=items_pos, bh_data=bh_data, raw=raw,
-                                  gazex=meg_gazex_data_clean, gazey=meg_gazey_data_clean, subject=subject, trial=trial)
+                                  gazex=meg_gazex_data_clean, gazey=meg_gazey_data_clean, subject=subject, trial_idx=trial_idx)
 
             preproc_plot.trial_gaze(raw=raw, bh_data=bh_data, gazex=meg_gazex_data_clean, gazey=meg_gazey_data_clean,
-                                    subject=subject, trial=trial)
+                                    subject=subject, trial_idx=trial_idx)
 
     #---------------- Add scaled data to meg data ----------------#
     print('\nSaving scaled et data to meg raw data structure')
@@ -145,11 +142,12 @@ def preprocess(subject, plot=False):
     evt_df = pd.DataFrame([evt_id])
     preproc_evt_map_fname = f'Subject_{subject.subject_id}_eve_map.csv'
     evt_df.to_csv(preproc_save_path + preproc_evt_map_fname)
-
     print(f'Preprocessed data saved to {preproc_save_path}')
+
+    # Free up memory
     del(raw)
     del(subject)
 
 
-for subject in [0, 1, 2, 3, 4, 5]:
-    preprocess(subject=subject, plot=False)
+for subject in [2,3,4,5]:
+    preprocess(subject=subject, plot=True)

@@ -1,4 +1,6 @@
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 
 def scale_from_interval(signal_to_scale, reference_signal, interval_signal=None, interval_ref=None):
@@ -41,7 +43,7 @@ def remove_missing(x, y, time, missing):
     return x, y, time
 
 
-def find_nearest(array, value):
+def find_nearest(array, values):
     """
     Find the nearest element in an array to a given value
 
@@ -49,16 +51,31 @@ def find_nearest(array, value):
     ----------
     array: ndarray
         The 1D array to look in for the nearest value.
+    values: int, float, list or 1D array
+        If int or float, use that value to find neares elemen in array and return index and element as int and array.dtype
+        If list or array, iterate over values and return arrays of indexes and elements nearest to each value.
 
     Returns
     -------
     idx: int
       The index of the element in the array that is nearest to the given value.
+    element:
+        The nearest element to the specified value
     """
-
     array = np.asarray(array)
-    idx = (np.abs(array - value)).argmin()
-    return idx, array[idx]
+
+    if isinstance(values, float) or isinstance(values, int):
+        idx = (np.abs(array - values)).argmin()
+        return idx, array[idx]
+
+    elif len(values):
+        idxs = []
+        elements = []
+        for value in values:
+            idx = (np.abs(array - value)).argmin()
+            idxs.append(idx)
+            elements.append(array[idx])
+        return np.asarray(idxs), np.asarray(elements)
 
 
 def find_previous(array, value):
@@ -79,6 +96,67 @@ def find_previous(array, value):
     array = np.asarray(array)
     idx = np.max(np.where(array - value <= 0)[0])
     return idx, array[idx]
+
+
+
+def find_first_within(array, low_bound, up_bound):
+    """
+    Find the first element from an array in a certain interval
+
+    Parameters
+    ----------
+    array: ndarray
+        The 1D array to look in for the nearest value.
+    low_bound: float
+        the lower boundary of the search interval
+    up_bound: float
+        the upper boundary of the search interval
+
+    Returns
+    -------
+    idx: int
+      The index of the element in the array that is nearest to the given value.
+    value: float
+      The value of the array in the found index.
+    """
+
+    array = np.asarray(array)
+    elements = np.where(np.logical_and((array > low_bound), (array < up_bound)))[0]
+    try:
+        idx = np.min(elements)
+        return idx, array[idx]
+    except:
+        return False, False
+
+
+def find_last_within(array, low_bound, up_bound):
+    """
+    Find the first element from an array in a certain interval
+
+    Parameters
+    ----------
+    array: ndarray
+        The 1D array to look in for the nearest value.
+    low_bound: float
+        the lower boundary of the search interval
+    up_bound: float
+        the upper boundary of the search interval
+
+    Returns
+    -------
+    idx: int
+      The index of the element in the array that is nearest to the given value.
+    value: float
+      The value of the array in the found index.
+    """
+
+    array = np.asarray(array)
+    elements = np.where(np.logical_and((array > low_bound), (array < up_bound)))[0]
+    try:
+        idx = np.max(elements)
+        return idx, array[idx]
+    except:
+        return False, False
 
 
 def first_trial(evt_buttons):
@@ -104,3 +182,44 @@ def first_trial(evt_buttons):
 def flatten_list(ls):
     flat_list = [element for sublist in ls for element in sublist]
     return flat_list
+
+
+def align_signals(signal_1, signal_2):
+    '''
+    Find samples shift that aligns two matching signals by Pearson correlation.
+
+    Parameters
+    ----------
+    signal_1: ndarray
+        1D array signal. Must be longer than signal_2, if not, the samples shift will be referenced to signal_2.
+
+    signal_2: ndarray
+        1D array signal.
+
+    Returns
+    -------
+    max_sample: int
+      Sample shift of maximum correlation between signals.
+    '''
+
+    start_samples = len(signal_1) - len(signal_2)
+
+    # invert signals to return samples shift referenced to the longer signal
+    if start_samples < 0:
+        save_signal = signal_1
+        signal_1 = signal_2
+        signal_2 = save_signal
+
+    corrs = []
+    for i in range(start_samples):
+        print("\rProgress: {}%".format(int((i + 1) * 100 / start_samples)), end='')
+        df = pd.DataFrame({'x1': signal_1[i:i + len(signal_2)], 'x2': signal_2})
+        corrs.append(df.corr()['x1']['x2'])
+        if df.corr()['x1']['x2'] > 0.5 and all(np.diff(corrs[-50:]) < 0):
+            print(f'\nMaximal correlation sample shift found in sample {i}')
+            break
+    max_sample = np.argmax(corrs)
+    print(f'Maximum correlation of {np.max(corrs)}')
+
+    return max_sample, corrs
+

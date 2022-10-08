@@ -78,8 +78,11 @@ class subject:
         elif self.group == 'Counterbalanced':
             self.map = {'blue': '4', 'red': '1'}
 
-        ## Define missing bh subjects
+        # Define missing bh subjects
         self.missing_bh = ['16191001', '16200001', '16201001']
+
+        # Define subjects that took the old trials loop experiment
+        self.trials_loop_exp = ['15909001', '15912001']
 
 
     # MEG data
