@@ -12,23 +12,23 @@ evokeds = []
 
 for subject in [0, 1, 2, 3, 4, 5]:
 
-    subject = load.subject(subject)
-    raw = subject.preproc_data()
+    subject = load.raw_subject(subject)
+    meg_data = subject.preproc_meg()
 
     # PICK MEG AND STIM CHS
-    raw.pick(['meg'])
+    meg_data.pick(['meg'])
     # Exclude bad channels
     bads = subject.bad_channels
-    raw.info['bads'].extend(bads)
+    meg_data.info['bads'].extend(bads)
 
     # EPOCH DATA BASED ON BUTTON BOX
     reject = dict(mag=4e-12)
 
     # Get events from annotations
-    events, event_id = mne.events_from_annotations(raw)
+    events, event_id = mne.events_from_annotations(meg_data)
 
     # Epoch data
-    epochs = mne.Epochs(raw, events, event_id=event_id, reject=reject, event_repeated='merge')
+    epochs = mne.Epochs(meg_data, events, event_id=event_id, reject=reject, event_repeated='merge')
 
     # Select epochs
     epoch_id = 'fix_vs'
