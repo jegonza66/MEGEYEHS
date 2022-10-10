@@ -8,6 +8,7 @@ import seaborn as sn
 import functions
 from paths import paths
 
+
 def get_intervals_signals(reference_signal, signal_to_scale, fig=None):
     """
     Get the intervals of interest for scaling signals.
@@ -145,6 +146,46 @@ def scaled_signals(time, scaled_signals, reference_signals, interval_signal=None
     plt.pause(0.5)
 
     return fig
+
+
+def alignment(subject, et_gazex, meg_gazex, corrs, et_block_start, meg_block_start, max_sample,
+              et_block_end, meg_block_end, et_drop_start, meg_drop_start, block_num, block_trials, block_idxs,
+              cross1_start_et, eyemap_start_et, eyemap_end_et):
+
+    # Plot correlaion
+    plt.ioff()
+    plt.figure()
+    plt.title(f'Block {block_num + 1}')
+    plt.xlabel('Samples')
+    plt.ylabel('Correlation')
+    plt.plot(corrs)
+    save_path = paths().plots_path() + f'Preprocessing/{subject.subject_id}/ET_align/'
+    os.makedirs(save_path, exist_ok=True)
+    plt.savefig(save_path + f'Corr_block{block_num+1}.png')
+
+    # Plot block gazex signals
+    plot_samples_shift = max_sample + meg_drop_start - et_drop_start  # Samples shift for plot
+
+    plt.figure(figsize=(15, 7))
+    plt.plot(np.arange(len(et_gazex[et_block_start:et_block_end])) + plot_samples_shift, et_gazex[et_block_start:et_block_end], label='ET')
+    plt.plot(np.arange(len(meg_gazex[meg_block_start:meg_block_end])), meg_gazex[meg_block_start:meg_block_end] * 200 + 1000, label='MEG')
+
+    for i in range(block_trials):
+        plt.vlines(x=cross1_start_et[block_idxs[i]] + plot_samples_shift - et_block_start, ymin=-500, ymax=1800,
+                   color='black', linestyles='--', label='cross1')
+    for i in range(5):
+        plt.vlines(x=eyemap_start_et[i + 5*block_num] + plot_samples_shift - et_block_start, ymin=-500, ymax=1800,
+                   color='green', linestyles='--', label='eyemap start')
+        plt.vlines(x=eyemap_end_et[i + 5*block_num] + plot_samples_shift - et_block_start, ymin=-500, ymax=1800,
+                   color='red', linestyles='--', label='eyemap end')
+
+    plt.title(f'Block {block_num + 1}')
+    plt.xlabel('Samples')
+    plt.ylabel('Amplitude [\mu V]')
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    plt.legend(by_label.values(), by_label.keys(), loc='upper right')
+    plt.savefig(save_path + f'Signals_block{block_num + 1}.png')
 
 
 def scanpath(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial_idx,

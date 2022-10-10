@@ -10,7 +10,7 @@ from scipy import ndimage
 
 mri_path = paths().mri_path()
 subject_id = '15909001'
-subject = load.subject(subject_id)
+subject = load.raw_subject(subject_id)
 
 subj_path = pathlib.Path(os.path.join(mri_path, subject.subject_id))
 mri_file_path = list(subj_path.glob('*.nii'))[1]

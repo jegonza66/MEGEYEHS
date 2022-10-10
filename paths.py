@@ -14,6 +14,24 @@ class paths:
         self.name = os.popen('whoami').read()
 
 
+    def config_path(self):
+        """
+        Paths to run configuration.
+
+        Returns
+        -------
+        config_path: str
+            Path in str format to the config directory.
+        """
+
+        if self.name == 'laptop-5i5qsv76\\joaco\n':  # Asus Rog
+            config_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/Config/'
+        elif self.name == 'usuario\n':  # Liaa Colores
+            config_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Config/'
+        else:  # Notts
+            config_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/Config/'
+        return config_path
+
     def ctf_path(self):
         """
         Paths to participants MEG data.

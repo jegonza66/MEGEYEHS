@@ -13,7 +13,7 @@ evokeds = []
 
 for subject in [0, 1, 2, 3, 4, 5]:
 
-    subject = load.subject(subject)
+    subject = load.raw_subject(subject)
     evoked_save_path = save_path + f'Evoked/{epoch_id}_lfreq{l_freq}_hfreq{h_freq}/' + subject.subject_id + '/'
     evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
     evoked = mne.read_evokeds(evoked_data_fname)

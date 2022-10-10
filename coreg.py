@@ -10,7 +10,7 @@ mri_path = paths().mri_path()
 subjects_dir = os.path.join(mri_path, 'FreeSurfer_out')
 os.environ["SUBJECTS_DIR"] = subjects_dir
 # Load one subject
-subject = load.subject()
+subject = load.raw_subject()
 # PATH TO MRI <-> HEAD TRANSFORMATION (Saved from coreg)
 trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-trans.fif'.format(subject.subject_id))
 fids_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-fiducials.fif'.format(subject.subject_id))
@@ -34,7 +34,7 @@ mne.viz.set_3d_view(fig, 45, 90, distance=0.6, focalpoint=(0., 0., 0.))
 # https://mne.tools/stable/auto_tutorials/forward/30_forward.html#sphx-glr-auto-tutorials-forward-30-forward-py
 
 # Load Preprocesed
-raw = subject.preproc_data()
+raw = subject.preproc_meg()
 
 # PICK MEG AND STIM CHS
 raw.pick(['meg', 'misc'])
@@ -63,7 +63,7 @@ evoked_std.pick('meg')
 evoked_std.filter(l_freq=0.5, h_freq=80., fir_design='firwin')
 
 # LOAD BACKGROUND NOISE
-noise = load.subject('BACK_NOISE')
+noise = load.raw_subject('BACK_NOISE')
 raw_noise = noise.ctf_data()
 raw_noise.pick('meg')
 # COMPUTE COVARIANCE TO WITHDRAW FROM MEG DATA

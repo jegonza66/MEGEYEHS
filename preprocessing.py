@@ -1,21 +1,22 @@
-import mne
-import os
-import numpy as np
-import pickle
-
-import pandas as pd
-
-from paths import paths
+import setup
 import load
+import save
 import preproc_plot
 import preproc_functions
 
 
-def preprocess(subject, plot=False):
+def preprocess(subject_code, plot=False):
 
     #---------------- Load data ----------------#
+    # Load experiment info
+    exp_info = setup.exp_info()
+
+    # Load run configuration
+    config = load.config(exp_info)
+
     # Define subject
-    subject = load.subject(subject)
+    subject = setup.raw_subject(exp_info=exp_info, config=config, subject_code=subject_code)
+
     # Load Meg data
     raw = subject.ctf_data()
 
@@ -36,37 +37,32 @@ def preprocess(subject, plot=False):
 
     #---------------- Blinks removal ----------------#
     # Define intervals around blinks to also fill with nan. Due to conversion noise from square signal
-    blink_min_dur = 70
-    start_interval_samples = 12
-    end_interval_samples = 24
-
     meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean = preproc_functions.blinks_to_nan(meg_gazex_data_scaled=meg_gazex_data_scaled,
                                                                                                         meg_gazey_data_scaled=meg_gazey_data_scaled,
                                                                                                         meg_pupils_data_raw=meg_pupils_data_raw,
-                                                                                                        start_interval_samples=start_interval_samples,
-                                                                                                        end_interval_samples=end_interval_samples)
+                                                                                                        config=subject.config.preproc)
 
     #---------------- Missing signal interpolation ----------------#
     et_channels_meg = preproc_functions.fake_blink_interpolate(meg_gazex_data_clean=meg_gazex_data_clean,
                                                                meg_gazey_data_clean=meg_gazey_data_clean,
                                                                meg_pupils_data_clean=meg_pupils_data_clean,
-                                                               blink_min_dur=blink_min_dur,
-                                                               start_interval_samples=start_interval_samples,
-                                                               end_interval_samples=start_interval_samples,
-                                                               sfreq=raw.info['sfreq'])
+                                                               config=config.preprocessing, sfreq=raw.info['sfreq'])
 
     #---------------- Defining response events and trials ----------------#
-    bh_data, raw, subject = preproc_functions.define_events_trials(raw=raw, subject=subject,
-                                                                      et_channel_names=et_channel_names)
+    bh_data, raw, subject = preproc_functions.define_events_trials(raw=raw, subject=subject, config=config, exp_info=exp_info,
+                                                                   et_channel_names=et_channel_names)
 
     #---------------- Fixations and saccades detection ----------------#
     fixations, saccades = preproc_functions.fixations_saccades_detection(raw=raw, meg_gazex_data_clean=meg_gazex_data_clean,
                                                                          meg_gazey_data_clean=meg_gazey_data_clean,
                                                                          subject=subject)
 
+    # ---------------- Saccades classification ----------------#
+    saccades, raw = preproc_functions.saccades_classification(subject=subject, bh_data=bh_data, saccades=saccades, raw=raw)
+
     #---------------- Fixations classification ----------------#
-    fixations, raw = preproc_functions.fixation_classification_ET(subject=subject, bh_data=bh_data, fixations=fixations,
-                                                                  raw=raw, meg_pupils_data_clean=meg_pupils_data_clean)
+    fixations, raw = preproc_functions.fixation_classification(subject=subject, bh_data=bh_data, fixations=fixations,
+                                                               raw=raw, meg_pupils_data_clean=meg_pupils_data_clean, exp_info=exp_info)
 
     #---------------- Items classification ----------------#
     fixations, items_pos = preproc_functions.target_vs_distractor(fixations=fixations, bh_data=bh_data,
@@ -89,65 +85,15 @@ def preprocess(subject, plot=False):
                                     subject=subject, trial_idx=trial_idx)
 
     #---------------- Add scaled data to meg data ----------------#
-    print('\nSaving scaled et data to meg raw data structure')
-    # copy raw structure
-    raw_et = raw.copy()
-    # make new raw structure from et channels only
-    raw_et = mne.io.RawArray(et_channels_meg, raw_et.pick(et_channel_names).info)
-    # change channel names
-    for ch_name, new_name in zip(raw_et.ch_names, ['ET_gaze_x', 'ET_gaze_y', 'ET_pupils']):
-        raw_et.rename_channels({ch_name: new_name})
-
-    # Pick data from MEG channels and other channels of interest
-    channel_idx = mne.pick_types(raw.info, meg=True)
-    channel_idx = np.append(channel_idx, mne.pick_channels(raw.info['ch_names'], ['UPPT001', 'UADC001-4123', 'UADC002-4123', 'UADC013-4123']))
-    raw.pick(channel_idx)
-
-    # save to original raw structure (requires to load data)
-    print('Loading MEG data')
-    raw.load_data()
-    print('Adding new ET channels')
-    raw.add_channels([raw_et], force_update_info=True)
-    del (raw_et)
+    preproc_functions.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=et_channel_names)
 
     #---------------- Save preprocesed data ----------------#
-    print('Saving preprocessed data')
-    # Path
-    preproc_data_path = paths().preproc_path()
-    preproc_save_path = preproc_data_path + subject.subject_id + '/'
-    os.makedirs(preproc_save_path, exist_ok=True)
-
-    # Add data to subject class and save
-    subject.bh_data = bh_data
-    subject.fixations = fixations
-    subject.saccades = saccades
-
-    f = open(preproc_save_path + 'Subject_data.pkl', 'wb')
-    pickle.dump(subject, f)
-    f.close()
-
-    # Save fixations
-    fixations.to_csv(preproc_save_path + 'fixations.csv')
-
-    # Save MEG
-    preproc_meg_data_fname = f'Subject_{subject.subject_id}_meg.fif'
-    raw.save(preproc_save_path + preproc_meg_data_fname, overwrite=True)
-
-    # Save events
-    evt, evt_id = mne.events_from_annotations(raw)
-    preproc_evt_data_fname = f'Subject_{subject.subject_id}_eve.fif'
-    mne.write_events(preproc_save_path + preproc_evt_data_fname, evt, overwrite=True)
-
-    # Save events mapping
-    evt_df = pd.DataFrame([evt_id])
-    preproc_evt_map_fname = f'Subject_{subject.subject_id}_eve_map.csv'
-    evt_df.to_csv(preproc_save_path + preproc_evt_map_fname)
-    print(f'Preprocessed data saved to {preproc_save_path}')
+    save.save_preproc(raw=raw, subject=subject, bh_data=bh_data, fixations=fixations, saccades=saccades)
 
     # Free up memory
     del(raw)
     del(subject)
 
 
-for subject in [2,3,4,5]:
-    preprocess(subject=subject, plot=True)
+for subject_code in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]:
+    preprocess(subject_code=subject_code, plot=True)

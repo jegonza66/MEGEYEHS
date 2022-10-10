@@ -17,7 +17,7 @@ plt.ioff()
 exp_path = paths().experiment_path()
 plots_path = paths().plots_path()
 
-subject = load.subject()
+subject = load.raw_subject()
 bh_data = subject.bh_data()
 
 all_targets = bh_data[bh_data['Tpres'] == 1]

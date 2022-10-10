@@ -8,7 +8,7 @@ import load
 ## First fixation delay distribution
 
 # Define subject
-subject = load.subject()
+subject = load.raw_subject()
 
 # Load data
 raw = subject.ctf_data()
