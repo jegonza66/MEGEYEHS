@@ -89,12 +89,12 @@ def preprocess(subject_code, plot=False):
     preproc_functions.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=et_channel_names)
 
     #---------------- Save preprocesed data ----------------#
-    save.save_preproc(raw=raw, subject=subject, bh_data=bh_data, fixations=fixations, saccades=saccades, config=config)
+    save.preprocesed_data(raw=raw, subject=subject, bh_data=bh_data, fixations=fixations, saccades=saccades, config=config)
 
     # Free up memory
     del(raw)
     del(subject)
 
 
-for subject_code in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]:
+for subject_code in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]:
     preprocess(subject_code=subject_code, plot=True)

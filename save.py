@@ -2,7 +2,6 @@ import mne
 import os
 import pickle
 import pandas as pd
-import pathlib
 
 from paths import paths
 
@@ -50,9 +49,9 @@ def preprocesed_data(raw, subject, bh_data, fixations, saccades, config):
     evt_df.to_csv(preproc_save_path + preproc_evt_map_fname)
 
     # Save configuration
-    if config.update_config:
-        config_path = paths().config_path()
-        var(config, paths=config_path, fname='config.pkl')
+    config.update_config = False
+    config_path = paths().config_path()
+    var(config, path=config_path, fname='config.pkl')
 
     print(f'Preprocessed data saved to {preproc_save_path}')
 

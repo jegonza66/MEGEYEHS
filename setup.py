@@ -196,10 +196,16 @@ class raw_subject:
                 for preproc_att in preproc_attributes:
                     att = getattr(config.preprocessing, preproc_att)
                     if type(att) == dict:
-                        att_value = att[subject_id]
+                        try:
+                            # If subject_id in dictionary keys, get attribute, else pass
+                            att_value = att[subject_id]
+                            setattr(self, preproc_att, att_value)
+                        except:
+                            pass
                     else:
+                        # If attribute is general for all subjects, get attribute
                         att_value = att
-                    setattr(self, preproc_att, att_value)
+                        setattr(self, preproc_att, att_value)
 
 
     # MEG data

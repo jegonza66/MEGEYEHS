@@ -8,6 +8,7 @@ import mne
 import functions
 import preproc_plot
 from paths import paths
+import save
 
 
 def bh_emap_dur(bh_data_eyemap):
@@ -459,14 +460,15 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
 
             time_diff = vs_end_times_meg_block[trial] - meg_evt_time
 
+            search_dur = vs_end_times_meg_block[trial] - vs_times_meg_block[trial]
             # Answer after a 10 search screen or time difference of 100 ms -> No answer
-            if (time_diff < 0) and (vs_end_times_meg_block[trial] - vs_times_meg_block[trial] >= 9.9) or time_diff < -0.3 or time_diff > 2:
-                print(f'No answer in Trial: {total_trial}')
+            if (time_diff < 0) and (vs_end_times_meg_block[trial] - vs_times_meg_block[trial] >= 9.9) or time_diff < -0.3 or time_diff > search_dur:
+                print(f'No answer in Trial {total_trial} with {round((vs_end_times_meg_block[trial] - meg_evt_time) * 1000, 1)} ms time difference')
                 no_answer_block.append(total_trial)
 
             else:
                 if abs(time_diff) > 0.0:
-                    print(f'{round((vs_end_times_meg_block[trial] - meg_evt_time) * 1000, 1)} ms difference in Trial: {total_trial}')
+                    print(f'{round((vs_end_times_meg_block[trial] - meg_evt_time) * 1000, 1)} ms difference in Trial {total_trial}')
 
                 # Append time and button to annotations
                 onset_block.append(meg_evt_time)
@@ -529,8 +531,13 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
 
     # Save updated configuration
     if config.update_config:
+        # Save samples shift to preprocessing configuration
         config.preprocessing.et_samples_shift[subject.subject_id] = subject.config.preproc.et_samples_shift
-        config.save_config(config_path=paths().config_path())
+        # Set save configuration to false before saving
+        config.update_config = False
+        # Configuration path and save
+        config_path = paths().config_path()
+        save.var(config, path=config_path, fname='config.pkl')
 
     return bh_data, raw, subject
 
@@ -544,7 +551,7 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
     if not force_run:
         try:
             # Load pre run saccades and fixation detection
-            results = pd.read_csv(out_folder + out_fname, sep='\t')
+            sac_fix = pd.read_csv(out_folder + out_fname, sep='\t')
             print('Saccades and fixations loaded')
         except:
             force_run = True
@@ -571,7 +578,7 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
             os.system(command)
 
             # Read results file with detections
-            results = pd.read_csv(out_fname, sep='\t')
+            sac_fix = pd.read_csv(out_fname, sep='\t')
 
             # Move eye data, detections file and image to subject results directory
             os.makedirs(out_folder, exist_ok=True)
@@ -584,8 +591,8 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
             os.replace(out_fname, out_folder + out_fname)
 
     # Get saccades and fixations
-    saccades = copy.copy(results.loc[results['label'] == 'SACC'])
-    fixations = copy.copy(results.loc[results['label'] == 'FIXA'])
+    saccades = copy.copy(sac_fix.loc[sac_fix['label'] == 'SACC'])
+    fixations = copy.copy(sac_fix.loc[sac_fix['label'] == 'FIXA'])
 
     return fixations, saccades
 
