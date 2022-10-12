@@ -100,24 +100,19 @@ class config:
         self.update_config = True
         self.preprocessing = self.preprocessing()
 
-    def save_config(self, config_path):
-
-        # Set update config to False before saving so loaded configurations afterwards won't be overwritten
-        self.update_config = False
-
-        # Save
-        os.makedirs(config_path, exist_ok=True)
-
-        file_path = config_path + '/config.pkl'
-        f = open(file_path, 'wb')
-        pickle.dump(config, f)
-        f.close()
-
     class preprocessing:
         def __init__(self):
+            # Pupil size threshold to consider missing signal
             self.pupil_thresh = {'15909001': -4.6, '15912001': -4.6, '15910001': -4.6, '15950001': -4.6, '15911001': -4.6,
                                  '11535009': -4.6, '16191001': -4.6, '16200001': -4.6, '16201001': -4.6, '16256001': -4.6,
                                  '09991040': -4.6, '10925091': -4.6, '16263002': -4.6, '16269001': -4.6}
+
+            # Distance to the screen durin the experiment
+            self.screen_distance = {'15909001': 58, '15912001': 58, '15910001': 58, '15950001': 58,
+                                    '15911001': 58, '11535009': 58, '16191001': 58, '16200001': 58,
+                                    '16201001': 58, '16256001': 58, '09991040': 58, '10925091': 58,
+                                    '16263002': 58, '16269001': 58}
+
             self.blink_min_dur = 70
             self.start_interval_samples = 12
             self.end_interval_samples = 24

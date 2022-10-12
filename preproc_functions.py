@@ -446,16 +446,26 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
         for trial in range(block_trials):
             total_trial = int(block_num * block_trials + trial + 1)
 
-            idx, meg_evt_time = functions.find_nearest(array=meg_evt_block_times, values=vs_end_times_meg_block[trial])
+            # Try to find first response within vs screen time interval
+
+            idx, meg_evt_time = functions.find_first_within(array=meg_evt_block_times,
+                                                            low_bound=vs_times_meg_block[trial],
+                                                            up_bound=vs_end_times_meg_block[trial])
+            # If no answer is found in interval (because of slight misalignment between MEG and ET on the las trials),
+            # find nearest answer to vs end time
+            if not idx:
+                idx, meg_evt_time = functions.find_nearest(array=meg_evt_block_times,
+                                                           values=vs_end_times_meg_block[trial])
+
             time_diff = vs_end_times_meg_block[trial] - meg_evt_time
 
             # Answer after a 10 search screen or time difference of 100 ms -> No answer
-            if (time_diff < 0 and vs_end_times_meg_block[trial] - vs_times_meg_block[trial] >= 10) or abs(time_diff) > 0.1:
+            if (time_diff < 0) and (vs_end_times_meg_block[trial] - vs_times_meg_block[trial] >= 9.9) or time_diff < -0.3 or time_diff > 2:
                 print(f'No answer in Trial: {total_trial}')
                 no_answer_block.append(total_trial)
 
             else:
-                if abs(time_diff) > 0.02:
+                if abs(time_diff) > 0.0:
                     print(f'{round((vs_end_times_meg_block[trial] - meg_evt_time) * 1000, 1)} ms difference in Trial: {total_trial}')
 
                 # Append time and button to annotations
@@ -526,7 +536,7 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
 
 
 def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean, subject, screen_size=38,
-                                 screen_distance=58, screen_resolution=1920, force_run=False):
+                                 screen_resolution=1920, force_run=False):
 
     out_fname = f'Fix_Sac_detection_{subject.subject_id}.tsv'
     out_folder = paths().save_path() + 'Preprocesed_Data/' + subject.subject_id + '/Sac-Fix_detection/'
@@ -549,7 +559,7 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
 
             # Remodnav parameters
             fname = f'eye_data_{subject.subject_id}.csv'
-            px2deg = math.degrees(math.atan2(.5 * screen_size, screen_distance)) / (.5 * screen_resolution)
+            px2deg = math.degrees(math.atan2(.5 * screen_size, subject.screen_distance)) / (.5 * screen_resolution)
             sfreq = raw.info['sfreq']
 
             # Save csv file
@@ -580,7 +590,7 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
     return fixations, saccades
 
 
-def saccades_classification(subject, bh_data, saccades, raw, exp_info):
+def saccades_classification(subject, bh_data, saccades, raw):
 
     print('Classifying saccades')
 
@@ -610,19 +620,19 @@ def saccades_classification(subject, bh_data, saccades, raw, exp_info):
     # Get mss and target pres/abs from bh data
     mss = bh_data['Nstim'].astype(int)
     pres_abs = bh_data['Tpres'].astype(int)
-    corr_ans = bh_data['key_resp.corr'].astype(int)
-
-    # Get correct_answers for subjects with no BH
-    if subject.subject_id in exp_info.missing_bh_subjects:
-        corr_ans = np.zeros(len(bh_data)).astype(int)
-        corr_answers = bh_data['corrAns']
-        actual_answers = subject.description
-        for i, trial in enumerate(response_trials_meg):
-            trial_idx = trial-1
-            if int(subject.map[actual_answers[i]]) != corr_answers[trial_idx]: # Check if mapping of button corresponds to correct answer
-                corr_ans[trial_idx] = 0
-            else:
-                corr_ans[trial_idx] = 1
+    # corr_ans = bh_data['key_resp.corr'].astype(int)
+    #
+    # # Get correct_answers for subjects with no BH
+    # if subject.subject_id in exp_info.missing_bh_subjects:
+    corr_ans = np.zeros(len(bh_data)).astype(int)
+    corr_answers = bh_data['corrAns']
+    actual_answers = subject.description
+    for i, trial in enumerate(response_trials_meg):
+        trial_idx = trial-1
+        if int(subject.map[actual_answers[i]]) != corr_answers[trial_idx]: # Check if mapping of button corresponds to correct answer
+            corr_ans[trial_idx] = 0
+        else:
+            corr_ans[trial_idx] = 1
 
     # Get MSS, present/absent for every trial
     sac_trial = []
@@ -854,18 +864,18 @@ def fixation_classification(subject, bh_data, fixations, raw, meg_pupils_data_cl
     # Get mss and target pres/abs from bh data
     mss = bh_data['Nstim'].astype(int)
     pres_abs = bh_data['Tpres'].astype(int)
-    corr_ans = bh_data['key_resp.corr'].astype(int)
-
-    if subject.subject_id in exp_info.missing_bh_subjects:
-        corr_ans = np.zeros(len(bh_data)).astype(int)
-        corr_answers = bh_data['corrAns']
-        actual_answers = subject.description
-        for i, trial in enumerate(response_trials_meg):
-            trial_idx = trial-1
-            if int(subject.map[actual_answers[i]]) != corr_answers[trial_idx]: # Check if mapping of button corresponds to correct answer
-                corr_ans[trial_idx] = 0
-            else:
-                corr_ans[trial_idx] = 1
+    # corr_ans = bh_data['key_resp.corr'].astype(int)
+    #
+    # if subject.subject_id in exp_info.missing_bh_subjects:
+    corr_ans = np.zeros(len(bh_data)).astype(int)
+    corr_answers = bh_data['corrAns']
+    actual_answers = subject.description
+    for i, trial in enumerate(response_trials_meg):
+        trial_idx = trial-1
+        if int(subject.map[actual_answers[i]]) != corr_answers[trial_idx]: # Check if mapping of button corresponds to correct answer
+            corr_ans[trial_idx] = 0
+        else:
+            corr_ans[trial_idx] = 1
 
     # Differences only in no answer trials. We're recovering the answers!
     # diff = (corr_ans1-corr_ans).values

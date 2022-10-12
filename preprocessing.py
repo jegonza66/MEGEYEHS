@@ -3,6 +3,7 @@ import load
 import save
 import preproc_plot
 import preproc_functions
+from paths import paths
 
 
 def preprocess(subject_code, plot=False):
@@ -12,7 +13,7 @@ def preprocess(subject_code, plot=False):
     exp_info = setup.exp_info()
 
     # Load run configuration
-    config = load.config(exp_info)
+    config = load.config(path=paths().config_path(), fname='config.pkl')
 
     # Define subject
     subject = setup.raw_subject(exp_info=exp_info, config=config, subject_code=subject_code)
@@ -88,7 +89,7 @@ def preprocess(subject_code, plot=False):
     preproc_functions.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=et_channel_names)
 
     #---------------- Save preprocesed data ----------------#
-    save.save_preproc(raw=raw, subject=subject, bh_data=bh_data, fixations=fixations, saccades=saccades)
+    save.save_preproc(raw=raw, subject=subject, bh_data=bh_data, fixations=fixations, saccades=saccades, config=config)
 
     # Free up memory
     del(raw)

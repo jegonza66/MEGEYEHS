@@ -7,8 +7,16 @@ import pathlib
 from paths import paths
 
 
-def preprocesed(raw, subject, bh_data, fixations, saccades):
-    #---------------- Save preprocesed data ----------------#
+def preprocesed_data(raw, subject, bh_data, fixations, saccades, config):
+    """
+    Save preprocesed data
+    :param raw:
+    :param subject:
+    :param bh_data:
+    :param fixations:
+    :param saccades:
+    """
+
     print('Saving preprocessed data')
     # Path
     preproc_data_path = paths().preproc_path()
@@ -41,20 +49,35 @@ def preprocesed(raw, subject, bh_data, fixations, saccades):
     preproc_evt_map_fname = f'Subject_{subject.subject_id}_eve_map.csv'
     evt_df.to_csv(preproc_save_path + preproc_evt_map_fname)
 
+    # Save configuration
+    if config.update_config:
+        config_path = paths().config_path()
+        var(config, paths=config_path, fname='config.pkl')
+
     print(f'Preprocessed data saved to {preproc_save_path}')
 
 
-def preproc_config(subject, config):
-    '''
-    Configuration setup for preprocessing run.
-    '''
+def var(var, path, fname):
+    """
+    Save variable var with given filename to given path.
 
-    print('\nSaving preprocessing configuration')
+    Parameters
+    ----------
+    var: any
+        Variable to save
+    path: str
+        Path to save directory
+    fname: str
+        Filename of file to save
+    """
 
-    # Configuration path
-    file_path = pathlib.Path(os.path.join(subject.config_path, subject.subject_id, f'{subject.subject_id}_config.pkl'))
+    print('\nSaving')
+    # Make dir
+    os.makedirs(path, exist_ok=True)
 
+    # Save
+    file_path = path + fname
     f = open(file_path, 'wb')
-    pickle.dump(config, f)
+    pickle.dump(var, f)
     f.close()
 

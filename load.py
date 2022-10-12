@@ -5,14 +5,17 @@ import pathlib
 import pickle
 
 
-def config(config_path):
+def config(path, fname):
     """
-    Load the run configuration and setup information.
+    Try and load the run configuration and setup information.
+    If no previous configuration file was saved, setup config obj.
 
-    Attributes
+    Parameters
     ----------
-    exp_info: class
-        The experiment information class.
+    path: str
+        The path to the directory where configuration file is stored.
+    fname: str
+        The filename for the configuration file.
 
     Returns
     -------
@@ -22,7 +25,7 @@ def config(config_path):
 
     try:
         # Load
-        filepath = config_path + '/config.pkl'
+        filepath = path + fname
         f = open(filepath, 'rb')
         config = pickle.load(f)
         f.close()
@@ -37,9 +40,31 @@ def config(config_path):
     return config
 
 
+def var(file_path):
+    """
+    Load variable from specified path
+
+    Parameters
+    ----------
+    file_path: str
+        The path to the file to load.
+
+    Returns
+    -------
+    var: any
+        The loaded variable.
+    """
+    # Load
+    f = open(file_path, 'rb')
+    var = pickle.load(f)
+    f.close()
+
+    return var
+
+
 def preproc_subject(exp_info, subject_code):
     """
-    Preprocessed subject class
+    Load preprocessed subject object.
 
     Attributes
     --------
