@@ -62,12 +62,12 @@ def preprocess(subject_code, plot=False):
     saccades, raw = preproc_functions.saccades_classification(subject=subject, bh_data=bh_data, saccades=saccades, raw=raw)
 
     #---------------- Fixations classification ----------------#
-    fixations, raw = preproc_functions.fixation_classification(subject=subject, bh_data=bh_data, fixations=fixations,
-                                                               raw=raw, meg_pupils_data_clean=meg_pupils_data_clean, exp_info=exp_info)
+    fixations, raw = preproc_functions.fixation_classification(subject=subject, bh_data=bh_data, fixations=fixations, saccades=saccades,
+                                                               raw=raw, meg_pupils_data_clean=meg_pupils_data_clean)
 
     #---------------- Items classification ----------------#
-    fixations, items_pos = preproc_functions.target_vs_distractor(fixations=fixations, bh_data=bh_data,
-                                                                  subject=subject, distance_threshold=100)
+    fixations, raw, items_pos = preproc_functions.target_vs_distractor(fixations=fixations, bh_data=bh_data,
+                                                                       raw=raw, distance_threshold=100)
 
     #---------------- Save fix time distribution, pupils size vs mss, scanpath and trial gaze figures ----------------#
     if plot:
@@ -96,5 +96,6 @@ def preprocess(subject_code, plot=False):
     del(subject)
 
 
-for subject_code in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]:
+# for subject_code in [6, 7, 8, 9, 10, 11, 12, 13]:
+for subject_code in range(1, 14):
     preprocess(subject_code=subject_code, plot=True)

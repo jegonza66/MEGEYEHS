@@ -277,6 +277,7 @@ class raw_subject:
         print('\nLoading ET data')
         # get subject path
         subj_path = self.et_path
+        # Load asc file
         asc_file_path = list(subj_path.glob('*{}.asc'.format(self.subject_id)))[0]
 
         # data structure

@@ -384,7 +384,7 @@ def first_fixation_delay(fixations, subject, display_fig=False, save=True):
 
     fixations1_fix_screen = fixations.loc[(fixations['screen'].isin(['cross1', 'cross2'])) & (fixations['n_fix'] == 1)]
     plt.figure()
-    plt.hist(fixations1_fix_screen['time'], bins=40)
+    plt.hist(fixations1_fix_screen['delay'], bins=40)
     plt.title('1st fixation delay distribution')
     plt.xlabel('Time [s]')
 

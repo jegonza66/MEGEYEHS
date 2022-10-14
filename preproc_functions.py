@@ -320,8 +320,13 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
     # Save samples shift for each block if no previous data
     if 'et_samples_shift' not in subject.config.preproc.__dict__.keys() or force_realign:
         subject.config.preproc.et_samples_shift = {}
-        config.preprocessing.et_samples_shift = {}
+        # Set save configuration to True to save the new alignment samples shift
         config.update_config = True
+
+        # If et_samples_shift not in config.preprocessing, add that attribute as empty dict (only would happen for first participant)
+        # If the attribute already exists, it will be a dictionary but with no data for the current participant.
+        if 'et_samples_shift' not in config.preprocessing.__dict__.keys() or force_realign:
+            config.preprocessing.et_samples_shift = {}
 
     # Define trials block by block
     for block_num in range(len(blocks_bounds_evt)):
@@ -383,13 +388,12 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
         description_block = []
         onset_block = []
 
-        # # Get emap MEG end time from ET data triggers
-        emap_end_block = eyemap_end_et[4 + 5*block_num] + samples_shift
-        emap_end_meg_block = raw_et.times[emap_end_block]
+        # Get emap MEG end time from ET data triggers
+        last_emap_start_block = eyemap_start_et[4 + 5*block_num] + samples_shift
+        emap_bl_start_meg_block = raw_et.times[last_emap_start_block]
 
         # Get emap trials MEG time from bh duration
-        emap_bl_end_meg_block = emap_end_meg_block - end_msg_dur[block_num]
-        emap_bl_start_meg_block = emap_bl_end_meg_block - bl_dur[block_num]
+        emap_bl_end_meg_block = emap_bl_start_meg_block + bl_dur[block_num]
         emap_vs_start_meg_block = emap_bl_start_meg_block - vs_dur[block_num]
         emap_hs_start_meg_block = emap_vs_start_meg_block - hs_dur[block_num]
         emap_vl_start_meg_block = emap_hs_start_meg_block - vl_dur[block_num]
@@ -447,28 +451,31 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
         for trial in range(block_trials):
             total_trial = int(block_num * block_trials + trial + 1)
 
-            # Try to find first response within vs screen time interval
-
-            idx, meg_evt_time = functions.find_first_within(array=meg_evt_block_times,
-                                                            low_bound=vs_times_meg_block[trial],
-                                                            up_bound=vs_end_times_meg_block[trial])
-            # If no answer is found in interval (because of slight misalignment between MEG and ET on the las trials),
-            # find nearest answer to vs end time
-            if not idx:
+            if subject.subject_id in exp_info.missing_bh_subjects:
+                # Find last meg response in vs screen:
+                idx, meg_evt_time = functions.find_last_within(array=meg_evt_block_times,
+                                                               low_bound=vs_times_meg_block[trial],
+                                                               up_bound=vs_end_times_meg_block[trial])
+            else:
+                # Find nearest answer to vs end time
                 idx, meg_evt_time = functions.find_nearest(array=meg_evt_block_times,
                                                            values=vs_end_times_meg_block[trial])
 
+            # Evaluate answer parameters
             time_diff = vs_end_times_meg_block[trial] - meg_evt_time
-
-            search_dur = vs_end_times_meg_block[trial] - vs_times_meg_block[trial]
+            search_screen_dur = vs_end_times_meg_block[trial] - vs_times_meg_block[trial]
+            late_ans_thr = -0.2
             # Answer after a 10 search screen or time difference of 100 ms -> No answer
-            if (time_diff < 0) and (vs_end_times_meg_block[trial] - vs_times_meg_block[trial] >= 9.9) or time_diff < -0.3 or time_diff > search_dur:
-                print(f'No answer in Trial {total_trial} with {round((vs_end_times_meg_block[trial] - meg_evt_time) * 1000, 1)} ms time difference')
+            if (time_diff < 0) and (vs_end_times_meg_block[trial] - vs_times_meg_block[trial] > 9.99) or time_diff < late_ans_thr or time_diff > search_screen_dur:
+                print(f'\nNo answer in Trial {total_trial}\n'
+                      f' Time difference: {round((vs_end_times_meg_block[trial] - meg_evt_time) * 1000, 1)} ms\n'
+                      f'Search duration: {search_screen_dur} s')
                 no_answer_block.append(total_trial)
 
             else:
-                if abs(time_diff) > 0.0:
-                    print(f'{round((vs_end_times_meg_block[trial] - meg_evt_time) * 1000, 1)} ms difference in Trial {total_trial}')
+                print(f'\nTrial {total_trial}:\n'
+                      f'Time difference: {round((vs_end_times_meg_block[trial] - meg_evt_time) * 1000, 1)} ms \n'
+                      f'Search duration: {search_screen_dur} s')
 
                 # Append time and button to annotations
                 onset_block.append(meg_evt_time)
@@ -566,7 +573,7 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
 
             # Remodnav parameters
             fname = f'eye_data_{subject.subject_id}.csv'
-            px2deg = math.degrees(math.atan2(.5 * screen_size, subject.screen_distance)) / (.5 * screen_resolution)
+            px2deg = math.degrees(math.atan2(.5 * screen_size, subject.config.preproc.screen_distance)) / (.5 * screen_resolution)
             sfreq = raw.info['sfreq']
 
             # Save csv file
@@ -591,7 +598,7 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
             os.replace(out_fname, out_folder + out_fname)
 
     # Get saccades and fixations
-    saccades = copy.copy(sac_fix.loc[sac_fix['label'] == 'SACC'])
+    saccades = copy.copy(sac_fix.loc[(sac_fix['label'] == 'SACC') | (sac_fix['label'] == 'ISAC')])
     fixations = copy.copy(sac_fix.loc[sac_fix['label'] == 'FIXA'])
 
     return fixations, saccades
@@ -627,10 +634,8 @@ def saccades_classification(subject, bh_data, saccades, raw):
     # Get mss and target pres/abs from bh data
     mss = bh_data['Nstim'].astype(int)
     pres_abs = bh_data['Tpres'].astype(int)
-    # corr_ans = bh_data['key_resp.corr'].astype(int)
-    #
-    # # Get correct_answers for subjects with no BH
-    # if subject.subject_id in exp_info.missing_bh_subjects:
+
+    # Determine corr ans from mapping and meg response
     corr_ans = np.zeros(len(bh_data)).astype(int)
     corr_answers = bh_data['corrAns']
     actual_answers = subject.description
@@ -649,16 +654,39 @@ def saccades_classification(subject, bh_data, saccades, raw):
     trial_correct = []
     n_sacs = []
     sac_delay = []
+    sac_deg = []
+    sac_dir = []
     description = []
     onset = []
 
     # Define dict to store screen-trial fixation number
     sac_numbers = {}
 
-    for i, sac_time in enumerate(saccades['onset'].values):
-        emap_sac = False
+    i = 0
+    for row_idx, saccade in saccades.iterrows():
+        sac_time = saccade['onset']
+
+        # Saccades degree
+        x_dif = saccade['end_x'] - saccade['start_x']
+        y_dif = saccade['end_y'] - saccade['start_y']
+        z = complex(x_dif, y_dif)
+        deg = np.angle(z, deg=True)
+        sac_deg.append(deg)
+
+        if -15 < deg < 15:
+            dir = 'r'
+        elif 75 < deg < 105:
+            dir = 'u'
+        elif 165 < deg or deg < -165:
+            dir = 'l'
+        elif -75 > deg > -105:
+            dir = 'd'
+        else:
+            dir = 'none'
+        sac_dir.append(dir)
 
         # find saccades's block
+        emap_sac = False
         for (block_num, emap_start_time), emap_end_time in zip(enumerate(hl_start_times), bl_end_times):
             if emap_start_time < sac_time < emap_end_time:
                 emap_sac = True
@@ -685,7 +713,7 @@ def saccades_classification(subject, bh_data, saccades, raw):
                 n_sacs.append(sac_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'sac_{screen}_{n_sacs[-1]}')
+                description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
                 onset.append([sac_time])
             # vl
             elif vl_start_times[block_num] < sac_time < hs_start_times[block_num]:
@@ -697,7 +725,7 @@ def saccades_classification(subject, bh_data, saccades, raw):
                 n_sacs.append(sac_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'sac_{screen}_{n_sacs[-1]}')
+                description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
                 onset.append([sac_time])
             # hs
             elif hs_start_times[block_num] < sac_time < vs_start_times[block_num]:
@@ -709,7 +737,7 @@ def saccades_classification(subject, bh_data, saccades, raw):
                 n_sacs.append(sac_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'sac_{screen}_{n_sacs[-1]}')
+                description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
                 onset.append([sac_time])
             # vs
             elif vs_start_times[block_num] < sac_time < bl_start_times[block_num]:
@@ -721,7 +749,7 @@ def saccades_classification(subject, bh_data, saccades, raw):
                 n_sacs.append(sac_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'sac_{screen}_{n_sacs[-1]}')
+                description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
                 onset.append([sac_time])
             # bl
             elif bl_start_times[block_num] < sac_time < bl_end_times[block_num]:
@@ -733,7 +761,7 @@ def saccades_classification(subject, bh_data, saccades, raw):
                 n_sacs.append(sac_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'sac_{screen}_{n_sacs[-1]}')
+                description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
                 onset.append([sac_time])
 
             else:
@@ -748,6 +776,7 @@ def saccades_classification(subject, bh_data, saccades, raw):
                 if trial_start_time < sac_time < trial_end_time:
                     trial_found = True
                     break
+
             if trial_found:
                 # Define trial to store screen sacation number. if sac_time > all trials end time, sac gets stored as last trial under screen None.
                 trial = trial_idx + 1
@@ -770,7 +799,7 @@ def saccades_classification(subject, bh_data, saccades, raw):
                     n_sacs.append(sac_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    description.append(f'sac_{screen}_{n_sacs[-1]}')
+                    description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
                     onset.append([sac_time])
 
                 # MS
@@ -783,7 +812,7 @@ def saccades_classification(subject, bh_data, saccades, raw):
                     n_sacs.append(sac_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    description.append(f'sac_{screen}_{n_sacs[-1]}')
+                    description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
                     onset.append([sac_time])
 
                 # Second sacations corss
@@ -796,7 +825,7 @@ def saccades_classification(subject, bh_data, saccades, raw):
                     n_sacs.append(sac_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    description.append(f'sac_{screen}_{n_sacs[-1]}')
+                    description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
                     onset.append([sac_time])
 
                 # VS
@@ -809,7 +838,7 @@ def saccades_classification(subject, bh_data, saccades, raw):
                     n_sacs.append(sac_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    description.append(f'sac_{screen}_{n_sacs[-1]}')
+                    description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
                     onset.append([sac_time])
 
                 # No screen identified
@@ -829,18 +858,32 @@ def saccades_classification(subject, bh_data, saccades, raw):
                 n_sacs.append(None)
 
         print("\rProgress: {}%".format(int((i + 1) * 100 / len(saccades))), end='')
+        i += 1
 
     print()
+    saccades['subject'] = subject.subject_id
     saccades['trial'] = sac_trial
     saccades['mss'] = trial_mss
     saccades['screen'] = sac_screen
     saccades['target_pres'] = tgt_pres_abs
     saccades['correct'] = trial_correct
     saccades['n_sac'] = n_sacs
-    saccades['time'] = sac_delay
+    saccades['delay'] = sac_delay
+    saccades['deg'] = sac_deg
+    saccades['dir'] = sac_dir
 
-    saccades = saccades.astype({'trial': 'Int64', 'mss': 'Int64', 'target_pres': 'Int64', 'time': float, 'correct': 'Int64',
-                                'n_sac': 'Int64'})
+    # Rearange columns
+    col1 = saccades.pop('subject')
+    saccades.insert(0, col1.name, col1)
+    col2 = saccades.pop('deg')
+    saccades.insert(9, col2.name, col2)
+    col3 = saccades.pop('dir')
+    saccades.insert(10, col3.name, col3)
+
+
+    # Define column type
+    saccades = saccades.astype({'subject': str, 'trial': 'Int64', 'mss': 'Int64', 'target_pres': 'Int64', 'delay': float,
+                                'correct': 'Int64', 'n_sac': 'Int64', 'deg': float, 'dir': str})
 
     # Add vs fixations data to raw annotations
     raw.annotations.description = np.concatenate((raw.annotations.description, np.array(description)))
@@ -858,8 +901,24 @@ def saccades_classification(subject, bh_data, saccades, raw):
     return saccades, raw
 
 
-def fixation_classification(subject, bh_data, fixations, raw, meg_pupils_data_clean, exp_info):
+def fixation_classification(subject, bh_data, fixations, saccades, raw, meg_pupils_data_clean):
+    
+    # Eyemap trials start and end indexes
+    hl_start_idx = np.where(raw.annotations.description == 'hl_start')[0]
+    vl_start_idx = np.where(raw.annotations.description == 'vl_start')[0]
+    hs_start_idx = np.where(raw.annotations.description == 'hs_start')[0]
+    vs_start_idx = np.where(raw.annotations.description == 'vs_start')[0]
+    bl_start_idx = np.where(raw.annotations.description == 'bl_start')[0]
+    bl_end_idx = np.where(raw.annotations.description == 'bl_end')[0]
 
+    # Eyemap trials start and end times
+    hl_start_times = raw.annotations.onset[hl_start_idx]
+    vl_start_times = raw.annotations.onset[vl_start_idx]
+    hs_start_times = raw.annotations.onset[hs_start_idx]
+    vs_start_times = raw.annotations.onset[vs_start_idx]
+    bl_start_times = raw.annotations.onset[bl_start_idx]
+    bl_end_times = raw.annotations.onset[bl_end_idx]
+    
     cross1_times_meg = subject.cross1
     response_trials_meg = subject.trial
     ms_times_meg = subject.ms
@@ -871,9 +930,8 @@ def fixation_classification(subject, bh_data, fixations, raw, meg_pupils_data_cl
     # Get mss and target pres/abs from bh data
     mss = bh_data['Nstim'].astype(int)
     pres_abs = bh_data['Tpres'].astype(int)
-    # corr_ans = bh_data['key_resp.corr'].astype(int)
-    #
-    # if subject.subject_id in exp_info.missing_bh_subjects:
+
+    # Determine corr ans from meg event and mapping
     corr_ans = np.zeros(len(bh_data)).astype(int)
     corr_answers = bh_data['corrAns']
     actual_answers = subject.description
@@ -884,10 +942,6 @@ def fixation_classification(subject, bh_data, fixations, raw, meg_pupils_data_cl
         else:
             corr_ans[trial_idx] = 1
 
-    # Differences only in no answer trials. We're recovering the answers!
-    # diff = (corr_ans1-corr_ans).values
-    # np.where(diff!=0)[0]+1
-
     # Get MSS, present/absent for every trial
     fix_trial = []
     fix_screen = []
@@ -897,6 +951,10 @@ def fixation_classification(subject, bh_data, fixations, raw, meg_pupils_data_cl
     n_fixs = []
     fix_delay = []
     pupil_size = []
+    prev_sac = []
+    next_sac = []
+    sacc_thresh = 0.02
+
     description = []
     onset = []
 
@@ -906,102 +964,207 @@ def fixation_classification(subject, bh_data, fixations, raw, meg_pupils_data_cl
     # Define dict to store screen-trial fixation number
     fix_numbers = {}
 
-    for i, fix_time in enumerate(fixations['onset'].values):
-        # find fixation's trial
-        for trial_idx, trial_end_time in enumerate(vsend_times_meg):
-            if fix_time < trial_end_time:
+    i = 0
+    for fix_idx, fixation in fixations.iterrows():
+
+        fix_time = fixation['onset']
+        fix_dur = fixation['duration']
+
+        # Previous and next saccades
+        try:
+            sac0 = saccades.loc[(saccades['onset'] + saccades['duration'] > fix_time - sacc_thresh) & (saccades['onset'] + saccades['duration'] < fix_time + sacc_thresh)].index.values[0]
+        except:
+            sac0 = None
+        prev_sac.append(sac0)
+
+        try:
+            sac1 = saccades.loc[(saccades['onset'] > fix_time + fix_dur - sacc_thresh) & (saccades['onset']< fix_time + fix_dur + sacc_thresh)].index.values[0]
+        except:
+            sac1 = None
+        next_sac.append(sac1)
+
+        # Average pupil size
+        fix_time_idx = \
+            np.where(np.logical_and(fix_time < times, times < fix_time + fix_dur))[0]
+        pupil_data_fix = meg_pupils_data_clean[fix_time_idx]
+        pupil_size.append(np.nanmean(pupil_data_fix))
+
+        emap_fix = False
+
+        # find fixation's block
+        for (block_num, emap_start_time), emap_end_time in zip(enumerate(hl_start_times), bl_end_times):
+            if emap_start_time < fix_time < emap_end_time:
+                emap_fix = True
                 break
 
-        # Define trial to store screen fixation number
-        trial = trial_idx + 1
+        # Save fix number within block
+        if block_num not in fix_numbers.keys():
+            fix_numbers[block_num] = {'emap_hl': 0, 'emap_vl': 0, 'emap_hs': 0, 'emap_vs': 0, 'emap_bl': 0}
 
-        fix_trial.append(trial)
-        trial_mss.append(mss[trial_idx])
-        tgt_pres_abs.append(pres_abs[trial_idx])
-        trial_correct.append(corr_ans[trial_idx])
+        if emap_fix:
+            # Find fixations emap trial
+            fix_trial.append(None)
+            trial_mss.append(None)
+            tgt_pres_abs.append(None)
+            trial_correct.append(None)
 
-        if trial not in fix_numbers.keys():
-            fix_numbers[trial] = {'cross1': 0, 'ms': 0, 'cross2': 0, 'vs': 0}
+            # hl
+            if hl_start_times[block_num] < fix_time < vl_start_times[block_num]:
+                # fixation data
+                screen = 'emap_hl'
+                fix_screen.append(screen)
+                fix_delay.append(fix_time - hl_start_times[block_num])
+                fix_numbers[block_num][screen] += 1
+                n_fixs.append(fix_numbers[block_num][screen])
 
-        # First fixation cross
-        if cross1_times_meg[trial_idx] < fix_time < ms_times_meg[trial_idx]:
-            screen = 'cross1'
-            fix_screen.append(screen)
-            fix_delay.append(fix_time - cross1_times_meg[trial_idx])
-            fix_numbers[trial][screen] += 1
-            n_fixs.append(fix_numbers[trial][screen])
+                # Save to raw
+                description.append(f'fix_{screen}_{n_fixs[-1]}')
+                onset.append([fix_time])
+            # vl
+            elif vl_start_times[block_num] < fix_time < hs_start_times[block_num]:
+                # fixation data
+                screen = 'emap_vl'
+                fix_screen.append(screen)
+                fix_delay.append(fix_time - vl_start_times[block_num])
+                fix_numbers[block_num][screen] += 1
+                n_fixs.append(fix_numbers[block_num][screen])
 
-            description.append(f'fix_{screen}_{n_fixs[-1]}')
-            onset.append([fix_time])
+                # Save to raw
+                description.append(f'fix_{screen}_{n_fixs[-1]}')
+                onset.append([fix_time])
+            # hs
+            elif hs_start_times[block_num] < fix_time < vs_start_times[block_num]:
+                # fixation data
+                screen = 'emap_hs'
+                fix_screen.append(screen)
+                fix_delay.append(fix_time - hs_start_times[block_num])
+                fix_numbers[block_num][screen] += 1
+                n_fixs.append(fix_numbers[block_num][screen])
 
-            # Average pupil size
-            screen_time_idx = \
-                np.where(np.logical_and(cross1_times_meg[trial_idx] < times, times < ms_times_meg[trial_idx]))[0]
-            pupil_data_screen = meg_pupils_data_clean[screen_time_idx]
-            pupil_size.append(np.nanmean(pupil_data_screen))
+                # Save to raw
+                description.append(f'fix_{screen}_{n_fixs[-1]}')
+                onset.append([fix_time])
+            # vs
+            elif vs_start_times[block_num] < fix_time < bl_start_times[block_num]:
+                # fixation data
+                screen = 'emap_vs'
+                fix_screen.append(screen)
+                fix_delay.append(fix_time - vs_start_times[block_num])
+                fix_numbers[block_num][screen] += 1
+                n_fixs.append(fix_numbers[block_num][screen])
 
-        # MS
-        elif ms_times_meg[trial_idx] < fix_time < cross2_times_meg[trial_idx]:
-            screen = 'ms'
-            fix_screen.append(screen)
-            fix_delay.append(fix_time - ms_times_meg[trial_idx])
-            fix_numbers[trial][screen] += 1
-            n_fixs.append(fix_numbers[trial][screen])
+                # Save to raw
+                description.append(f'fix_{screen}_{n_fixs[-1]}')
+                onset.append([fix_time])
+            # bl
+            elif bl_start_times[block_num] < fix_time < bl_end_times[block_num]:
+                # fixation data
+                screen = 'emap_bl'
+                fix_screen.append(screen)
+                fix_delay.append(fix_time - bl_start_times[block_num])
+                fix_numbers[block_num][screen] += 1
+                n_fixs.append(fix_numbers[block_num][screen])
 
-            description.append(f'fix_{screen}_{n_fixs[-1]}')
-            onset.append([fix_time])
+                # Save to raw
+                description.append(f'fix_{screen}_{n_fixs[-1]}')
+                onset.append([fix_time])
 
-            # Average pupil size
-            screen_time_idx = \
-                np.where(np.logical_and(ms_times_meg[trial_idx] < times, times < cross2_times_meg[trial_idx]))[0]
-            pupil_data_screen = meg_pupils_data_clean[screen_time_idx]
-            pupil_size.append(np.nanmean(pupil_data_screen))
+            else:
+                # No emap trial identified
+                fix_screen.append(None)
+                fix_delay.append(None)
+                n_fixs.append(None)
 
-        # Second fixations corss
-        elif cross2_times_meg[trial_idx] < fix_time < vs_times_meg[trial_idx]:
-            screen = 'cross2'
-            fix_screen.append(screen)
-            fix_delay.append(fix_time - cross2_times_meg[trial_idx])
-            fix_numbers[trial][screen] += 1
-            n_fixs.append(fix_numbers[trial][screen])
-
-            description.append(f'fix_{screen}_{n_fixs[-1]}')
-            onset.append([fix_time])
-
-            # Average pupil size
-            screen_time_idx = \
-                np.where(np.logical_and(cross2_times_meg[trial_idx] < times, times < vs_times_meg[trial_idx]))[0]
-            pupil_data_screen = meg_pupils_data_clean[screen_time_idx]
-            pupil_size.append(np.nanmean(pupil_data_screen))
-
-        # VS
-        elif vs_times_meg[trial_idx] < fix_time < vsend_times_meg[trial_idx]:
-            screen = 'vs'
-            fix_screen.append(screen)
-            fix_delay.append(fix_time - vs_times_meg[trial_idx])
-            fix_numbers[trial][screen] += 1
-            n_fixs.append(fix_numbers[trial][screen])
-
-            description.append(f'fix_{screen}_{n_fixs[-1]}')
-            onset.append([fix_time])
-
-            # Average pupil size
-            screen_time_idx = \
-                np.where(np.logical_and(vs_times_meg[trial_idx] < times, times < vsend_times_meg[trial_idx]))[0]
-            pupil_data_screen = meg_pupils_data_clean[screen_time_idx]
-            pupil_size.append(np.nanmean(pupil_data_screen))
-
-        # No screen identified
+        # No emap fixation
         else:
-            fix_screen.append(None)
-            fix_delay.append(None)
-            n_fixs.append(None)
-            pupil_size.append(None)
 
-        previous_trial = trial
+            trial_found = False
+            for (trial_idx, trial_start_time), trial_end_time in zip(enumerate(cross1_times_meg), vsend_times_meg):
+                if trial_start_time < fix_time < trial_end_time:
+                    trial_found = True
+                    break
+
+            if trial_found:
+                # Define trial to store screen fixation number. if fix_time > all trials end time, fix gets stored as last trial under screen None.
+                trial = trial_idx + 1
+
+                fix_trial.append(trial)
+                trial_mss.append(mss[trial_idx])
+                tgt_pres_abs.append(pres_abs[trial_idx])
+                trial_correct.append(corr_ans[trial_idx])
+
+                if f'trial_{trial}' not in fix_numbers[block_num].keys():
+                    fix_numbers[block_num][f'trial_{trial}'] = {'cross1': 0, 'ms': 0, 'cross2': 0, 'vs': 0}
+
+                # First fixation cross
+                if cross1_times_meg[trial_idx] < fix_time < ms_times_meg[trial_idx]:
+                    # fixation data
+                    screen = 'cross1'
+                    fix_screen.append(screen)
+                    fix_delay.append(fix_time - cross1_times_meg[trial_idx])
+                    fix_numbers[block_num][f'trial_{trial}'][screen] += 1
+                    n_fixs.append(fix_numbers[block_num][f'trial_{trial}'][screen])
+
+                    # Save to raw
+                    description.append(f'fix_{screen}_{n_fixs[-1]}')
+                    onset.append([fix_time])
+
+                # MS
+                elif ms_times_meg[trial_idx] < fix_time < cross2_times_meg[trial_idx]:
+                    # fixation data
+                    screen = 'ms'
+                    fix_screen.append(screen)
+                    fix_delay.append(fix_time - ms_times_meg[trial_idx])
+                    fix_numbers[block_num][f'trial_{trial}'][screen] += 1
+                    n_fixs.append(fix_numbers[block_num][f'trial_{trial}'][screen])
+
+                    # Save to raw
+                    description.append(f'fix_{screen}_{n_fixs[-1]}')
+                    onset.append([fix_time])
+
+                # Second fixations corss
+                elif cross2_times_meg[trial_idx] < fix_time < vs_times_meg[trial_idx]:
+                    # fixation data
+                    screen = 'cross2'
+                    fix_screen.append(screen)
+                    fix_delay.append(fix_time - ms_times_meg[trial_idx])
+                    fix_numbers[block_num][f'trial_{trial}'][screen] += 1
+                    n_fixs.append(fix_numbers[block_num][f'trial_{trial}'][screen])
+
+                    # Save to raw
+                    description.append(f'fix_{screen}_{n_fixs[-1]}')
+                    onset.append([fix_time])
+
+                # VS
+                elif vs_times_meg[trial_idx] < fix_time < vsend_times_meg[trial_idx]:
+                    # fixation data
+                    screen = 'vs'
+                    fix_screen.append(screen)
+                    fix_delay.append(fix_time - ms_times_meg[trial_idx])
+                    fix_numbers[block_num][f'trial_{trial}'][screen] += 1
+                    n_fixs.append(fix_numbers[block_num][f'trial_{trial}'][screen])
+
+                # No screen identified
+                else:
+                    fix_screen.append(None)
+                    fix_delay.append(None)
+                    n_fixs.append(None)
+
+            # No trial identified
+            else:
+                fix_trial.append(None)
+                trial_mss.append(None)
+                tgt_pres_abs.append(None)
+                trial_correct.append(None)
+                fix_screen.append(None)
+                fix_delay.append(None)
+                n_fixs.append(None)
+
         print("\rProgress: {}%".format(int((i + 1) * 100 / len(fixations))), end='')
+        i += 1
 
     print()
+    fixations['subject'] = subject.subject_id
     fixations['pupil'] = pupil_size
     fixations['trial'] = fix_trial
     fixations['mss'] = trial_mss
@@ -1009,28 +1172,21 @@ def fixation_classification(subject, bh_data, fixations, raw, meg_pupils_data_cl
     fixations['target_pres'] = tgt_pres_abs
     fixations['correct'] = trial_correct
     fixations['n_fix'] = n_fixs
-    fixations['time'] = fix_delay
+    fixations['delay'] = fix_delay
+    fixations['prev_sac'] = prev_sac
+    fixations['next_sac'] = next_sac
 
-    fixations = fixations.astype({'trial': int, 'mss': 'Int64', 'target_pres': 'Int64', 'time': float, 'correct': 'Int64',
-                                  'n_fix': 'Int64', 'pupil': float})
+    fixations = fixations.astype({'trial': 'Int64', 'mss': 'Int64', 'target_pres': 'Int64', 'delay': float, 'correct': 'Int64',
+                                  'n_fix': 'Int64', 'pupil': float, 'prev_sac': 'Int64', 'next_sac': 'Int64'})
 
     # Add vs fixations data to raw annotations
     raw.annotations.description = np.concatenate((raw.annotations.description, np.array(description)))
     raw.annotations.onset = np.concatenate((raw.annotations.onset, np.array(functions.flatten_list(onset))))
 
-    # Order raw.annotations chronologically
-    raw_annot = np.array([raw.annotations.onset, raw.annotations.description])
-    raw_annot = raw_annot[:, raw_annot[0].astype(float).argsort()]
-    raw.annotations.onset = raw_annot[0].astype(float)
-    raw.annotations.description = raw_annot[1]
-
-    # Set durations and ch_names length to match the annotations length
-    raw.annotations.duration = np.zeros(len(raw.annotations.description))
-
     return fixations, raw
 
 
-def target_vs_distractor(fixations, bh_data, subject, distance_threshold=100, screen_res_x=1920, screen_res_y=1080,
+def target_vs_distractor(fixations, bh_data, raw, distance_threshold=100, screen_res_x=1920, screen_res_y=1080,
                          img_res_x=1280, img_res_y=1024):
 
     print('Identifying fixated items')
@@ -1054,12 +1210,18 @@ def target_vs_distractor(fixations, bh_data, subject, distance_threshold=100, sc
     fix_target = []
     trials_image = []
 
+    description = []
+    onset = []
+
      # Iterate over fixations
     for fix_idx, fix in fixations_vs.iterrows():
 
-        # Get fixation trial
+        # Get fixation trial time, and n_fix
         trial = fix['trial']
         trial_idx = trial - 1
+
+        n_fix = fix['n_fix']
+        fix_time = fix['onset']
 
         # Get fixations x and y
         fix_x = np.mean([fix['start_x'], fix['end_x']])
@@ -1108,13 +1270,34 @@ def target_vs_distractor(fixations, bh_data, subject, distance_threshold=100, sc
         fix_item_distance.append(item_distance)
         fix_target.append(istarget)
 
+        if istarget:
+            prefix = 'tgt'
+        elif item != None:
+            prefix = 'it'
+        else:
+            prefix = 'none'
+
+        description.append(f'{prefix}_fix_vs_{n_fix}')
+        onset.append([fix_time])
+
     # Save to fixations_vs df
     fixations.loc[fixations['screen'] == 'vs', 'item'] = items
     fixations.loc[fixations['screen'] == 'vs', 'fix_target'] = fix_target
     fixations.loc[fixations['screen'] == 'vs', 'distance'] = fix_item_distance
     fixations.loc[fixations['screen'] == 'vs', 'trial_image'] = trials_image
 
-    return fixations, items_pos
+    # Save to raw annotations
+    raw.annotations.description = np.concatenate((raw.annotations.description, np.array(description)))
+    raw.annotations.onset = np.concatenate((raw.annotations.onset, np.array(functions.flatten_list(onset))))
+
+    raw_annot = np.array([raw.annotations.onset, raw.annotations.description])
+    raw_annot = raw_annot[:, raw_annot[0].astype(float).argsort()]
+    raw.annotations.onset = raw_annot[0].astype(float)
+    raw.annotations.description = raw_annot[1]
+
+    raw.annotations.duration = np.zeros(len(raw.annotations.description))
+
+    return fixations, raw, items_pos
 
 
 def add_et_channels(raw, et_channels_meg, et_channel_names):
