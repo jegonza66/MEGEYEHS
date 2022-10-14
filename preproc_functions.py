@@ -36,19 +36,14 @@ def bh_emap_dur(bh_data_eyemap):
     bl_end_bh = bh_data_eyemap['emap_stim_L.stopped'].loc[bh_data_eyemap['emap_st_tags'] == 'BL']. \
         astype(float).reset_index(drop=True)
 
-    # End-msg end
-    emap_endmsg_end_bh = bh_data_eyemap['key_resp_3.stopped'].loc[bh_data_eyemap['emap_st_tags'] == 'BL']. \
-        astype(float).reset_index(drop=True)
-
     # Get emap screen durations
-    end_msg_dur = emap_endmsg_end_bh - bl_end_bh
     bl_dur = bl_end_bh - bl_start_bh
     vs_dur = bl_start_bh - vs_start_bh
     hs_dur = vs_start_bh - hs_start_bh
     vl_dur = hs_start_bh - vl_start_bh
     hl_dur = vl_start_bh - hl_start_bh
 
-    return end_msg_dur, bl_dur, vs_dur, hs_dur, vl_dur, hl_dur
+    return bl_dur, vs_dur, hs_dur, vl_dur, hl_dur
 
 
 def et_screen_samples(et_data, subject, et_times, exp_info):
@@ -285,7 +280,7 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
     # Get only trial data rows
     bh_data = bh_data_raw.loc[~pd.isna(bh_data_raw['target.started'])].reset_index(drop=True)
 
-    end_msg_dur, bl_dur, vs_dur, hs_dur, vl_dur, hl_dur = bh_emap_dur(bh_data_eyemap=bh_data_eyemap)
+    bl_dur, vs_dur, hs_dur, vl_dur, hl_dur = bh_emap_dur(bh_data_eyemap=bh_data_eyemap)
 
     # Load ET data
     et_data = subject.et_data()
@@ -471,6 +466,7 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
                       f' Time difference: {round((vs_end_times_meg_block[trial] - meg_evt_time) * 1000, 1)} ms\n'
                       f'Search duration: {search_screen_dur} s')
                 no_answer_block.append(total_trial)
+                response_times_meg_block.append(float('nan'))
 
             else:
                 print(f'\nTrial {total_trial}:\n'
@@ -484,7 +480,7 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
                 # Append to subject data
                 time_diff_block.append(time_diff)
                 buttons_meg_block.append((meg_evt_block_buttons[idx]))
-                response_times_meg_block.append(meg_evt_time)
+                response_times_meg_block.append(meg_evt_time - vs_times_meg_block[trial])
                 response_trials_meg_block.append(total_trial)
 
         # Append block data to overall data
@@ -531,7 +527,8 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
     subject.vs = np.array(vs_times_meg)
     subject.vsend = np.array(vsend_times_meg)
     subject.description = np.array(buttons_meg)
-    subject.onset = np.array(response_times_meg)
+    subject.onset = np.array(onset)
+    subject.rt = np.array(response_times_meg)
     subject.time_differences = np.array(time_differences)
     subject.trial = np.array(response_trials_meg)
     subject.no_answer = np.array(no_answer)
@@ -645,6 +642,9 @@ def saccades_classification(subject, bh_data, saccades, raw):
             corr_ans[trial_idx] = 0
         else:
             corr_ans[trial_idx] = 1
+
+    # Add correct ans data to subject
+    subject.corr_ans = corr_ans
 
     # Get MSS, present/absent for every trial
     sac_trial = []
@@ -898,7 +898,7 @@ def saccades_classification(subject, bh_data, saccades, raw):
     # Set durations and ch_names length to match the annotations length
     raw.annotations.duration = np.zeros(len(raw.annotations.description))
 
-    return saccades, raw
+    return saccades, raw, subject
 
 
 def fixation_classification(subject, bh_data, fixations, saccades, raw, meg_pupils_data_clean):
@@ -931,16 +931,8 @@ def fixation_classification(subject, bh_data, fixations, saccades, raw, meg_pupi
     mss = bh_data['Nstim'].astype(int)
     pres_abs = bh_data['Tpres'].astype(int)
 
-    # Determine corr ans from meg event and mapping
-    corr_ans = np.zeros(len(bh_data)).astype(int)
-    corr_answers = bh_data['corrAns']
-    actual_answers = subject.description
-    for i, trial in enumerate(response_trials_meg):
-        trial_idx = trial-1
-        if int(subject.map[actual_answers[i]]) != corr_answers[trial_idx]: # Check if mapping of button corresponds to correct answer
-            corr_ans[trial_idx] = 0
-        else:
-            corr_ans[trial_idx] = 1
+    # Get corr ans from meg event and mapping
+    corr_ans = subject.corr_ans
 
     # Get MSS, present/absent for every trial
     fix_trial = []

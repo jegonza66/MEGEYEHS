@@ -27,7 +27,7 @@ class paths:
         if self.name == 'laptop-5i5qsv76\\joaco\n':  # Asus Rog
             config_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/Python/Config/'
         elif self.name == 'usuario\n':  # Liaa Colores
-            config_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Config/'
+            config_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Python/Config/'
         else:  # Notts
             config_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/Config/'
         return config_path
@@ -140,7 +140,7 @@ class paths:
         if self.name == 'laptop-5i5qsv76\\joaco\n':
             save_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/Python/Save/'
         elif self.name == 'usuario\n':  # Liaa Colores
-            save_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Save/'
+            save_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Python/Save/'
         else:
             save_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/Save/'
 
@@ -163,7 +163,7 @@ class paths:
         if self.name == 'laptop-5i5qsv76\\joaco\n':
             preproc_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/Python/Save/Preprocesed_Data/'
         elif self.name == 'usuario\n': # Liaa Colores
-            preproc_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Save/Preprocesed_Data/'
+            preproc_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Python/Save/Preprocesed_Data/'
         else:
             preproc_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/Save/Preprocesed_Data/'
 
@@ -186,7 +186,7 @@ class paths:
         if self.name == 'laptop-5i5qsv76\\joaco\n':
             results_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/Python/Results/'
         elif self.name == 'usuario\n': # Liaa Colores
-            results_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Results/'
+            results_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Python/Results/'
         else:
             results_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/Results/'
 
@@ -208,7 +208,7 @@ class paths:
         if self.name == 'laptop-5i5qsv76\\joaco\n':
             plots_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/Python/Plots/'
         elif self.name == 'usuario\n': # Liaa Colores
-            plots_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Plots/'
+            plots_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Python/Plots/'
         else:
             plots_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/Plots/'
 

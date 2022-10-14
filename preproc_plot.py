@@ -431,32 +431,32 @@ def pupil_size_increase(fixations, subject, display_fig=False, save=True):
         plt.savefig(save_path + f'{subject.subject_id} Pupil size increase.png')
 
 
-def performance(subject, display=False, save=True):
+def performance(subject, bh_data, display=False, save=True):
 
     if display:
         plt.ion()
     else:
         plt.ioff()
 
-    # Load bh data
-    bh_data = subject.bh_data()
-
     # Get response time mean and stf by MSS
-    rt_1 = bh_data.loc[bh_data['Nstim'] == 1]['key_resp.rt']
-    rt_2 = bh_data.loc[bh_data['Nstim'] == 2]['key_resp.rt']
-    rt_4 = bh_data.loc[bh_data['Nstim'] == 4]['key_resp.rt']
+    rt = subject.rt
+    corr_ans = subject.corr_ans
 
-    rt1_mean = np.mean(rt_1)
-    rt1_std = np.std(rt_1)
-    rt2_mean = np.mean(rt_2)
-    rt2_std = np.std(rt_2)
-    rt4_mean = np.mean(rt_4)
-    rt4_std = np.std(rt_4)
+    rt_1 = rt[np.where(bh_data['Nstim'] == 1)[0]]
+    rt_2 = rt[np.where(bh_data['Nstim'] == 2)[0]]
+    rt_4 = rt[np.where(bh_data['Nstim'] == 4)[0]]
+
+    rt1_mean = np.nanmean(rt_1)
+    rt1_std = np.nanstd(rt_1)
+    rt2_mean = np.nanmean(rt_2)
+    rt2_std = np.nanstd(rt_2)
+    rt4_mean = np.nanmean(rt_4)
+    rt4_std = np.nanstd(rt_4)
 
     # Get correct ans mean and std by MSS
-    corr_1 = bh_data.loc[bh_data['Nstim'] == 1]['key_resp.corr']
-    corr_2 = bh_data.loc[bh_data['Nstim'] == 2]['key_resp.corr']
-    corr_4 = bh_data.loc[bh_data['Nstim'] == 4]['key_resp.corr']
+    corr_1 = corr_ans[np.where(bh_data['Nstim'] == 1)[0]]
+    corr_2 = corr_ans[np.where(bh_data['Nstim'] == 2)[0]]
+    corr_4 = corr_ans[np.where(bh_data['Nstim'] == 4)[0]]
 
     corr1_mean = np.mean(corr_1)
     corr1_std = np.std(corr_1)

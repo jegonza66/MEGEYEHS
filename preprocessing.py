@@ -59,7 +59,7 @@ def preprocess(subject_code, plot=False):
                                                                          subject=subject)
 
     # ---------------- Saccades classification ----------------#
-    saccades, raw = preproc_functions.saccades_classification(subject=subject, bh_data=bh_data, saccades=saccades, raw=raw)
+    saccades, raw, subject = preproc_functions.saccades_classification(subject=subject, bh_data=bh_data, saccades=saccades, raw=raw)
 
     #---------------- Fixations classification ----------------#
     fixations, raw = preproc_functions.fixation_classification(subject=subject, bh_data=bh_data, fixations=fixations, saccades=saccades,
@@ -73,7 +73,7 @@ def preprocess(subject_code, plot=False):
     if plot:
         preproc_plot.first_fixation_delay(fixations=fixations, subject=subject)
         preproc_plot.pupil_size_increase(fixations=fixations, subject=subject)
-        preproc_plot.performance(subject=subject)
+        preproc_plot.performance(subject=subject, bh_data=bh_data)
 
         print('Plotting scanpaths and trials gaze screens')
         for trial_idx in range(len(bh_data)):
@@ -97,5 +97,5 @@ def preprocess(subject_code, plot=False):
 
 
 # for subject_code in [6, 7, 8, 9, 10, 11, 12, 13]:
-for subject_code in range(1, 14):
+for subject_code in range(6, 14):
     preprocess(subject_code=subject_code, plot=True)
