@@ -33,8 +33,10 @@ def bh_emap_dur(bh_data_eyemap):
     # BL emap trial start
     bl_start_bh = bh_data_eyemap['emap_stim_L.started'].loc[bh_data_eyemap['emap_st_tags'] == 'BL']. \
         astype(float).reset_index(drop=True)
-    bl_end_bh = bh_data_eyemap['emap_stim_L.stopped'].loc[bh_data_eyemap['emap_st_tags'] == 'BL']. \
-        astype(float).reset_index(drop=True)
+    # bl_end_bh = bh_data_eyemap['emap_stim_L.stopped'].loc[bh_data_eyemap['emap_st_tags'] == 'BL']. \
+    #     astype(float).reset_index(drop=True)
+    # Hardcode last emap duration
+    bl_end_bh = bl_start_bh + 6
 
     # Get emap screen durations
     bl_dur = bl_end_bh - bl_start_bh
@@ -274,13 +276,18 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
     bh_data_raw = subject.bh_data()
 
     # Get bh data from eyemap
-    bh_data_eyemap = bh_data_raw.loc[np.logical_and(pd.notnull(bh_data_raw['emap_stim_L.started']),
+    bh_data_emap = bh_data_raw.loc[np.logical_and(pd.notnull(bh_data_raw['emap_stim_L.started']),
                                                     bh_data_raw['emap_stim_L.started'] != 'None')].reset_index(drop=True)
 
     # Get only trial data rows
     bh_data = bh_data_raw.loc[~pd.isna(bh_data_raw['target.started'])].reset_index(drop=True)
 
-    bl_dur, vs_dur, hs_dur, vl_dur, hl_dur = bh_emap_dur(bh_data_eyemap=bh_data_eyemap)
+    # Save to subject
+    subject.trial_imgs = bh_data['searchimage'].str.split('cmp_', expand=True)[1].str.split('.jpg', expand=True)[0]
+    subject.bh_data = bh_data
+    subject.bh_data_emap = bh_data_emap
+
+    bl_dur, vs_dur, hs_dur, vl_dur, hl_dur = bh_emap_dur(bh_data_eyemap=bh_data_emap)
 
     # Load ET data
     et_data = subject.et_data()
@@ -297,9 +304,11 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
     raw_et, meg_gazex, evt_buttons, evt_times, blocks_bounds_evt, blocks_bounds_meg = \
         meg_blocks_bounds_evt(raw=raw, et_channel_names=et_channel_names)
 
+    emap_trials = ['hl_start', 'vl_start', 'hs_start', 'vs_start', 'bl_start', 'bl_end']
+
     # Define variables to store data
     no_answer = []
-    emap_times_meg = []
+    emap_times_meg = pd.DataFrame(columns=emap_trials)
     cross1_times_meg = []
     ms_times_meg = []
     cross2_times_meg = []
@@ -397,10 +406,13 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
         # Append to onset and description
         emap_times_meg_block = [emap_hl_start_meg_block, emap_vl_start_meg_block, emap_hs_start_meg_block,
                                 emap_vs_start_meg_block, emap_bl_start_meg_block, emap_bl_end_meg_block]
-        emap_desc_meg_block = ['hl_start', 'vl_start', 'hs_start', 'vs_start', 'bl_start', 'bl_end']
 
+        # Save to raw
         onset_block.append(emap_times_meg_block)
-        description_block.append(emap_desc_meg_block)
+        description_block.append(emap_trials)
+
+        # Savet o subject
+        emap_times_meg.loc[block_num] = emap_times_meg_block
 
         # Get cross1 MEG start time from ET data triggers and samples shift
         cross1_start_block = cross1_start_et[block_idxs] + samples_shift
@@ -484,7 +496,6 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
                 response_trials_meg_block.append(total_trial)
 
         # Append block data to overall data
-        emap_times_meg.append(emap_times_meg_block)
         cross1_times_meg.append(cross1_times_meg_block)
         ms_times_meg.append(ms_times_meg_block)
         cross2_times_meg.append(cross2_times_meg_block)
@@ -500,7 +511,6 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
         onset.append(onset_block)
 
     # Flatten variables over blocks
-    emap_times_meg = functions.flatten_list(emap_times_meg)
     cross1_times_meg = functions.flatten_list(cross1_times_meg)
     ms_times_meg = functions.flatten_list(ms_times_meg)
     cross2_times_meg = functions.flatten_list(cross2_times_meg)
@@ -520,7 +530,7 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
     raw.annotations.onset = np.array(onset)
 
     # Save data to subject class
-    subject.emap = np.array(emap_times_meg)
+    subject.emap = emap_times_meg
     subject.cross1 = np.array(cross1_times_meg)
     subject.ms = np.array(ms_times_meg)
     subject.cross2 = np.array(cross2_times_meg)
@@ -543,7 +553,7 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
         config_path = paths().config_path()
         save.var(config, path=config_path, fname='config.pkl')
 
-    return bh_data, raw, subject
+    return raw, subject
 
 
 def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean, subject, screen_size=38,
@@ -601,7 +611,7 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
     return fixations, saccades
 
 
-def saccades_classification(subject, bh_data, saccades, raw):
+def saccades_classification(subject, saccades, raw):
 
     print('Classifying saccades')
 
@@ -629,12 +639,12 @@ def saccades_classification(subject, bh_data, saccades, raw):
     vsend_times_meg = subject.vsend
 
     # Get mss and target pres/abs from bh data
-    mss = bh_data['Nstim'].astype(int)
-    pres_abs = bh_data['Tpres'].astype(int)
+    mss = subject.bh_data['Nstim'].astype(int)
+    pres_abs = subject.bh_data['Tpres'].astype(int)
 
     # Determine corr ans from mapping and meg response
-    corr_ans = np.zeros(len(bh_data)).astype(int)
-    corr_answers = bh_data['corrAns']
+    corr_ans = np.zeros(len(subject.bh_data)).astype(int)
+    corr_answers = subject.bh_data['corrAns']
     actual_answers = subject.description
     for i, trial in enumerate(response_trials_meg):
         trial_idx = trial-1
@@ -820,7 +830,7 @@ def saccades_classification(subject, bh_data, saccades, raw):
                     # Saccade data
                     screen = 'cross2'
                     sac_screen.append(screen)
-                    sac_delay.append(sac_time - ms_times_meg[trial_idx])
+                    sac_delay.append(sac_time - cross2_times_meg[trial_idx])
                     sac_numbers[block_num][f'trial_{trial}'][screen] += 1
                     n_sacs.append(sac_numbers[block_num][f'trial_{trial}'][screen])
 
@@ -833,7 +843,7 @@ def saccades_classification(subject, bh_data, saccades, raw):
                     # Saccade data
                     screen = 'vs'
                     sac_screen.append(screen)
-                    sac_delay.append(sac_time - ms_times_meg[trial_idx])
+                    sac_delay.append(sac_time - vs_times_meg[trial_idx])
                     sac_numbers[block_num][f'trial_{trial}'][screen] += 1
                     n_sacs.append(sac_numbers[block_num][f'trial_{trial}'][screen])
 
@@ -885,6 +895,9 @@ def saccades_classification(subject, bh_data, saccades, raw):
     saccades = saccades.astype({'subject': str, 'trial': 'Int64', 'mss': 'Int64', 'target_pres': 'Int64', 'delay': float,
                                 'correct': 'Int64', 'n_sac': 'Int64', 'deg': float, 'dir': str})
 
+    # Save to subject
+    subject.saccades = saccades
+
     # Add vs fixations data to raw annotations
     raw.annotations.description = np.concatenate((raw.annotations.description, np.array(description)))
     raw.annotations.onset = np.concatenate((raw.annotations.onset, np.array(functions.flatten_list(onset))))
@@ -901,7 +914,7 @@ def saccades_classification(subject, bh_data, saccades, raw):
     return saccades, raw, subject
 
 
-def fixation_classification(subject, bh_data, fixations, saccades, raw, meg_pupils_data_clean):
+def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_clean):
     
     # Eyemap trials start and end indexes
     hl_start_idx = np.where(raw.annotations.description == 'hl_start')[0]
@@ -928,8 +941,8 @@ def fixation_classification(subject, bh_data, fixations, saccades, raw, meg_pupi
     times = raw.times
 
     # Get mss and target pres/abs from bh data
-    mss = bh_data['Nstim'].astype(int)
-    pres_abs = bh_data['Tpres'].astype(int)
+    mss = subject.bh_data['Nstim'].astype(int)
+    pres_abs = subject.bh_data['Tpres'].astype(int)
 
     # Get corr ans from meg event and mapping
     corr_ans = subject.corr_ans
@@ -945,7 +958,6 @@ def fixation_classification(subject, bh_data, fixations, saccades, raw, meg_pupi
     pupil_size = []
     prev_sac = []
     next_sac = []
-    sacc_thresh = 0.02
 
     description = []
     onset = []
@@ -962,22 +974,22 @@ def fixation_classification(subject, bh_data, fixations, saccades, raw, meg_pupi
         fix_time = fixation['onset']
         fix_dur = fixation['duration']
 
+        sacc_thresh = 0.02 # 20 ms change to 100 ms and keep las saccade for 0 and first saccade for 1
         # Previous and next saccades
         try:
-            sac0 = saccades.loc[(saccades['onset'] + saccades['duration'] > fix_time - sacc_thresh) & (saccades['onset'] + saccades['duration'] < fix_time + sacc_thresh)].index.values[0]
+            sac0 = saccades.loc[(saccades['onset'] + saccades['duration'] > fix_time - sacc_thresh) & (saccades['onset'] + saccades['duration'] < fix_time)].index.values[-1]
         except:
             sac0 = None
         prev_sac.append(sac0)
 
         try:
-            sac1 = saccades.loc[(saccades['onset'] > fix_time + fix_dur - sacc_thresh) & (saccades['onset']< fix_time + fix_dur + sacc_thresh)].index.values[0]
+            sac1 = saccades.loc[(saccades['onset'] > fix_time + fix_dur) & (saccades['onset'] < fix_time + fix_dur + sacc_thresh)].index.values[0]
         except:
             sac1 = None
         next_sac.append(sac1)
 
         # Average pupil size
-        fix_time_idx = \
-            np.where(np.logical_and(fix_time < times, times < fix_time + fix_dur))[0]
+        fix_time_idx = np.where(np.logical_and(fix_time < times, times < fix_time + fix_dur))[0]
         pupil_data_fix = meg_pupils_data_clean[fix_time_idx]
         pupil_size.append(np.nanmean(pupil_data_fix))
 
@@ -1069,7 +1081,6 @@ def fixation_classification(subject, bh_data, fixations, saccades, raw, meg_pupi
 
         # No emap fixation
         else:
-
             trial_found = False
             for (trial_idx, trial_start_time), trial_end_time in zip(enumerate(cross1_times_meg), vsend_times_meg):
                 if trial_start_time < fix_time < trial_end_time:
@@ -1119,7 +1130,7 @@ def fixation_classification(subject, bh_data, fixations, saccades, raw, meg_pupi
                     # fixation data
                     screen = 'cross2'
                     fix_screen.append(screen)
-                    fix_delay.append(fix_time - ms_times_meg[trial_idx])
+                    fix_delay.append(fix_time - cross2_times_meg[trial_idx])
                     fix_numbers[block_num][f'trial_{trial}'][screen] += 1
                     n_fixs.append(fix_numbers[block_num][f'trial_{trial}'][screen])
 
@@ -1132,7 +1143,7 @@ def fixation_classification(subject, bh_data, fixations, saccades, raw, meg_pupi
                     # fixation data
                     screen = 'vs'
                     fix_screen.append(screen)
-                    fix_delay.append(fix_time - ms_times_meg[trial_idx])
+                    fix_delay.append(fix_time - vs_times_meg[trial_idx])
                     fix_numbers[block_num][f'trial_{trial}'][screen] += 1
                     n_fixs.append(fix_numbers[block_num][f'trial_{trial}'][screen])
 
@@ -1178,7 +1189,7 @@ def fixation_classification(subject, bh_data, fixations, saccades, raw, meg_pupi
     return fixations, raw
 
 
-def target_vs_distractor(fixations, bh_data, raw, distance_threshold=100, screen_res_x=1920, screen_res_y=1080,
+def target_vs_distractor(fixations, subject, raw, distance_threshold=100, screen_res_x=1920, screen_res_y=1080,
                          img_res_x=1280, img_res_y=1024):
 
     print('Identifying fixated items')
@@ -1220,7 +1231,7 @@ def target_vs_distractor(fixations, bh_data, raw, distance_threshold=100, screen
         fix_y = np.mean([fix['start_y'], fix['end_y']])
 
         # Get trial image
-        trial_image = bh_data['searchimage'][trial_idx].split('cmp_')[-1].split('.jpg')[0]
+        trial_image = subject.trial_imgs[trial_idx]
         trials_image.append(trial_image)
 
         # Find item position information for such image
@@ -1278,6 +1289,9 @@ def target_vs_distractor(fixations, bh_data, raw, distance_threshold=100, screen
     fixations.loc[fixations['screen'] == 'vs', 'distance'] = fix_item_distance
     fixations.loc[fixations['screen'] == 'vs', 'trial_image'] = trials_image
 
+    # Save to subject
+    subject.fixations = fixations
+
     # Save to raw annotations
     raw.annotations.description = np.concatenate((raw.annotations.description, np.array(description)))
     raw.annotations.onset = np.concatenate((raw.annotations.onset, np.array(functions.flatten_list(onset))))
@@ -1289,7 +1303,7 @@ def target_vs_distractor(fixations, bh_data, raw, distance_threshold=100, screen
 
     raw.annotations.duration = np.zeros(len(raw.annotations.description))
 
-    return fixations, raw, items_pos
+    return raw, subject, items_pos
 
 
 def add_et_channels(raw, et_channels_meg, et_channel_names):

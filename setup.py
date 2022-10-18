@@ -46,7 +46,7 @@ class exp_info:
 
         # Select subject
         self.subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001', '16200001',
-                             '16201001', '16256001', '09991040', '10925091', '16263002', '16269001', 'BACK_NOISE']
+                             '16201001', '09991040', '10925091', '16263002', '16269001', 'BACK_NOISE', '16256001']
 
         # Subjects bad channels
         self.subjects_bad_channels = {'15909001': ['MLT11-4123', 'MLT21-4123'], '15912001': ['MRT53-4123'],
@@ -278,7 +278,7 @@ class raw_subject:
         # get subject path
         subj_path = self.et_path
         # Load asc file
-        asc_file_path = list(subj_path.glob('*{}.asc'.format(self.subject_id)))[0]
+        asc_file_path = list(subj_path.glob('*{}*.asc'.format(self.subject_id)))[0]
 
         # data structure
         et = {}
