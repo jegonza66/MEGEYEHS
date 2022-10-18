@@ -11,7 +11,10 @@ plot_path = paths().plots_path()
 l_freq = 0.5
 h_freq = 100
 epoch_ids = ['fix_vs']
-plot_xlim = (-0.05, 0.1)
+if any('fix' in id for id in epoch_ids):
+    plot_xlim = (-0.2, 0.5)
+elif any('sac' in id for id in epoch_ids):
+    plot_xlim = (-0.05, 0.1)
 
 evokeds = []
 

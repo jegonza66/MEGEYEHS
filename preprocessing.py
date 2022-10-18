@@ -100,6 +100,6 @@ def preprocess(subject_code, plot=False):
     del(subject)
 
 
-# for subject_code in [6, 7, 8, 9, 10, 11, 12, 13]:
-for subject_code in range(9, 13):
+# for subject_code in [6, 7, 8, 9, 10, 11, 12]:
+for subject_code in range(11, 13):
     preprocess(subject_code=subject_code, plot=True)

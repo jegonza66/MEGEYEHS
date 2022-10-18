@@ -15,6 +15,12 @@ h_freq = 100
 epoch_ids = ['l_sac_emap']
 plot_ind = False
 save_ind = False
+epoch_ids = ['fix_vs']
+if any('fix' in id for id in epoch_ids):
+    plot_xlim = (-0.2, 0.5)
+elif any('sac' in id for id in epoch_ids):
+    plot_xlim = (-0.05, 0.1)
+
 
 evokeds = []
 
@@ -29,7 +35,7 @@ for subject_code in range(9):
     evokeds.append(evoked)
 
     if plot_ind:
-        fig = evoked.plot(gfp=True, time_unit='s', spatial_colors=True, xlim=(-0.05, 0.1))
+        fig = evoked.plot(gfp=True, time_unit='s', spatial_colors=True, xlim=plot_xlim)
         if save_ind:
             fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}_lfreq{l_freq}_hfreq{h_freq}/'
             fname = subject.subject_id + '.png'
@@ -44,7 +50,7 @@ grand_avg_data_fname = f'Grand_average_ave.fif'
 grand_avg.save(ga_save_path + grand_avg_data_fname, overwrite=True)
 
 # PLOT
-fig = grand_avg.plot(gfp=True, spatial_colors=True, time_unit='s', xlim=(-0.05, 0.1), window_title=f'Grand average {"-".join(epoch_ids)}')
+fig = grand_avg.plot(gfp=True, spatial_colors=True, time_unit='s', xlim=plot_xlim, window_title=f'Grand average {"-".join(epoch_ids)}')
 fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}_lfreq{l_freq}_hfreq{h_freq}/'
 fname = 'Grand_average.png'
 save.fig(fig, fig_path, fname)
@@ -52,6 +58,6 @@ save.fig(fig, fig_path, fname)
 # Saccades channels
 if any('sac' in id for id in epoch_ids):
     sac_chs = ['MLF14-4123', 'MLF13-4123', 'MLF12-4123', 'MLF11-4123', 'MRF11-4123', 'MRF12-4123', 'MRF13-4123', 'MRF14-4123', 'MZF01-4123']
-    fig = grand_avg.plot(picks=sac_chs, gfp=True, spatial_colors=True, time_unit='s', xlim=(-0.05, 0.1), window_title=f'Grand average {"-".join(epoch_ids)}')
+    fig = grand_avg.plot(picks=sac_chs, gfp=True, spatial_colors=True, time_unit='s', xlim=plot_xlim, window_title=f'Grand average {"-".join(epoch_ids)}')
     fname = 'Grand_average_ch_sel.png'
     save.fig(fig, fig_path, fname)

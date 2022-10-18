@@ -58,8 +58,8 @@ class exp_info:
         self.subjects_groups = {'15909001': 'Balanced', '15912001': 'Balanced', '15910001': 'Balanced',
                                 '15950001': 'Counterbalanced', '15911001': 'Balanced', '11535009': 'Balanced',
                                 '16191001': 'Balanced', '16200001': 'Balanced', '16201001': 'Balanced',
-                                '16256001': 'Counterbalanced', '09991040': 'Counterbalanced',
-                                '10925091': 'Counterbalanced', '16263002':  'Balanced', '16269001':  'Balanced'}
+                                '16256001': 'Counterbalanced', '09991040': 'Balanced',
+                                '10925091': 'Balanced', '16263002':  'Balanced', '16269001':  'Balanced'}
 
         # Missing bh subjects
         self.missing_bh_subjects = ['16191001', '16200001', '16201001']

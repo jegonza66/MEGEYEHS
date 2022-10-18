@@ -280,7 +280,7 @@ def performance(subject, display=False, save=True):
 
     # Plot
     fig, axs = plt.subplots(2, sharex=True)
-    fig.suptitle(f'{subject.subject_id} MEG')
+    fig.suptitle(f'Performance {subject.subject_id}')
 
     axs[0].plot([1, 2, 4], [corr1_mean, corr2_mean, corr4_mean], 'o')
     axs[0].errorbar(x=[1, 2, 4], y=[corr1_mean, corr2_mean, corr4_mean], yerr=[corr1_std, corr2_std, corr4_std],
@@ -300,7 +300,7 @@ def performance(subject, display=False, save=True):
     if save:
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id
         os.makedirs(save_path, exist_ok=True)
-        plt.savefig(save_path + '/Performance_MEG.png')
+        plt.savefig(save_path + f'/{subject.subject_id} Performance.png')
 
 
 def trial_gaze(raw, subject, gaze_x, gaze_y, trial_idx, display_fig=False, save=True):
@@ -461,9 +461,10 @@ def scanpath(raw, subject, gaze_x, gaze_y, items_pos, trial_idx,
     # Define rainwbow cmap for fixations
     cmap = plt.cm.rainbow
     # define the bins and normalize
-    fix_num = fixations_t['n_fix'].values.astype(int)
-    bounds = np.linspace(1, fix_num[-1]+1, fix_num[-1]+1)
-    norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+    if len(fixations_t):
+        fix_num = fixations_t['n_fix'].values.astype(int)
+        bounds = np.linspace(1, fix_num[-1] + 1, fix_num[-1] + 1)
+        norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
 
     # Display image True or False
     if display_fig:
@@ -507,9 +508,10 @@ def scanpath(raw, subject, gaze_x, gaze_y, items_pos, trial_idx,
             spine.set_linewidth(3)
 
     # Fixations
-    ax6.scatter(fixations_t['start_x'] - (screen_res_x - img_res_x) / 2,
-                fixations_t['start_y'] - (screen_res_y - img_res_y) / 2,
-                c=fix_num, s=sizes, cmap=cmap, norm=norm, zorder=3)
+    if len(fixations_t):
+        ax6.scatter(fixations_t['start_x'] - (screen_res_x - img_res_x) / 2,
+                    fixations_t['start_y'] - (screen_res_y - img_res_y) / 2,
+                    c=fix_num, s=sizes, cmap=cmap, norm=norm, zorder=3)
 
     # Image
     ax6.imshow(img, zorder=0)
@@ -530,12 +532,12 @@ def scanpath(raw, subject, gaze_x, gaze_y, items_pos, trial_idx,
              gaze_y[vs_start_idx:vs_end_idx] - (1080 - 1024) / 2,
              '--', color='black', zorder=2)
 
-
-    PCM = ax6.get_children()[0]  # When the fixations dots for color mappable were ploted (first)
-    cb = plt.colorbar(PCM, ax=ax6, ticks=[fix_num[0] + 1/2, fix_num[int(len(fix_num)/2)]+1/2, fix_num[-1]+1/2])
-    cb.ax.set_yticklabels([fix_num[0], fix_num[int(len(fix_num)/2)], fix_num[-1]])
-    cb.ax.tick_params(labelsize=10)
-    cb.set_label('# of fixation', fontsize=13)
+    if len(fixations_t):
+        PCM = ax6.get_children()[0]  # When the fixations dots for color mappable were ploted (first)
+        cb = plt.colorbar(PCM, ax=ax6, ticks=[fix_num[0] + 1/2, fix_num[int(len(fix_num)/2)]+1/2, fix_num[-1]+1/2])
+        cb.ax.set_yticklabels([fix_num[0], fix_num[int(len(fix_num)/2)], fix_num[-1]])
+        cb.ax.tick_params(labelsize=10)
+        cb.set_label('# of fixation', fontsize=13)
 
     # Gaze
     ax7.plot(raw.times[vs_start_idx:vs_end_idx], gaze_x[vs_start_idx:vs_end_idx], label='X')
