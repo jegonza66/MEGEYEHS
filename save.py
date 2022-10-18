@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import mne
 import os
 import pickle
@@ -6,7 +7,7 @@ import pandas as pd
 from paths import paths
 
 
-def preprocesed_data(raw, subject, bh_data, fixations, saccades, config):
+def preprocesed_data(raw, subject, config):
     """
     Save preprocesed data
     :param raw:
@@ -22,17 +23,13 @@ def preprocesed_data(raw, subject, bh_data, fixations, saccades, config):
     preproc_save_path = preproc_data_path + subject.subject_id + '/'
     os.makedirs(preproc_save_path, exist_ok=True)
 
-    # Add data to subject class and save
-    subject.bh_data = bh_data
-    subject.fixations = fixations
-    subject.saccades = saccades
-
     f = open(preproc_save_path + 'Subject_data.pkl', 'wb')
     pickle.dump(subject, f)
     f.close()
 
-    # Save fixations
-    fixations.to_csv(preproc_save_path + 'fixations.csv')
+    # Save fixations ans saccades
+    subject.fixations.to_csv(preproc_save_path + 'fixations.csv')
+    subject.saccades.to_csv(preproc_save_path + 'saccades.csv')
 
     # Save MEG
     preproc_meg_data_fname = f'Subject_{subject.subject_id}_meg.fif'
@@ -70,7 +67,6 @@ def var(var, path, fname):
         Filename of file to save
     """
 
-    print('\nSaving')
     # Make dir
     os.makedirs(path, exist_ok=True)
 
@@ -79,4 +75,25 @@ def var(var, path, fname):
     f = open(file_path, 'wb')
     pickle.dump(var, f)
     f.close()
+
+
+def fig(fig, path, fname):
+    """
+    Save figure fig with given filename to given path.
+
+    Parameters
+    ----------
+    fig: figure
+        Instance of figure to save
+    path: str
+        Path to save directory
+    fname: str
+        Filename of file to save
+    """
+
+    # Make dir
+    os.makedirs(path, exist_ok=True)
+
+    # Save
+    fig.savefig(path + fname)
 

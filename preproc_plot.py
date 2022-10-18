@@ -188,12 +188,242 @@ def alignment(subject, et_gazex, meg_gazex, corrs, et_block_start, meg_block_sta
     plt.savefig(save_path + f'Signals_block{block_num + 1}.png')
 
 
-def scanpath(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial_idx,
+def first_fixation_delay(subject, display_fig=False, save=True):
+
+    if display_fig:
+        plt.ion()
+    else:
+        plt.ioff()
+
+    fixations1_fix_screen = subject.fixations.loc[(subject.fixations['screen'].isin(['cross1', 'cross2'])) & (subject.fixations['n_fix'] == 1)]
+    plt.figure()
+    plt.hist(fixations1_fix_screen['delay'], bins=40)
+    plt.title('1st fixation delay distribution')
+    plt.xlabel('Time [s]')
+
+    if save:
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
+        os.makedirs(save_path, exist_ok=True)
+        plt.savefig(save_path + f'{subject.subject_id} 1st fix delay dist.png')
+
+
+def pupil_size_increase(subject, display_fig=False, save=True):
+
+    if display_fig:
+        plt.ion()
+    else:
+        plt.ioff()
+
+    fixations_pupil_s = subject.fixations.loc[(subject.fixations['screen'].isin(['cross1', 'ms', 'cross2'])) & (subject.fixations['n_fix'] == 1)]
+
+    pupil_diffs = []
+    mss = []
+    for trial in subject.trial:
+        trial_data = fixations_pupil_s.loc[fixations_pupil_s['trial'] == trial]
+
+        try:
+            if 'cross1' in trial_data['screen'].values:
+                pupil_diff = trial_data[trial_data['screen'] == 'cross2']['pupil'].values[0] - trial_data[trial_data['screen'] == 'cross1']['pupil'].values[0]
+            else:
+                pupil_diff = trial_data[trial_data['screen'] == 'cross2']['pupil'].values[0] - \
+                             trial_data[trial_data['screen'] == 'ms']['pupil'].values[0]
+            pupil_diffs.append(pupil_diff)
+            mss.append(trial_data['mss'].values[0])
+        except:
+            print(f'No fix or mss data in trial {trial}')
+
+    plt.figure()
+    sn.boxplot(x=mss, y=pupil_diffs)
+    plt.title('Pupil size')
+    plt.xlabel('MSS')
+    plt.ylabel('Pupil size increase (fix point 2 - 1)')
+
+    if save:
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
+        os.makedirs(save_path, exist_ok=True)
+        plt.savefig(save_path + f'{subject.subject_id} Pupil size increase.png')
+
+
+def performance(subject, display=False, save=True):
+
+    if display:
+        plt.ion()
+    else:
+        plt.ioff()
+
+    # Get response time mean and stf by MSS
+    rt = subject.rt
+    corr_ans = subject.corr_ans
+
+    rt_1 = rt[np.where(subject.bh_data['Nstim'] == 1)[0]]
+    rt_2 = rt[np.where(subject.bh_data['Nstim'] == 2)[0]]
+    rt_4 = rt[np.where(subject.bh_data['Nstim'] == 4)[0]]
+
+    rt1_mean = np.nanmean(rt_1)
+    rt1_std = np.nanstd(rt_1)
+    rt2_mean = np.nanmean(rt_2)
+    rt2_std = np.nanstd(rt_2)
+    rt4_mean = np.nanmean(rt_4)
+    rt4_std = np.nanstd(rt_4)
+
+    # Get correct ans mean and std by MSS
+    corr_1 = corr_ans[np.where(subject.bh_data['Nstim'] == 1)[0]]
+    corr_2 = corr_ans[np.where(subject.bh_data['Nstim'] == 2)[0]]
+    corr_4 = corr_ans[np.where(subject.bh_data['Nstim'] == 4)[0]]
+
+    corr1_mean = np.mean(corr_1)
+    corr1_std = np.std(corr_1)
+    corr2_mean = np.mean(corr_2)
+    corr2_std = np.std(corr_2)
+    corr4_mean = np.mean(corr_4)
+    corr4_std = np.std(corr_4)
+
+    # Plot
+    fig, axs = plt.subplots(2, sharex=True)
+    fig.suptitle(f'{subject.subject_id} MEG')
+
+    axs[0].plot([1, 2, 4], [corr1_mean, corr2_mean, corr4_mean], 'o')
+    axs[0].errorbar(x=[1, 2, 4], y=[corr1_mean, corr2_mean, corr4_mean], yerr=[corr1_std, corr2_std, corr4_std],
+                    color='black', linewidth=0.5)
+    axs[0].set_ylim([0, 1.3])
+    axs[0].set_ylabel('Accuracy')
+    axs[0].set_xticks([1, 2, 4])
+
+    axs[1].plot([1, 2, 4], [rt1_mean, rt2_mean, rt4_mean], 'o')
+    axs[1].errorbar(x=[1, 2, 4], y=[rt1_mean, rt2_mean, rt4_mean], yerr=[rt1_std, rt2_std, rt4_std],
+                    color='black', linewidth=0.5)
+    axs[1].set_ylim([0, 10])
+    axs[1].set_ylabel('Rt')
+    axs[1].set_xlabel('MSS')
+    axs[1].set_xticks([1, 2, 4])
+
+    if save:
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id
+        os.makedirs(save_path, exist_ok=True)
+        plt.savefig(save_path + '/Performance_MEG.png')
+
+
+def trial_gaze(raw, subject, gaze_x, gaze_y, trial_idx, display_fig=False, save=True):
+
+    trial = trial_idx + 1
+
+    plt.clf()
+    plt.close('all')
+
+    if display_fig:
+        plt.ion()
+    else:
+        plt.ioff()
+
+    # get trial info from bh data
+    pres_abs_trial = 'Present' if subject.bh_data['Tpres'].astype(int)[trial_idx] == 1 else 'Absent'
+    correct_trial = 'Correct' if subject.corr_ans.astype(int)[trial_idx] == 1 else 'Incorrect'
+    mss = subject.bh_data['Nstim'][trial_idx]
+
+    # Get trial start and end samples
+    trial_start_idx = functions.find_nearest(raw.times, subject.cross1[trial_idx])[0] - 120 * 2
+    trial_end_idx = functions.find_nearest(raw.times, subject.vsend[trial_idx])[0] + 120 * 6
+
+    # Plot
+    plt.figure(figsize=(15, 5))
+    plt.title(f'Trial {trial} - {pres_abs_trial} - {correct_trial} - MSS: {int(mss)}')
+
+    # Gazes
+    plt.plot(raw.times[trial_start_idx:trial_end_idx], gaze_x[trial_start_idx:trial_end_idx], label='X')
+    plt.plot(raw.times[trial_start_idx:trial_end_idx], gaze_y[trial_start_idx:trial_end_idx] - 1000, 'black', label='Y')
+
+    # Screens
+    plt.axvspan(ymin=0, ymax=1, xmin=subject.cross1[trial_idx], xmax=subject.ms[trial_idx], color='grey',
+                alpha=0.4, label='Fix')
+    plt.axvspan(ymin=0, ymax=1, xmin=subject.ms[trial_idx], xmax=subject.cross2[trial_idx], color='red',
+                alpha=0.4, label='MS')
+    plt.axvspan(ymin=0, ymax=1, xmin=subject.cross2[trial_idx], xmax=subject.vs[trial_idx], color='grey',
+                alpha=0.4, label='Fix')
+    plt.axvspan(ymin=0, ymax=1, xmin=subject.vs[trial_idx], xmax=subject.vsend[trial_idx], color='green',
+                alpha=0.4, label='VS')
+
+    plt.xlabel('time [s]')
+    plt.ylabel('Gaze')
+    plt.grid()
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    plt.legend(by_label.values(), by_label.keys(), loc='upper right')
+
+    if save:
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + f'/Gaze_Trials/'
+        os.makedirs(save_path + 'svg/', exist_ok=True)
+        plt.savefig(save_path + f'Trial {trial}.png')
+        plt.savefig(save_path + f'svg/Trial {trial}.svg')
+
+
+def emap_gaze(raw, subject, gaze_x, gaze_y, block_num, display_fig=False, save=True):
+
+    emaps = subject.emap.iloc[block_num]
+
+    plt.clf()
+    plt.close('all')
+
+    if display_fig:
+        plt.ion()
+    else:
+        plt.ioff()
+
+    for emap_trial in range(len(emaps)-1):
+
+        emap_trial_name = emaps.keys()[emap_trial].split("_")[0]
+
+        # Get fixations and saccades
+        saccades_t = subject.saccades.loc[(subject.saccades['screen'] == f'emap_{emap_trial_name}') &
+                                          (emaps[emap_trial] < subject.saccades['onset']) &
+                                          (subject.saccades['onset'] < emaps[emap_trial+1])]
+        fixations_t = subject.fixations.loc[(subject.fixations['screen'] == f'emap_{emap_trial_name}') &
+                                            (emaps[emap_trial] < subject.fixations['onset']) &
+                                            (subject.fixations['onset'] < emaps[emap_trial+1])]
+
+        # Get trial start and end samples
+        trial_start_idx = functions.find_nearest(raw.times, emaps[emap_trial])[0] - 120 * 2
+        trial_end_idx = functions.find_nearest(raw.times, emaps[emap_trial+1])[0] + 120 * 6
+
+        # Plot
+        plt.figure(figsize=(15, 5))
+        plt.title(f'Eyemap {emap_trial_name.upper()}')
+
+        # Gazes
+        plt.plot(raw.times[trial_start_idx:trial_end_idx], gaze_x[trial_start_idx:trial_end_idx], label='X')
+        plt.plot(raw.times[trial_start_idx:trial_end_idx], gaze_y[trial_start_idx:trial_end_idx] - 1000, 'black', label='Y')
+
+        plot_max = np.nanmax(gaze_x[trial_start_idx:trial_end_idx])
+        plot_min = np.nanmin(gaze_y[trial_start_idx:trial_end_idx] - 1000)
+
+        # Screens
+        for sac_idx, saccade in saccades_t.iterrows():
+            plt.vlines(x=saccade['onset'], ymin=plot_min, ymax=plot_max, colors='red', linestyles='--', label='sac')
+
+        for fix_idx, fixation in fixations_t.iterrows():
+            plt.axvspan(ymin=0, ymax=1, xmin=fixation['onset'], xmax=fixation['onset']+fixation['duration'], color='green',
+                        alpha=0.4, label='fix')
+
+        plt.xlabel('time [s]')
+        plt.ylabel('Gaze')
+        plt.grid()
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        plt.legend(by_label.values(), by_label.keys(), loc='upper right')
+
+        if save:
+            save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + f'/Gaze_Trials/'
+            os.makedirs(save_path + 'svg/', exist_ok=True)
+            plt.savefig(save_path + f'Eyemap_{emap_trial_name}.png')
+            plt.savefig(save_path + f'svg/Eyemap_{emap_trial_name}.svg')
+
+
+def scanpath(raw, subject, gaze_x, gaze_y, items_pos, trial_idx,
              screen_res_x=1920, screen_res_y=1080, img_res_x=1280, img_res_y=1024, display_fig=False, save=True):
 
     trial = trial_idx + 1
 
-    fixations_vs = fixations.loc[fixations['screen'] == 'vs']
+    fixations_vs = subject.fixations.loc[subject.fixations['screen'] == 'vs']
+    saccades_vs = subject.saccades.loc[subject.saccades['screen'] == 'vs']
 
     plt.clf()
     plt.close('all')
@@ -203,19 +433,20 @@ def scanpath(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial_id
 
     # Get trial
     fixations_t = fixations_vs.loc[fixations_vs['trial'] == trial]
-    item_pos_t = items_pos.loc[items_pos['folder'] == fixations_t['trial_image'].values[0]]
+    saccades_t = saccades_vs.loc[saccades_vs['trial'] == trial]
+    item_pos_t = items_pos.loc[items_pos['folder'] == subject.trial_imgs[trial_idx]]
 
     # Get vs from trial
     vs_start_idx = functions.find_nearest(raw.times, subject.vs[trial_idx])[0]
     vs_end_idx = functions.find_nearest(raw.times, subject.vsend[trial_idx])[0]
 
     # Load search image
-    img = mpimg.imread(exp_path + 'cmp_' + fixations_t['trial_image'].values[0] + '.jpg')
+    img = mpimg.imread(exp_path + 'cmp_' + subject.trial_imgs[trial_idx] + '.jpg')
 
     # Load targets
-    bh_data_trial = bh_data.loc[bh_data['searchimage'] == 'cmp_' + fixations_t['trial_image'].values[0] + '.jpg']
+    bh_data_trial = subject.bh_data.iloc[trial_idx]
     target_keys = ['st1', 'st2', 'st3', 'st4', 'st5']
-    targets = bh_data_trial[target_keys].values[0]
+    targets = bh_data_trial[target_keys]
     st1 = mpimg.imread(exp_path + targets[0])
     st2 = mpimg.imread(exp_path + targets[1])
     st3 = mpimg.imread(exp_path + targets[2])
@@ -223,7 +454,7 @@ def scanpath(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial_id
     st5 = mpimg.imread(exp_path + targets[4])
 
     # Load correct vs incorrect
-    correct_ans = bh_data_trial['key_resp.corr'].values
+    correct_ans = subject.corr_ans[trial_idx]
 
     # Colormap: Get fixation durations for scatter circle size
     sizes = fixations_t['duration'] * 100
@@ -295,8 +526,8 @@ def scanpath(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial_id
             ax6.scatter(target['center_x'], target['center_y'], s=1000, color='red', alpha=0.3, zorder=1)
 
     # Scanpath
-    ax6.plot(gazex[vs_start_idx:vs_end_idx] - (1920 - 1280) / 2,
-             gazey[vs_start_idx:vs_end_idx] - (1080 - 1024) / 2,
+    ax6.plot(gaze_x[vs_start_idx:vs_end_idx] - (1920 - 1280) / 2,
+             gaze_y[vs_start_idx:vs_end_idx] - (1080 - 1024) / 2,
              '--', color='black', zorder=2)
 
 
@@ -307,9 +538,22 @@ def scanpath(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial_id
     cb.set_label('# of fixation', fontsize=13)
 
     # Gaze
-    ax7.plot(raw.times[vs_start_idx:vs_end_idx], gazex[vs_start_idx:vs_end_idx], label='X')
-    ax7.plot(raw.times[vs_start_idx:vs_end_idx], gazey[vs_start_idx:vs_end_idx], 'black', label='Y')
-    ax7.legend(fontsize=8)
+    ax7.plot(raw.times[vs_start_idx:vs_end_idx], gaze_x[vs_start_idx:vs_end_idx], label='X')
+    ax7.plot(raw.times[vs_start_idx:vs_end_idx], gaze_y[vs_start_idx:vs_end_idx], 'black', label='Y')
+
+    plot_min, plot_max = ax7.get_ylim()
+
+    for sac_idx, saccade in saccades_t.iterrows():
+        ax7.vlines(x=saccade['onset'], ymin=plot_min, ymax=plot_max, colors='red', linestyles='--', label='sac')
+
+    for fix_idx, fixation in fixations_t.iterrows():
+        color = cmap(norm(fixation['n_fix']))
+        ax7.axvspan(ymin=0, ymax=1, xmin=fixation['onset'], xmax=fixation['onset'] + fixation['duration'],
+                    color=color, alpha=0.4, label='fix')
+
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    plt.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize=8)
     ax7.set_ylabel('Gaze')
     ax7.set_xlabel('Time [s]')
 
@@ -320,182 +564,12 @@ def scanpath(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial_id
         plt.savefig(save_path + f'svg/Trial{trial}.svg')
 
 
-
-def trial_gaze(raw, bh_data, gazex, gazey, subject, trial_idx, display_fig=False, save=True):
-
-    trial = trial_idx + 1
-
-    plt.clf()
-    plt.close('all')
-
-    if display_fig:
-        plt.ion()
-    else:
-        plt.ioff()
-
-    # get trial info from bh data
-    pres_abs_trial = 'Present' if bh_data['Tpres'].astype(int)[trial_idx] == 1 else 'Absent'
-    correct_trial = 'Correct' if bh_data['key_resp.corr'].astype(int)[trial_idx] == 1 else 'Incorrect'
-    mss = bh_data['Nstim'][trial_idx]
-
-    # Get trial start and end samples
-    trial_start_idx = \
-    functions.find_nearest(raw.times, subject.cross1[trial_idx])[0] - 120 * 2
-    trial_end_idx = functions.find_nearest(raw.times, subject.vsend[trial_idx])[0] + 120 * 6
-
-    # Plot
-    plt.figure(figsize=(15, 5))
-    plt.title(f'Trial {trial} - {pres_abs_trial} - {correct_trial} - MSS: {int(mss)}')
-
-    # Gazes
-    plt.plot(raw.times[trial_start_idx:trial_end_idx], gazex[trial_start_idx:trial_end_idx], label='X')
-    plt.plot(raw.times[trial_start_idx:trial_end_idx], gazey[trial_start_idx:trial_end_idx] - 1000, 'black', label='Y')
-
-    # Screens
-    plt.axvspan(ymin=0, ymax=1, xmin=subject.cross1[trial_idx], xmax=subject.ms[trial_idx], color='grey',
-                alpha=0.4, label='Fix')
-    plt.axvspan(ymin=0, ymax=1, xmin=subject.ms[trial_idx], xmax=subject.cross2[trial_idx], color='red',
-                alpha=0.4, label='MS')
-    plt.axvspan(ymin=0, ymax=1, xmin=subject.cross2[trial_idx], xmax=subject.vs[trial_idx], color='grey',
-                alpha=0.4, label='Fix')
-    plt.axvspan(ymin=0, ymax=1, xmin=subject.vs[trial_idx], xmax=subject.vsend[trial_idx], color='green',
-                alpha=0.4, label='VS')
-
-    plt.xlabel('time [s]')
-    plt.ylabel('Gaze')
-    plt.grid()
-    handles, labels = plt.gca().get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
-    plt.legend(by_label.values(), by_label.keys(), loc='upper right')
-
-    if save:
-        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + f'/Gaze_Trials/'
-        os.makedirs(save_path + 'svg/', exist_ok=True)
-        plt.savefig(save_path + f'Trial {trial}.png')
-        plt.savefig(save_path + f'svg/Trial {trial}.svg')
-
-
-def first_fixation_delay(fixations, subject, display_fig=False, save=True):
-
-    if display_fig:
-        plt.ion()
-    else:
-        plt.ioff()
-
-    fixations1_fix_screen = fixations.loc[(fixations['screen'].isin(['cross1', 'cross2'])) & (fixations['n_fix'] == 1)]
-    plt.figure()
-    plt.hist(fixations1_fix_screen['delay'], bins=40)
-    plt.title('1st fixation delay distribution')
-    plt.xlabel('Time [s]')
-
-    if save:
-        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
-        os.makedirs(save_path, exist_ok=True)
-        plt.savefig(save_path + f'{subject.subject_id} 1st fix delay dist.png')
-
-
-def pupil_size_increase(fixations, subject, display_fig=False, save=True):
-
-    if display_fig:
-        plt.ion()
-    else:
-        plt.ioff()
-
-    fixations_pupil_s = fixations.loc[(fixations['screen'].isin(['cross1', 'ms', 'cross2'])) & (fixations['n_fix'] == 1)]
-
-    pupil_diffs = []
-    mss = []
-    for trial in subject.trial:
-        trial_data = fixations_pupil_s.loc[fixations_pupil_s['trial'] == trial]
-
-        try:
-            if 'cross1' in trial_data['screen'].values:
-                pupil_diff = trial_data[trial_data['screen'] == 'cross2']['pupil'].values[0] - trial_data[trial_data['screen'] == 'cross1']['pupil'].values[0]
-            else:
-                pupil_diff = trial_data[trial_data['screen'] == 'cross2']['pupil'].values[0] - \
-                             trial_data[trial_data['screen'] == 'ms']['pupil'].values[0]
-            pupil_diffs.append(pupil_diff)
-            mss.append(trial_data['mss'].values[0])
-        except:
-            print(f'No fix or mss data in trial {trial}')
-
-    plt.figure()
-    sn.boxplot(x=mss, y=pupil_diffs)
-    plt.title('Pupil size')
-    plt.xlabel('MSS')
-    plt.ylabel('Pupil size increase (fix point 2 - 1)')
-
-    if save:
-        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
-        os.makedirs(save_path, exist_ok=True)
-        plt.savefig(save_path + f'{subject.subject_id} Pupil size increase.png')
-
-
-def performance(subject, bh_data, display=False, save=True):
-
-    if display:
-        plt.ion()
-    else:
-        plt.ioff()
-
-    # Get response time mean and stf by MSS
-    rt = subject.rt
-    corr_ans = subject.corr_ans
-
-    rt_1 = rt[np.where(bh_data['Nstim'] == 1)[0]]
-    rt_2 = rt[np.where(bh_data['Nstim'] == 2)[0]]
-    rt_4 = rt[np.where(bh_data['Nstim'] == 4)[0]]
-
-    rt1_mean = np.nanmean(rt_1)
-    rt1_std = np.nanstd(rt_1)
-    rt2_mean = np.nanmean(rt_2)
-    rt2_std = np.nanstd(rt_2)
-    rt4_mean = np.nanmean(rt_4)
-    rt4_std = np.nanstd(rt_4)
-
-    # Get correct ans mean and std by MSS
-    corr_1 = corr_ans[np.where(bh_data['Nstim'] == 1)[0]]
-    corr_2 = corr_ans[np.where(bh_data['Nstim'] == 2)[0]]
-    corr_4 = corr_ans[np.where(bh_data['Nstim'] == 4)[0]]
-
-    corr1_mean = np.mean(corr_1)
-    corr1_std = np.std(corr_1)
-    corr2_mean = np.mean(corr_2)
-    corr2_std = np.std(corr_2)
-    corr4_mean = np.mean(corr_4)
-    corr4_std = np.std(corr_4)
-
-    # Plot
-    fig, axs = plt.subplots(2, sharex=True)
-    fig.suptitle(f'{subject.subject_id} MEG')
-
-    axs[0].plot([1, 2, 4], [corr1_mean, corr2_mean, corr4_mean], 'o')
-    axs[0].errorbar(x=[1, 2, 4], y=[corr1_mean, corr2_mean, corr4_mean], yerr=[corr1_std, corr2_std, corr4_std],
-                    color='black', linewidth=0.5)
-    axs[0].set_ylim([0, 1.3])
-    axs[0].set_ylabel('Accuracy')
-    axs[0].set_xticks([1, 2, 4])
-
-    axs[1].plot([1, 2, 4], [rt1_mean, rt2_mean, rt4_mean], 'o')
-    axs[1].errorbar(x=[1, 2, 4], y=[rt1_mean, rt2_mean, rt4_mean], yerr=[rt1_std, rt2_std, rt4_std],
-                    color='black', linewidth=0.5)
-    axs[1].set_ylim([0, 10])
-    axs[1].set_ylabel('Rt')
-    axs[1].set_xlabel('MSS')
-    axs[1].set_xticks([1, 2, 4])
-
-    if save:
-        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id
-        os.makedirs(save_path, exist_ok=True)
-        plt.savefig(save_path + '/Performance_MEG.png')
-
-
 ## OLD out of use
-
 
 def scanpath_BH(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial,
              screen_res_x=1920, screen_res_y=1080, img_res_x=1280, img_res_y=1024, display_fig=False, save=True):
 
+    trial_idx = trial - 1
     fixations_vs = fixations.loc[fixations['screen'] == 'vs']
 
     plt.clf()
@@ -506,17 +580,17 @@ def scanpath_BH(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial
 
     # Get trial
     fixations_t = fixations_vs.loc[fixations_vs['trial'] == trial]
-    item_pos_t = items_pos.loc[items_pos['folder'] == fixations_t['trial_image'].values[0]]
+    item_pos_t = items_pos.loc[items_pos['folder'] == subject.trial_imgs[trial_idx]]
 
     # Get vs from trial
     vs_start_idx = functions.find_nearest(raw.times, subject.vs[np.where(subject.trial == trial)[0]])[0]
     vs_end_idx = functions.find_nearest(raw.times, subject.onset[np.where(subject.trial == trial)[0]])[0]
 
     # Load search image
-    img = mpimg.imread(exp_path + 'cmp_' + fixations_t['trial_image'].values[0] + '.jpg')
+    img = mpimg.imread(exp_path + 'cmp_' + subject.trial_imgs[trial_idx] + '.jpg')
 
     # Load targets
-    bh_data_trial = bh_data.loc[bh_data['searchimage'] == 'cmp_' + fixations_t['trial_image'].values[0] + '.jpg']
+    bh_data_trial = bh_data.loc[bh_data['searchimage'] == 'cmp_' + subject.trial_imgs[trial_idx] + '.jpg']
     target_keys = ['st1', 'st2', 'st3', 'st4', 'st5']
     targets = bh_data_trial[target_keys].values[0]
     st1 = mpimg.imread(exp_path + targets[0])
