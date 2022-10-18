@@ -83,7 +83,7 @@ fname = 'Grand_average.png'
 save.fig(fig, fig_path, fname)
 
 # Saccades channels
-if 'sac' in any(epoch_ids):
+if any('sac' in id for id in epoch_ids):
     sac_chs = ['MLF14-4123', 'MLF13-4123', 'MLF12-4123', 'MLF11-4123', 'MRF11-4123', 'MRF12-4123', 'MRF13-4123', 'MRF14-4123', 'MZF01-4123']
     fig = grand_avg.plot(picks=sac_chs, gfp=True, spatial_colors=True, time_unit='s', xlim=plot_xlim, window_title=f'Grand average {"-".join(epoch_ids)}')
     fname = 'Grand_average_ch_sel.png'
