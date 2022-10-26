@@ -202,24 +202,31 @@ def align_signals(signal_1, signal_2):
       Sample shift of maximum correlation between signals.
     '''
 
-    start_samples = len(signal_1) - len(signal_2)
+    invert = False
 
+    start_samples = len(signal_1) - len(signal_2)
     # invert signals to return samples shift referenced to the longer signal
     if start_samples < 0:
+        print('Signal_2 is longer. Inverting reference.')
         save_signal = signal_1
         signal_1 = signal_2
         signal_2 = save_signal
+        invert = True
 
     corrs = []
     for i in range(start_samples):
         print("\rProgress: {}%".format(int((i + 1) * 100 / start_samples)), end='')
         df = pd.DataFrame({'x1': signal_1[i:i + len(signal_2)], 'x2': signal_2})
         corrs.append(df.corr()['x1']['x2'])
-        if df.corr()['x1']['x2'] > 0.5 and all(np.diff(corrs[-50:]) < 0):
+        # if df.corr()['x1']['x2'] > 0.5 and all(np.diff(corrs[-50:]) < 0): # Original parameters
+        if any(np.array(corrs) > 0.9) and all(np.diff(corrs[-100:]) < 0):
             print(f'\nMaximal correlation sample shift found in sample {i}')
             break
     max_sample = np.argmax(corrs)
     print(f'Maximum correlation of {np.max(corrs)}')
+
+    if invert:
+        max_sample = -max_sample
 
     return max_sample, corrs
 

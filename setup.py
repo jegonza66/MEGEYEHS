@@ -5,7 +5,6 @@ import pandas as pd
 import numpy as np
 import pathlib
 import os
-import pickle
 
 
 class exp_info:
@@ -66,6 +65,12 @@ class exp_info:
 
         # Define subjects that took the old trials loop experiment
         self.trials_loop_subjects = ['15909001', '15912001']
+
+        # Get et channels by name [Gaze x, Gaze y, Pupils]
+        self.et_channel_names = ['UADC001-4123', 'UADC002-4123', 'UADC013-4123']
+
+        # Trigger channel name
+        self.trig_ch = 'UPPT002'
 
 
 class config:
