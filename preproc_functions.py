@@ -273,7 +273,7 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
 
     #----- Behavioural data -----#
     # Load behavioural data
-    bh_data_raw = subject.bh_data()
+    bh_data_raw = subject.load_raw_bh_data
 
     # Get bh data from eyemap
     bh_data_emap = bh_data_raw.loc[np.logical_and(pd.notnull(bh_data_raw['emap_stim_L.started']),
@@ -290,7 +290,7 @@ def define_events_trials(raw, subject, config, exp_info, et_channel_names, force
     bl_dur, vs_dur, hs_dur, vl_dur, hl_dur = bh_emap_dur(bh_data_eyemap=bh_data_emap)
 
     # Load ET data
-    et_data = subject.et_data()
+    et_data = subject.load_raw_et_data()
     et_gazex = np.asarray(et_data['samples'][1])
 
     # Define array of times with reset index to map ET time to samples
@@ -1366,7 +1366,7 @@ def define_events_trials_BH(raw, subject):
     blocks_bounds = [(blocks_start_end[i] + 1, blocks_start_end[i + 1]) for i in range(len(blocks_start_end) - 1)]
 
     # Load behavioural data
-    bh_data = subject.bh_data()
+    bh_data = subject.load_raw_bh_data
 
     # Get only trial data rows
     bh_data = bh_data.loc[~pd.isna(bh_data['target.started'])].reset_index(drop=True)

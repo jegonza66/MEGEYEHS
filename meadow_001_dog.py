@@ -18,7 +18,7 @@ exp_path = paths().experiment_path()
 plots_path = paths().plots_path()
 
 subject = load.raw_subject()
-bh_data = subject.bh_data()
+bh_data = subject.load_raw_bh_data
 
 all_targets = bh_data[bh_data['Tpres'] == 1]
 image_names = all_targets['searchimage'].drop_duplicates()

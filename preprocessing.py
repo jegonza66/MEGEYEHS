@@ -19,7 +19,7 @@ def preprocess(subject_code, plot=False):
     subject = setup.raw_subject(exp_info=exp_info, config=config, subject_code=subject_code)
 
     # Load Meg data
-    raw = subject.ctf_data()
+    raw = subject.load_raw_meg_data()
 
     print('\nGetting ET channels data from MEG')
     et_channels_meg = raw.get_data(picks=exp_info.et_channel_names)

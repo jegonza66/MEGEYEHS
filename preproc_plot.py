@@ -4,6 +4,7 @@ import matplotlib.image as mpimg
 import matplotlib as mpl
 import os
 import seaborn as sn
+import pandas as pd
 
 import functions
 from paths import paths
@@ -697,3 +698,66 @@ def scanpath_BH(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial
         os.makedirs(save_path + 'svg/', exist_ok=True)
         plt.savefig(save_path + f'Trial{trial}.png')
         plt.savefig(save_path + f'svg/Trial{trial}.svg')
+
+
+
+def performance_BH(subject, display=False, save=True):
+
+    if display:
+        plt.ion()
+    else:
+        plt.ioff()
+
+    # Get response time mean and stf by MSS
+    bh_data = subject.bh_data
+    bh_data = bh_data.loc[~pd.isna(bh_data['target.started'])].reset_index(drop=True)
+
+    rt = bh_data['key_resp.rt']
+    corr_ans = bh_data['key_resp.corr']
+
+    rt_1 = rt[bh_data['Nstim'] == 1]
+    rt_2 = rt[bh_data['Nstim'] == 2]
+    rt_4 = rt[bh_data['Nstim'] == 4]
+
+    rt1_mean = np.nanmean(rt_1)
+    rt1_std = np.nanstd(rt_1)
+    rt2_mean = np.nanmean(rt_2)
+    rt2_std = np.nanstd(rt_2)
+    rt4_mean = np.nanmean(rt_4)
+    rt4_std = np.nanstd(rt_4)
+
+    # Get correct ans mean and std by MSS
+    corr_1 = corr_ans[bh_data['Nstim'] == 1]
+    corr_2 = corr_ans[bh_data['Nstim'] == 2]
+    corr_4 = corr_ans[bh_data['Nstim'] == 4]
+
+    corr1_mean = np.mean(corr_1)
+    corr1_std = np.std(corr_1)
+    corr2_mean = np.mean(corr_2)
+    corr2_std = np.std(corr_2)
+    corr4_mean = np.mean(corr_4)
+    corr4_std = np.std(corr_4)
+
+    # Plot
+    fig, axs = plt.subplots(2, sharex=True)
+    fig.suptitle(f'Performance {subject.subject_id}')
+
+    axs[0].plot([1, 2, 4], [corr1_mean, corr2_mean, corr4_mean], 'o')
+    axs[0].errorbar(x=[1, 2, 4], y=[corr1_mean, corr2_mean, corr4_mean], yerr=[corr1_std, corr2_std, corr4_std],
+                    color='black', linewidth=0.5)
+    axs[0].set_ylim([0, 1.3])
+    axs[0].set_ylabel('Accuracy')
+    axs[0].set_xticks([1, 2, 4])
+
+    axs[1].plot([1, 2, 4], [rt1_mean, rt2_mean, rt4_mean], 'o')
+    axs[1].errorbar(x=[1, 2, 4], y=[rt1_mean, rt2_mean, rt4_mean], yerr=[rt1_std, rt2_std, rt4_std],
+                    color='black', linewidth=0.5)
+    axs[1].set_ylim([0, 10])
+    axs[1].set_ylabel('Rt')
+    axs[1].set_xlabel('MSS')
+    axs[1].set_xticks([1, 2, 4])
+
+    if save:
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id
+        os.makedirs(save_path, exist_ok=True)
+        plt.savefig(save_path + f'/{subject.subject_id} Performance.png')

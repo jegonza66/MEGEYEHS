@@ -162,7 +162,7 @@ class raw_subject:
         elif type(subject_code) == str and (subject_code in exp_info.subjects_ids):
             self.subject_id = subject_code
         else:
-            print('Subject not found.')
+            print('Subject not found')
 
         # Subject's data paths
         self.ctf_path = pathlib.Path(os.path.join(exp_info.ctf_path, self.subject_id))
@@ -214,7 +214,7 @@ class raw_subject:
 
 
     # MEG data
-    def ctf_data(self):
+    def load_raw_meg_data(self):
         """
         MEG data for parent subject as Raw instance of MNE.
         """
@@ -245,7 +245,7 @@ class raw_subject:
 
 
     # ET data
-    def et_data(self):
+    def load_raw_et_data(self):
         """
         Eye-Tracker data for parent subject as dict containing pandas DataFrames.
 
@@ -350,7 +350,7 @@ class raw_subject:
 
 
     # Behavioural data
-    def bh_data(self):
+    def load_raw_bh_data(self):
         """
         Behavioural data for parent subject as pandas DataFrames.
         """
@@ -365,7 +365,7 @@ class raw_subject:
 
 
     # MEG data
-    def preproc_meg(self):
+    def load_preproc_meg(self):
         """
         Preprocessed MEG data for parent subject as raw instance of MNE.
         """

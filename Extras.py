@@ -11,8 +11,8 @@ import load
 subject = load.raw_subject()
 
 # Load data
-raw = subject.ctf_data()
-bh_data = subject.bh_data()
+raw = subject.load_raw_meg_data()
+bh_data = subject.load_raw_bh_data
 
 # VS screen start time
 vs_time = bh_data['key_resp.started'].values
@@ -36,7 +36,7 @@ plt.ylabel('Time [s]')
 ##---------------- Reescaling based on eyemap matching ----------------#
 
 # Load edf data
-et_data_edf = subject.et_data()
+et_data_edf = subject.load_raw_et_data()
 et_channels_edf = et_data_edf['samples']
 edf_data_srate = 1000.0
 

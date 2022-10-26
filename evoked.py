@@ -37,7 +37,7 @@ for subject_code in range(13):
 
     exp_info = setup.exp_info()
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-    meg_data = subject.preproc_meg()
+    meg_data = subject.load_preproc_meg()
 
     # PICK MEG AND STIM CHS
     meg_data.pick('meg')

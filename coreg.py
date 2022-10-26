@@ -19,7 +19,7 @@ mne.gui.coregistration(subject=subject.subject_id, subjects_dir=subjects_dir)
 
 ## VISUALIZE ALIGNMENT FOR COREGISTRATION
 # https://mne.tools/stable/auto_tutorials/inverse/35_dipole_orientations.html#sphx-glr-auto-tutorials-inverse-35-dipole-orientations-py
-raw = subject.ctf_data()
+raw = subject.load_raw_meg_data()
 # fid_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-fiducials.fif'.format(subject.subject_id))
 
 surfaces = dict(brain=0.6, outer_skull=0.5, head=0.4)
@@ -34,7 +34,7 @@ mne.viz.set_3d_view(fig, 45, 90, distance=0.6, focalpoint=(0., 0., 0.))
 # https://mne.tools/stable/auto_tutorials/forward/30_forward.html#sphx-glr-auto-tutorials-forward-30-forward-py
 
 # Load Preprocesed
-raw = subject.preproc_meg()
+raw = subject.load_preproc_meg()
 
 # PICK MEG AND STIM CHS
 raw.pick(['meg', 'misc'])

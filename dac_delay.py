@@ -24,7 +24,7 @@ config = load.config(path=paths().config_path(), fname='config.pkl')
 subject = setup.raw_subject(exp_info=exp_info, config=config, subject_code=subject_code)
 
 # Load Meg data
-raw = subject.ctf_data()
+raw = subject.load_raw_meg_data()
 raw.pick(exp_info.et_channel_names + [exp_info.trig_ch])
 trig_data = raw.get_data(picks=exp_info.trig_ch)[0]
 # Get vs start from meg
@@ -43,7 +43,7 @@ et_chs = raw.get_data(picks=exp_info.et_channel_names)
 meg_gazex_data_raw = et_chs[0]
 
 # Load ET data
-et_data = subject.et_data()
+et_data = subject.load_raw_et_data()
 et_gazex = np.asarray(et_data['samples'][1])
 # Define array of times with reset index to map ET time to samples
 et_times = np.asarray(et_data['time'])
