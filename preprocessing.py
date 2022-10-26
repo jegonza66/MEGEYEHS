@@ -21,11 +21,8 @@ def preprocess(subject_code, plot=False):
     # Load Meg data
     raw = subject.ctf_data()
 
-    # Get et channels by name [Gaze x, Gaze y, Pupils]
-    et_channel_names = ['UADC001-4123', 'UADC002-4123', 'UADC013-4123']
-
     print('\nGetting ET channels data from MEG')
-    et_channels_meg = raw.get_data(picks=et_channel_names)
+    et_channels_meg = raw.get_data(picks=exp_info.et_channel_names)
 
     # Get separate data from et channels
     meg_gazex_data_raw = et_channels_meg[0]
@@ -51,7 +48,7 @@ def preprocess(subject_code, plot=False):
 
     #---------------- Defining response events and trials ----------------#
     raw, subject = preproc_functions.define_events_trials(raw=raw, subject=subject, config=config, exp_info=exp_info,
-                                                          et_channel_names=et_channel_names)
+                                                          et_channel_names=exp_info.et_channel_names)
 
     #---------------- Fixations and saccades detection ----------------#
     fixations, saccades = preproc_functions.fixations_saccades_detection(raw=raw, meg_gazex_data_clean=meg_gazex_data_clean,
@@ -90,7 +87,7 @@ def preprocess(subject_code, plot=False):
                                    block_num=block_num)
 
     #---------------- Add scaled data to meg data ----------------#
-    preproc_functions.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=et_channel_names)
+    preproc_functions.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=exp_info.et_channel_names)
 
     #---------------- Save preprocesed data ----------------#
     save.preprocesed_data(raw=raw, subject=subject, config=config)
