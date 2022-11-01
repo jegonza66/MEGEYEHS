@@ -46,8 +46,10 @@ for subject_code in range(13):
     # Get events from annotations
     events, event_id = mne.events_from_annotations(meg_data)
 
+    # Reject based on channel amplitude
+    reject = dict(mag=4e-1)
     # Epoch data
-    epochs = mne.Epochs(meg_data, events,  tmin=tmin, tmax=tmax, event_id=event_id, event_repeated='merge')
+    epochs = mne.Epochs(meg_data, events,  tmin=tmin, tmax=tmax, event_id=event_id, reject=reject, event_repeated='merge')
     # Drop bad epochs
     epochs.drop_bad()
 
@@ -57,7 +59,10 @@ for subject_code in range(13):
 
     # Get saccades info for every trial
     saccades = subject.saccades
-    left_saccades = saccades.loc[(saccades['dir'] == 'l') & (~pd.isna(saccades['screen']))].reset_index(drop=True)
+    left_saccades = saccades.loc[(saccades['dir'] == 'l') &
+                                 (~pd.isna(saccades['screen'])) &
+                                 (left_saccades['id'].isin(epoch_keys))].reset_index(drop=True)
+    event_saccades = left_saccades.loc[left_saccades['id'].isin(epoch_keys)].reset_index(drop=True)
     left_sac_dur = left_saccades['duration']
 
     # Parameters for plotting
@@ -75,24 +80,14 @@ for subject_code in range(13):
                 'MLT51', 'MLT52', 'MLT53']
     left_idx = [idx for ch_name in left_chs for idx in range(len(epochs.ch_names)) if ch_name == epochs.ch_names[idx]]
 
-    # Just for now, after re running preprocessing delete
-    epochs.rename_channels(functions.ch_name_map)
-
     picks = right_chs + left_chs
     picks = 'mag'
 
-    epoch_subset = epochs.copy()
-    epoch_subset = epoch_subset.pick(picks)
-    epoch_subset_data = epoch_subset.get_data()
 
-    epoch_subset_std = epoch_std(epoch_subset_data)
-    epoch_all_std = epoch_std(epoch_data)
-    #
-
-    #
     def epoch_std(epoch_data):
         epoch_std = np.std(epoch_data, axis=1)
         return epoch_std
+
 
     def right_left(epoch_subset_data):
         epoch_right = epoch_subset_data[:, :13, :]
@@ -105,6 +100,13 @@ for subject_code in range(13):
 
         return diff
 
+    epoch_subset = epochs.copy()
+    epoch_subset = epoch_subset.pick(picks)
+    epoch_subset_data = epoch_subset.get_data()
+
+    epoch_subset_std = epoch_std(epoch_subset_data)
+
+
     epoch_subset.plot_image(picks=picks, order=order, sigma=0, cmap='jet', overlay_times=left_sac_dur, combine=right_left,
                             title=subject.subject_id)
 
@@ -114,7 +116,11 @@ for subject_code in range(13):
 
     # Plot evoked
     evoked = epochs.average(picks=['meg', 'misc'])
+    # Filter evoked
+    evoked.filter(l_freq=l_freq, h_freq=h_freq, fir_design='firwin')
+
     epoch_data = epochs.get_data()
+    epoch_all_std = epoch_std(epoch_data)
 
     fig, axs = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]})
     axs[1].plot(evoked.times, evoked.data[-7, :])

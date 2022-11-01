@@ -334,7 +334,7 @@ def define_events_trials_ET(raw, subject, config, exp_info, et_channel_names, fo
 
     # Get bh data from eyemap
     bh_data_emap = bh_data_raw.loc[np.logical_and(pd.notnull(bh_data_raw['emap_stim_L.started']),
-                                                    bh_data_raw['emap_stim_L.started'] != 'None')].reset_index(drop=True)
+                                                  bh_data_raw['emap_stim_L.started'] != 'None')].reset_index(drop=True)
 
     # Get only trial data rows
     bh_data = bh_data_raw.loc[~pd.isna(bh_data_raw['target.started'])].reset_index(drop=True)
@@ -961,6 +961,7 @@ def saccades_classification(subject, saccades, raw):
     sac_delay = []
     sac_deg = []
     sac_dir = []
+    sac_id = []
     description = []
     onset = []
 
@@ -1018,7 +1019,9 @@ def saccades_classification(subject, saccades, raw):
                 n_sacs.append(sac_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
+                id = f'{dir}_sac_{screen}{block_num}_{n_sacs[-1]}'
+                sac_id.append(id)
+                description.append(id)
                 onset.append([sac_time])
             # vl
             elif vl_start_times[block_num] < sac_time < hs_start_times[block_num]:
@@ -1030,7 +1033,9 @@ def saccades_classification(subject, saccades, raw):
                 n_sacs.append(sac_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
+                id = f'{dir}_sac_{screen}{block_num}_{n_sacs[-1]}'
+                sac_id.append(id)
+                description.append(id)
                 onset.append([sac_time])
             # hs
             elif hs_start_times[block_num] < sac_time < vs_start_times[block_num]:
@@ -1042,7 +1047,9 @@ def saccades_classification(subject, saccades, raw):
                 n_sacs.append(sac_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
+                id = f'{dir}_sac_{screen}{block_num}_{n_sacs[-1]}'
+                sac_id.append(id)
+                description.append(id)
                 onset.append([sac_time])
             # vs
             elif vs_start_times[block_num] < sac_time < bl_start_times[block_num]:
@@ -1054,7 +1061,9 @@ def saccades_classification(subject, saccades, raw):
                 n_sacs.append(sac_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
+                id = f'{dir}_sac_{screen}{block_num}_{n_sacs[-1]}'
+                sac_id.append(id)
+                description.append(id)
                 onset.append([sac_time])
             # bl
             elif bl_start_times[block_num] < sac_time < bl_end_times[block_num]:
@@ -1066,13 +1075,16 @@ def saccades_classification(subject, saccades, raw):
                 n_sacs.append(sac_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
+                id = f'{dir}_sac_{screen}{block_num}_{n_sacs[-1]}'
+                sac_id.append(id)
+                description.append(id)
                 onset.append([sac_time])
 
             else:
                 sac_screen.append(None)
                 sac_delay.append(None)
                 n_sacs.append(None)
+                sac_id.append(None)
 
         # No emap saccade
         else:
@@ -1104,7 +1116,9 @@ def saccades_classification(subject, saccades, raw):
                     n_sacs.append(sac_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
+                    id = f'{dir}_sac_{screen}{trial}_{n_sacs[-1]}'
+                    sac_id.append(id)
+                    description.append(id)
                     onset.append([sac_time])
 
                 # MS
@@ -1117,7 +1131,9 @@ def saccades_classification(subject, saccades, raw):
                     n_sacs.append(sac_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
+                    id = f'{dir}_sac_{screen}{trial}_{n_sacs[-1]}'
+                    sac_id.append(id)
+                    description.append(id)
                     onset.append([sac_time])
 
                 # Second sacations corss
@@ -1130,7 +1146,9 @@ def saccades_classification(subject, saccades, raw):
                     n_sacs.append(sac_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
+                    id = f'{dir}_sac_{screen}{trial}_{n_sacs[-1]}'
+                    sac_id.append(id)
+                    description.append(id)
                     onset.append([sac_time])
 
                 # VS
@@ -1143,7 +1161,9 @@ def saccades_classification(subject, saccades, raw):
                     n_sacs.append(sac_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    description.append(f'{dir}_sac_{screen}_{n_sacs[-1]}')
+                    id = f'{dir}_sac_{screen}{trial}_{n_sacs[-1]}'
+                    sac_id.append(id)
+                    description.append(id)
                     onset.append([sac_time])
 
                 # No screen identified
@@ -1151,6 +1171,7 @@ def saccades_classification(subject, saccades, raw):
                     sac_screen.append(None)
                     sac_delay.append(None)
                     n_sacs.append(None)
+                    sac_id.append(None)
 
             # No trial identified
             else:
@@ -1161,6 +1182,7 @@ def saccades_classification(subject, saccades, raw):
                 sac_screen.append(None)
                 sac_delay.append(None)
                 n_sacs.append(None)
+                sac_id.append(None)
 
         print("\rProgress: {}%".format(int((i + 1) * 100 / len(saccades))), end='')
         i += 1
@@ -1176,6 +1198,7 @@ def saccades_classification(subject, saccades, raw):
     saccades['delay'] = sac_delay
     saccades['deg'] = sac_deg
     saccades['dir'] = sac_dir
+    saccades['id'] = sac_id
 
     # Rearange columns
     col1 = saccades.pop('subject')
@@ -1188,7 +1211,7 @@ def saccades_classification(subject, saccades, raw):
 
     # Define column type
     saccades = saccades.astype({'subject': str, 'trial': 'Int64', 'mss': 'Int64', 'target_pres': 'Int64', 'delay': float,
-                                'correct': 'Int64', 'n_sac': 'Int64', 'deg': float, 'dir': str})
+                                'correct': 'Int64', 'n_sac': 'Int64', 'deg': float, 'dir': str, 'id': str})
 
     # Save to subject
     subject.saccades = saccades
@@ -1251,6 +1274,7 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
     n_fixs = []
     fix_delay = []
     pupil_size = []
+    fix_id = []
     prev_sac = []
     next_sac = []
 
@@ -1269,7 +1293,7 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
         fix_time = fixation['onset']
         fix_dur = fixation['duration']
 
-        sacc_thresh = 0.02 # 20 ms change to 100 ms and keep las saccade for 0 and first saccade for 1
+        sacc_thresh = 0.05 # 50 ms change to 100 ms and keep las saccade for 0 and first saccade for 1
         # Previous and next saccades
         try:
             sac0 = saccades.loc[(saccades['onset'] + saccades['duration'] > fix_time - sacc_thresh) & (saccades['onset'] + saccades['duration'] < fix_time)].index.values[-1]
@@ -1317,7 +1341,9 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
                 n_fixs.append(fix_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'fix_{screen}_{n_fixs[-1]}')
+                id = f'fix_{screen}{block_num}_{n_fixs[-1]}'
+                fix_id.append(id)
+                description.append(id)
                 onset.append([fix_time])
             # vl
             elif vl_start_times[block_num] < fix_time < hs_start_times[block_num]:
@@ -1329,7 +1355,9 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
                 n_fixs.append(fix_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'fix_{screen}_{n_fixs[-1]}')
+                id = f'fix_{screen}{block_num}_{n_fixs[-1]}'
+                fix_id.append(id)
+                description.append(id)
                 onset.append([fix_time])
             # hs
             elif hs_start_times[block_num] < fix_time < vs_start_times[block_num]:
@@ -1341,7 +1369,9 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
                 n_fixs.append(fix_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'fix_{screen}_{n_fixs[-1]}')
+                id = f'fix_{screen}{block_num}_{n_fixs[-1]}'
+                fix_id.append(id)
+                description.append(id)
                 onset.append([fix_time])
             # vs
             elif vs_start_times[block_num] < fix_time < bl_start_times[block_num]:
@@ -1353,7 +1383,9 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
                 n_fixs.append(fix_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'fix_{screen}_{n_fixs[-1]}')
+                id = f'fix_{screen}{block_num}_{n_fixs[-1]}'
+                fix_id.append(id)
+                description.append(id)
                 onset.append([fix_time])
             # bl
             elif bl_start_times[block_num] < fix_time < bl_end_times[block_num]:
@@ -1365,7 +1397,9 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
                 n_fixs.append(fix_numbers[block_num][screen])
 
                 # Save to raw
-                description.append(f'fix_{screen}_{n_fixs[-1]}')
+                id = f'fix_{screen}{block_num}_{n_fixs[-1]}'
+                fix_id.append(id)
+                description.append(id)
                 onset.append([fix_time])
 
             else:
@@ -1373,6 +1407,7 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
                 fix_screen.append(None)
                 fix_delay.append(None)
                 n_fixs.append(None)
+                fix_id.append(None)
 
         # No emap fixation
         else:
@@ -1404,7 +1439,9 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
                     n_fixs.append(fix_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    description.append(f'fix_{screen}_{n_fixs[-1]}')
+                    id = f'fix_{screen}{trial}_{n_fixs[-1]}'
+                    fix_id.append(id)
+                    description.append(id)
                     onset.append([fix_time])
 
                 # MS
@@ -1417,7 +1454,9 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
                     n_fixs.append(fix_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    description.append(f'fix_{screen}_{n_fixs[-1]}')
+                    id = f'fix_{screen}{trial}_{n_fixs[-1]}'
+                    fix_id.append(id)
+                    description.append(id)
                     onset.append([fix_time])
 
                 # Second fixations corss
@@ -1430,7 +1469,9 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
                     n_fixs.append(fix_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    description.append(f'fix_{screen}_{n_fixs[-1]}')
+                    id = f'fix_{screen}{trial}_{n_fixs[-1]}'
+                    fix_id.append(id)
+                    description.append(id)
                     onset.append([fix_time])
 
                 # VS
@@ -1441,12 +1482,15 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
                     fix_delay.append(fix_time - vs_times_meg[trial_idx])
                     fix_numbers[block_num][f'trial_{trial}'][screen] += 1
                     n_fixs.append(fix_numbers[block_num][f'trial_{trial}'][screen])
+                    # Will specify id in target classification
+                    fix_id.append(None)
 
                 # No screen identified
                 else:
                     fix_screen.append(None)
                     fix_delay.append(None)
                     n_fixs.append(None)
+                    fix_id.append(None)
 
             # No trial identified
             else:
@@ -1457,6 +1501,7 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
                 fix_screen.append(None)
                 fix_delay.append(None)
                 n_fixs.append(None)
+                fix_id.append(None)
 
         print("\rProgress: {}%".format(int((i + 1) * 100 / len(fixations))), end='')
         i += 1
@@ -1473,9 +1518,10 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
     fixations['delay'] = fix_delay
     fixations['prev_sac'] = prev_sac
     fixations['next_sac'] = next_sac
+    fixations['id'] = fix_id
 
     fixations = fixations.astype({'trial': 'Int64', 'mss': 'Int64', 'target_pres': 'Int64', 'delay': float, 'correct': 'Int64',
-                                  'n_fix': 'Int64', 'pupil': float, 'prev_sac': 'Int64', 'next_sac': 'Int64'})
+                                  'n_fix': 'Int64', 'pupil': float, 'prev_sac': 'Int64', 'next_sac': 'Int64', 'id': str})
 
     # Add vs fixations data to raw annotations
     raw.annotations.description = np.concatenate((raw.annotations.description, np.array(description)))
@@ -1507,6 +1553,7 @@ def target_vs_distractor(fixations, subject, raw, distance_threshold=100, screen
     fix_item_distance = []
     fix_target = []
     trials_image = []
+    fix_id = []
 
     description = []
     onset = []
@@ -1559,23 +1606,25 @@ def target_vs_distractor(fixations, subject, raw, distance_threshold=100, screen
             item_distance = min_distance
             istarget = target[min_distance_idx]
         else:
-            item = None
-            item_distance = None
-            istarget = None
+            item = float('nan')
+            item_distance = float('nan')
+            istarget = float('nan')
 
         # Save trial data
         items.append(item)
         fix_item_distance.append(item_distance)
         fix_target.append(istarget)
 
-        if istarget:
+        if ~np.isnan(istarget) and istarget:
             prefix = 'tgt'
-        elif item != None:
+        elif ~np.isnan(item):
             prefix = 'it'
         else:
             prefix = 'none'
 
-        description.append(f'{prefix}_fix_vs_{n_fix}')
+        id = f'{prefix}_fix_vs{trial}_{n_fix}'
+        fix_id.append(id)
+        description.append(id)
         onset.append([fix_time])
 
     # Save to fixations_vs df
@@ -1583,6 +1632,7 @@ def target_vs_distractor(fixations, subject, raw, distance_threshold=100, screen
     fixations.loc[fixations['screen'] == 'vs', 'fix_target'] = fix_target
     fixations.loc[fixations['screen'] == 'vs', 'distance'] = fix_item_distance
     fixations.loc[fixations['screen'] == 'vs', 'trial_image'] = trials_image
+    fixations.loc[fixations['screen'] == 'vs', 'id'] = fix_id
 
     # Save to subject
     subject.fixations = fixations
@@ -1617,7 +1667,7 @@ def add_et_channels(raw, et_channels_meg, et_channel_names):
     channel_idx = np.append(channel_idx, mne.pick_channels(raw.info['ch_names'], ['UPPT001', 'UADC001-4123', 'UADC002-4123', 'UADC013-4123']))
     raw.pick(channel_idx)
     # Rename channels removing '-4123'
-    raw.rename_channels(functions.ch_name_map())
+    raw.rename_channels(functions.ch_name_map)
 
     # save to original raw structure (requires to load data)
     print('Loading MEG data')
