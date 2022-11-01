@@ -126,3 +126,29 @@ for trig_num in range(len(vs_start_et)-1):
     # save.fig(fig=fig, path=plots_path + 'DAC delay/', fname=f'trial_{trig_num}.png')
 
 
+##
+import numpy as np
+
+subject_code = 0
+
+#---------------- Load data ----------------#
+# Load experiment info
+exp_info = setup.exp_info()
+
+# Load run configuration
+config = load.config(path=paths().config_path(), fname='config.pkl')
+
+# Define subject
+subject = setup.raw_subject(exp_info=exp_info, config=config, subject_code=subject_code)
+
+# Load Meg data
+raw = subject.load_raw_meg_data()
+
+# Split chs
+right_chs = [ch_name for ch_name in raw.ch_names if 'MR' in ch_name]
+left_chs = [ch_name for ch_name in raw.ch_names if 'LR' in ch_name]
+
+# Plot parameters
+# Separate R L
+group_by = dict(left=left_chs, light=right_chs)
+

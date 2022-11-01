@@ -230,3 +230,10 @@ def align_signals(signal_1, signal_2):
 
     return max_sample, corrs
 
+
+def ch_name_map(orig_ch_name):
+    if orig_ch_name[-5:] == '-4123':
+        new_ch_name = orig_ch_name[:-5]
+    else:
+        new_ch_name = orig_ch_name
+    return new_ch_name

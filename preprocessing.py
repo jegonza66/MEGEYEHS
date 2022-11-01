@@ -24,10 +24,9 @@ def preprocess(subject_code, plot=False):
     print('\nGetting ET channels data from MEG')
     et_channels_meg = raw.get_data(picks=exp_info.et_channel_names)
 
-    # Get separate data from et channels
-    meg_gazex_data_raw = et_channels_meg[0]
-    meg_gazey_data_raw = et_channels_meg[1]
-    meg_pupils_data_raw = et_channels_meg[2]
+    #---------------- Remove DAC delay samples ----------------#
+    meg_gazex_data_raw, meg_gazey_data_raw, meg_pupils_data_raw = \
+        preproc_functions.DAC_samples(et_channels_meg=et_channels_meg, exp_info=exp_info, sfreq=raw.info['sfreq'])
 
     #---------------- Reescaling based on conversion parameters ----------------#
     meg_gazex_data_scaled, meg_gazey_data_scaled = preproc_functions.reescale_et_channels(meg_gazex_data_raw=meg_gazex_data_raw,
@@ -47,8 +46,12 @@ def preprocess(subject_code, plot=False):
                                                                config=config.preprocessing, sfreq=raw.info['sfreq'])
 
     #---------------- Defining response events and trials ----------------#
-    raw, subject = preproc_functions.define_events_trials(raw=raw, subject=subject, config=config, exp_info=exp_info,
-                                                          et_channel_names=exp_info.et_channel_names)
+    if subject.subject_id in exp_info.no_trig_subjects:
+        raw, subject = preproc_functions.define_events_trials_ET(raw=raw, subject=subject, config=config, exp_info=exp_info,
+                                                                 et_channel_names=exp_info.et_channel_names)
+    else:
+        raw, subject = preproc_functions.define_events_trials_trig(raw=raw, subject=subject, config=config, exp_info=exp_info,
+                                                                   et_channel_names=exp_info.et_channel_names)
 
     #---------------- Fixations and saccades detection ----------------#
     fixations, saccades = preproc_functions.fixations_saccades_detection(raw=raw, meg_gazex_data_clean=meg_gazex_data_clean,

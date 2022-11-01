@@ -12,7 +12,7 @@ subject = load.raw_subject()
 
 # Load data
 raw = subject.load_raw_meg_data()
-bh_data = subject.load_raw_bh_data
+bh_data = subject.load_raw_bh_data()
 
 # VS screen start time
 vs_time = bh_data['key_resp.started'].values

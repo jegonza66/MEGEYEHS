@@ -61,6 +61,10 @@ class exp_info:
                                 '10925091': 'Balanced', '16263002':  'Balanced', '16269001':  'Balanced'}
 
         # Missing bh subjects
+        self.no_trig_subjects = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001',
+                                 '16200001', '16201001']
+
+        # Missing bh subjects
         self.missing_bh_subjects = ['16191001', '16200001', '16201001']
 
         # Define subjects that took the old trials loop experiment
@@ -71,6 +75,9 @@ class exp_info:
 
         # Trigger channel name
         self.trig_ch = 'UPPT002'
+
+        # DAC delay (in ms)
+        self.DAC_delay = 8
 
 
 class config:
