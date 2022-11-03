@@ -465,8 +465,6 @@ def define_events_trials_ET(raw, subject, config, exp_info, force_realign=False)
                                 emap_vs_start_meg_block, emap_bl_start_meg_block, emap_bl_end_meg_block]
 
         # Save to raw
-        emap_trials = [f'hl_start{block_num}', f'vl_start{block_num}', f'hs_start{block_num}', f'vs_start{block_num}',
-                       f'bl_start{block_num}', f'bl_end{block_num}']
         onset_block.append(emap_times_meg_block)
         description_block.append(emap_trials)
 
@@ -889,7 +887,7 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
 
             # Run Remodnav not considering pursuit class and min fixations 100 ms
             command = f'remodnav {fname} {out_fname} {px2deg} {sfreq} --savgol-length {0.0195} --min-pursuit-duration {2} ' \
-                      f'--min-fixation-duration {0.1}'
+                      f'--max-pso-duration {0.0}'
             os.system(command)
 
             # Read results file with detections
@@ -1206,12 +1204,10 @@ def saccades_classification(subject, saccades, raw):
     saccades['id'] = sac_id
 
     # Rearange columns
-    col1 = saccades.pop('subject')
-    saccades.insert(0, col1.name, col1)
-    col2 = saccades.pop('deg')
+    col1 = saccades.pop('deg')
+    saccades.insert(8, col1.name, col1)
+    col2 = saccades.pop('dir')
     saccades.insert(9, col2.name, col2)
-    col3 = saccades.pop('dir')
-    saccades.insert(10, col3.name, col3)
 
 
     # Define column type
