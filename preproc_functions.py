@@ -153,7 +153,7 @@ def meg_blocks_bounds_evt(raw, et_channel_names):
     # Split events into blocks by green press at begening of block
     blocks_start_end = np.where(evt_buttons == 'green')[0]
 
-    # Add first trial idx (0) on first sample (0) and Add last trial idx in the end
+    # Add last trial idx in the end
     blocks_start_end = np.concatenate((blocks_start_end, np.array([len(evt_buttons) - 1])))
 
     # Delete blocks shorter than 20 trials or consecutive green presses
@@ -325,7 +325,7 @@ def DAC_samples(et_channels_meg, exp_info, sfreq):
     return meg_gazex_data_raw, meg_gazey_data_raw, meg_pupils_data_raw
 
 
-def define_events_trials_ET(raw, subject, config, exp_info, et_channel_names, force_realign=False):
+def define_events_trials_ET(raw, subject, config, exp_info, force_realign=False):
     print('Detecting events and defining trials by matching signals')
 
     #----- Behavioural data -----#
@@ -359,7 +359,7 @@ def define_events_trials_ET(raw, subject, config, exp_info, et_channel_names, fo
 
     # Downsample raw data and extract gazex channel, evt buttons, times and blocks bounds
     raw_et, meg_gazex, evt_buttons, evt_times, blocks_bounds_evt, blocks_bounds_meg = \
-        meg_blocks_bounds_evt(raw=raw, et_channel_names=et_channel_names)
+        meg_blocks_bounds_evt(raw=raw, et_channel_names=exp_info.et_channel_names)
 
     emap_trials = ['hl_start', 'vl_start', 'hs_start', 'vs_start', 'bl_start', 'bl_end']
 
@@ -394,7 +394,7 @@ def define_events_trials_ET(raw, subject, config, exp_info, et_channel_names, fo
         print(f'\nBlock: {block_num + 1}')
         block_bounds_evt = blocks_bounds_evt[block_num]
         block_start_evt = block_bounds_evt[0]
-        block_end_evt = block_bounds_evt[1]
+        block_end_evt = block_bounds_evt[1] + 1
         block_trials = 30
         block_idxs = np.arange(block_num * block_trials, (block_num + 1) * block_trials)
 
@@ -465,6 +465,8 @@ def define_events_trials_ET(raw, subject, config, exp_info, et_channel_names, fo
                                 emap_vs_start_meg_block, emap_bl_start_meg_block, emap_bl_end_meg_block]
 
         # Save to raw
+        emap_trials = [f'hl_start{block_num}', f'vl_start{block_num}', f'hs_start{block_num}', f'vs_start{block_num}',
+                       f'bl_start{block_num}', f'bl_end{block_num}']
         onset_block.append(emap_times_meg_block)
         description_block.append(emap_trials)
 
@@ -504,7 +506,7 @@ def define_events_trials_ET(raw, subject, config, exp_info, et_channel_names, fo
         vs_end_times_meg_block = raw_et.times[vs_end_block]
         onset_block.append(list(vs_end_times_meg_block))
         description_block.append([f'vsend_t{total_trial}' for total_trial in range(int(block_num * block_trials + 1),
-                                                                                int((block_num + 1) * block_trials + 1))])
+                                                                                   int((block_num + 1) * block_trials + 1))])
 
         # Flatten lists to append trial data
         onset_block = functions.flatten_list(onset_block)
@@ -532,7 +534,7 @@ def define_events_trials_ET(raw, subject, config, exp_info, et_channel_names, fo
             # Answer after a 10 search screen or time difference of 100 ms -> No answer
             if (time_diff < 0) and (vs_end_times_meg_block[trial] - vs_times_meg_block[trial] > 9.99) or time_diff < late_ans_thr or time_diff > search_screen_dur:
                 print(f'\nNo answer in Trial {total_trial}\n'
-                      f' Time difference: {round((vs_end_times_meg_block[trial] - meg_evt_time) * 1000, 1)} ms\n'
+                      f'Time difference: {round((vs_end_times_meg_block[trial] - meg_evt_time) * 1000, 1)} ms\n'
                       f'Search duration: {search_screen_dur} s')
                 no_answer_block.append(total_trial)
                 response_times_meg_block.append(float('nan'))
@@ -560,6 +562,7 @@ def define_events_trials_ET(raw, subject, config, exp_info, et_channel_names, fo
         vsend_times_meg.append(vs_end_times_meg_block)
         buttons_meg.append(buttons_meg_block)
         response_times_meg.append(response_times_meg_block)
+        time_differences.append(time_diff_block)
         response_trials_meg.append(response_trials_meg_block)
         no_answer.append(no_answer_block)
 
@@ -613,8 +616,8 @@ def define_events_trials_ET(raw, subject, config, exp_info, et_channel_names, fo
     return raw, subject
 
 
-def define_events_trials_trig(raw, subject, config, exp_info, et_channel_names, force_realign=False):
-    print('Detecting events and defining trials by matching signals')
+def define_events_trials_trig(raw, subject, config, exp_info):
+    print('Detecting events and defining trials by stim triggers')
 
     #----- Behavioural data -----#
     # Load behavioural data
@@ -633,9 +636,11 @@ def define_events_trials_trig(raw, subject, config, exp_info, et_channel_names, 
     subject.bh_data_emap = bh_data_emap
 
     # Get triggers from channel
+    # Use mne.find_events instead
+    # events = mne.find_events(raw=raw, stim_channel=exp_info.trig_ch)
     trig_data = raw.get_data(picks=exp_info.trig_ch)[0]
     # Get vs start from meg
-    vs_start_meg = np.where(np.diff(trig_data) == 255)[0][:-1] + 1  # Drop last message of exp end
+    vs_start_meg = np.where(np.diff(trig_data) == 255)[0][:210] + 1  # Drop last message of exp end
     vs_start_meg_times = raw.times[vs_start_meg]
 
     # Get screen durations from BH
@@ -677,14 +682,14 @@ def define_events_trials_trig(raw, subject, config, exp_info, et_channel_names, 
     for block_num in range(len(block_bounds) - 1):
         print(f'\nBlock: {block_num + 1}')
         # block_bounds_evt = blocks_bounds_evt[block_num]
-        block_start_evt = block_bounds[block_num]
-        block_end_evt = block_bounds[block_num + 1]
+        # block_start_evt = block_bounds[block_num]
+        # block_end_evt = block_bounds[block_num + 1] + 1  # +1 because [:] leaves out the last element
         block_trials = 30
         block_idxs = np.arange(block_num * block_trials, (block_num + 1) * block_trials)
 
         # Get events in block from MEG data
-        meg_evt_block_times = copy.copy(evt_times[block_start_evt:block_end_evt])
-        meg_evt_block_buttons = copy.copy(evt_buttons[block_start_evt:block_end_evt])
+        # meg_evt_block_times = copy.copy(evt_times[block_start_evt:block_end_evt])
+        # meg_evt_block_buttons = copy.copy(evt_buttons[block_start_evt:block_end_evt])
 
         # Save block variables
         no_answer_block = []
@@ -755,12 +760,12 @@ def define_events_trials_trig(raw, subject, config, exp_info, et_channel_names, 
 
             if subject.subject_id in exp_info.missing_bh_subjects:
                 # Find last meg response in vs screen:
-                idx, meg_evt_time = functions.find_last_within(array=meg_evt_block_times,
+                idx, meg_evt_time = functions.find_last_within(array=evt_times,
                                                                low_bound=vs_times_meg_block[trial],
                                                                up_bound=vs_end_times_meg_block[trial])
             else:
                 # Find nearest answer to vs end time
-                idx, meg_evt_time = functions.find_nearest(array=meg_evt_block_times,
+                idx, meg_evt_time = functions.find_nearest(array=evt_times,
                                                            values=vs_end_times_meg_block[trial])
 
             # Evaluate answer parameters
@@ -782,11 +787,11 @@ def define_events_trials_trig(raw, subject, config, exp_info, et_channel_names, 
 
                 # Append time and button to annotations
                 onset_block.append(meg_evt_time)
-                description_block.append(meg_evt_block_buttons[idx])
+                description_block.append(evt_buttons[idx])
 
                 # Append to subject data
                 time_diff_block.append(time_diff)
-                buttons_meg_block.append((meg_evt_block_buttons[idx]))
+                buttons_meg_block.append((evt_buttons[idx]))
                 response_times_meg_block.append(meg_evt_time - vs_times_meg_block[trial])
                 response_trials_meg_block.append(total_trial)
 
@@ -798,6 +803,7 @@ def define_events_trials_trig(raw, subject, config, exp_info, et_channel_names, 
         vsend_times_meg.append(vs_end_times_meg_block)
         buttons_meg.append(buttons_meg_block)
         response_times_meg.append(response_times_meg_block)
+        time_differences.append(time_diff_block)
         response_trials_meg.append(response_trials_meg_block)
         no_answer.append(no_answer_block)
 
@@ -1188,7 +1194,6 @@ def saccades_classification(subject, saccades, raw):
         i += 1
 
     print()
-    saccades['subject'] = subject.subject_id
     saccades['trial'] = sac_trial
     saccades['mss'] = trial_mss
     saccades['screen'] = sac_screen
@@ -1210,7 +1215,7 @@ def saccades_classification(subject, saccades, raw):
 
 
     # Define column type
-    saccades = saccades.astype({'subject': str, 'trial': 'Int64', 'mss': 'Int64', 'target_pres': 'Int64', 'delay': float,
+    saccades = saccades.astype({'trial': 'Int64', 'mss': 'Int64', 'target_pres': 'Int64', 'delay': float,
                                 'correct': 'Int64', 'n_sac': 'Int64', 'deg': float, 'dir': str, 'id': str})
 
     # Save to subject
@@ -1507,7 +1512,6 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
         i += 1
 
     print()
-    fixations['subject'] = subject.subject_id
     fixations['pupil'] = pupil_size
     fixations['trial'] = fix_trial
     fixations['mss'] = trial_mss

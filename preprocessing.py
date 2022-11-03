@@ -47,11 +47,9 @@ def preprocess(subject_code, plot=False):
 
     #---------------- Defining response events and trials ----------------#
     if subject.subject_id in exp_info.no_trig_subjects:
-        raw, subject = preproc_functions.define_events_trials_ET(raw=raw, subject=subject, config=config, exp_info=exp_info,
-                                                                 et_channel_names=exp_info.et_channel_names)
+        raw, subject = preproc_functions.define_events_trials_ET(raw=raw, subject=subject, config=config, exp_info=exp_info)
     else:
-        raw, subject = preproc_functions.define_events_trials_trig(raw=raw, subject=subject, config=config, exp_info=exp_info,
-                                                                   et_channel_names=exp_info.et_channel_names)
+        raw, subject = preproc_functions.define_events_trials_trig(raw=raw, subject=subject, config=config, exp_info=exp_info)
 
     #---------------- Fixations and saccades detection ----------------#
     fixations, saccades = preproc_functions.fixations_saccades_detection(raw=raw, meg_gazex_data_clean=meg_gazex_data_clean,

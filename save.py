@@ -36,7 +36,7 @@ def preprocesed_data(raw, subject, config):
     raw.save(preproc_save_path + preproc_meg_data_fname, overwrite=True)
 
     # Save events
-    evt, evt_id = mne.events_from_annotations(raw)
+    evt, evt_id = mne.events_from_annotations(raw, verbose=False)
     preproc_evt_data_fname = f'Subject_{subject.subject_id}_eve.fif'
     mne.write_events(preproc_save_path + preproc_evt_data_fname, evt, overwrite=True)
 
@@ -94,6 +94,11 @@ def fig(fig, path, fname):
     # Make dir
     os.makedirs(path, exist_ok=True)
 
+    # Create svg directory
+    svg_path = path + 'svg/'
+    os.makedirs(svg_path, exist_ok=True)
+
     # Save
     fig.savefig(path + fname)
+    fig.savefig(svg_path + fname)
 
