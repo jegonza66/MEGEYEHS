@@ -4,16 +4,26 @@ import matplotlib.pyplot as plt
 import mne
 from paths import paths
 import load
+import setup
+
+# Load experiment info
+exp_info = setup.exp_info()
+
+# Load run configuration
+config = load.config(path=paths().config_path(), fname='config.pkl')
 
 # Define Subjects_dir as Freesurfer output folder
 mri_path = paths().mri_path()
 subjects_dir = os.path.join(mri_path, 'FreeSurfer_out')
 os.environ["SUBJECTS_DIR"] = subjects_dir
+
 # Load one subject
-subject = load.raw_subject()
+subject = setup.raw_subject(exp_info=exp_info, config=config, subject_code=0)
+
 # PATH TO MRI <-> HEAD TRANSFORMATION (Saved from coreg)
 trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-trans.fif'.format(subject.subject_id))
 fids_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-fiducials.fif'.format(subject.subject_id))
+
 ## ALIGNMENT
 mne.gui.coregistration(subject=subject.subject_id, subjects_dir=subjects_dir)
 
@@ -63,8 +73,8 @@ evoked_std.pick('meg')
 evoked_std.filter(l_freq=0.5, h_freq=80., fir_design='firwin')
 
 # LOAD BACKGROUND NOISE
-noise = load.raw_subject('BACK_NOISE')
-raw_noise = noise.ctf_data()
+noise = setup.noise(exp_info=exp_info, id='BACK_NOISE')
+raw_noise = noise.load_raw_meg_data()
 raw_noise.pick('meg')
 # COMPUTE COVARIANCE TO WITHDRAW FROM MEG DATA
 cov = mne.compute_raw_covariance(raw_noise, reject=reject)

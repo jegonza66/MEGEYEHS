@@ -45,7 +45,7 @@ class exp_info:
 
         # Select subject
         self.subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001', '16200001',
-                             '16201001', '09991040', '10925091', '16263002', '16269001', 'BACK_NOISE', '16256001']
+                             '16201001', '09991040', '10925091', '16263002', '16269001']
 
         # Subjects bad channels
         self.subjects_bad_channels = {'15909001': ['MLT11', 'MLT21'], '15912001': ['MRT53-4123'],
@@ -124,6 +124,12 @@ class config:
                                     '15911001': 58, '11535009': 58, '16191001': 58, '16200001': 58,
                                     '16201001': 58, '16256001': 58, '09991040': 58, '10925091': 58,
                                     '16263002': 58, '16269001': 58}
+
+            # Distance to the screen durin the experiment
+            self.reject_amp = {'15909001': 1.5e-12, '15912001': 1.5e-12, '15910001': 1.5e-12, '15950001': 1.5e-12,
+                               '15911001': 1.5e-12, '11535009': 1.5e-12, '16191001': 1.5e-12, '16200001': 1.5e-12,
+                               '16201001': 1.5e-12, '16256001': 1.5e-12, '09991040': 1.5e-12, '10925091': 1.5e-12,
+                               '16263002': 1.5e-12, '16269001': 1.5e-12}
 
             self.blink_min_dur = 70
             self.start_interval_samples = 12
@@ -386,3 +392,70 @@ class raw_subject:
         fif = mne.io.read_raw_fif(file_path)
 
         return fif
+
+
+class noise:
+    """
+    Class containing bakground noise data.
+
+    Parameters
+    ----------
+    exp_info:
+    config:
+    subject: {'int', 'str'}, default=None
+        Subject id (str) or number (int). If None, takes the first subject.
+
+    Attributes
+    ----------
+    bad_channels: list
+        List of bad channels.
+    beh_path: str
+        Path to the behavioural data.
+    ctf_path: str
+        Path to the MEG data.
+    et_path: str
+        Path to the Eye-Tracker data.
+    mri_path: str
+        Path to the MRI data.
+    opt_path: str
+        Path to the Digitalization data.
+    subject_id: str
+        Subject id.
+    """
+
+    def __init__(self, exp_info, id='BACK_NOISE'):
+
+        self.id = id
+
+        # Noise data path
+        self.ctf_path = pathlib.Path(os.path.join(exp_info.ctf_path, self.id))
+
+    # MEG data
+    def load_raw_meg_data(self):
+        """
+        MEG data for parent subject as Raw instance of MNE.
+        """
+
+        print('\nLoading MEG data')
+        # get subject path
+        subj_path = self.ctf_path
+        ds_files = list(subj_path.glob('*{}*.ds'.format(self.id)))
+        ds_files.sort()
+
+        # Load sesions
+        # If more than 1 session concatenate all data to one raw data
+        if len(ds_files) > 1:
+            raws_list = []
+            for i in range(len(ds_files)):
+                raw = mne.io.read_raw_ctf(ds_files[i], system_clock='ignore')
+                raws_list.append(raw)
+            # MEG data structure
+            raw = mne.io.concatenate_raws(raws_list, on_mismatch='ignore')
+            return raw
+        # If only one session return that session as whole raw data
+        elif len(ds_files) == 1:
+            raw = mne.io.read_raw_ctf(ds_files[0], system_clock='ignore')
+            return raw
+        # Missing data
+        else:
+            print('No .ds files found in subject directory: {}'.format(subj_path))

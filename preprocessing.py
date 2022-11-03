@@ -6,15 +6,8 @@ import preproc_functions
 from paths import paths
 
 
-def preprocess(subject_code, plot=False):
-
+def preprocess(subject_code, exp_info, config, plot=False):
     #---------------- Load data ----------------#
-    # Load experiment info
-    exp_info = setup.exp_info()
-
-    # Load run configuration
-    config = load.config(path=paths().config_path(), fname='config.pkl')
-
     # Define subject
     subject = setup.raw_subject(exp_info=exp_info, config=config, subject_code=subject_code)
 
@@ -98,6 +91,12 @@ def preprocess(subject_code, plot=False):
     del(subject)
 
 
+# Run
+# Load experiment info
+exp_info = setup.exp_info()
+# Load run configuration
+config = load.config(path=paths().config_path(), fname='config.pkl')
+
 # for subject_code in [6, 7, 8, 9, 10, 11, 12]:
-for subject_code in range(11, 13):
-    preprocess(subject_code=subject_code, plot=True)
+for subject_code in exp_info.subjects_ids:
+    preprocess(subject_code=subject_code, exp_info=exp_info, config=config, plot=True)
