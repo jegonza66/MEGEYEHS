@@ -4,7 +4,7 @@ import pandas as pd
 import os
 import math
 import mne
-
+import scipy.signal as sgn
 import functions
 import preproc_plot
 from paths import paths
@@ -240,10 +240,13 @@ def blinks_to_nan(meg_pupils_data_raw, meg_gazex_data_scaled, meg_gazey_data_sca
     meg_pupils_data_clean = copy.copy(meg_pupils_data_raw)
 
     # Check for peaks in pupils signal
-    pupils_diff = np.concatenate((np.array([float('nan')]), np.diff(meg_pupils_data_clean)))
+    # pupils_diff = np.concatenate((np.array([float('nan')]), np.diff(meg_pupils_data_clean)))
+    peaks_idx, foo = sgn.find_peaks(-meg_pupils_data_clean, prominence=0.15, width=[0, 160])
 
     # Define missing values as 1 and non missing as 0 instead of True False
-    missing = ((meg_pupils_data_clean < pupil_size_thresh) | (abs(pupils_diff) > 0.1)).astype(int)
+    # missing = ((meg_pupils_data_clean < pupil_size_thresh) | (abs(pupils_diff) > 0.1)).astype(int)
+    missing = (meg_pupils_data_clean < pupil_size_thresh).astype(int)
+    missing[peaks_idx] = 1
 
     # Get missing start/end samples and duration
     missing_start = np.where(np.diff(missing) == 1)[0]

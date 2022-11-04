@@ -1,5 +1,4 @@
 from paths import paths
-
 import mne
 import pandas as pd
 import numpy as np
@@ -52,6 +51,7 @@ class exp_info:
                                       '15910001': [], '15950001': [], '15911001': [], '11535009': [],
                                       '16191001': ['MRT53'], '16200001': [], '16201001': [], '16256001': [],
                                       '09991040': [], '10925091': [], '16263002': [], '16269001': []}
+
         # Subjects groups
         # For some reason participant 6 has the mapping from balanced participants
         self.subjects_groups = {'15909001': 'Balanced', '15912001': 'Balanced', '15910001': 'Balanced',
@@ -114,8 +114,21 @@ class config:
 
     class preprocessing:
         def __init__(self):
+            
+            self.blink_min_dur = 70
+
+            # Samples drop at begining of missing pupils signal
+            self.start_interval_samples = {'15909001': 12, '15912001': 12, '15910001': 62, '15950001': 62, '15911001': 62,
+                                           '11535009': 48, '16191001': 52, '16200001': 48, '16201001': 48, '16256001': 48,
+                                           '09991040': 48, '10925091': 48, '16263002': 48, '16269001': 48}
+            
+            # Samples drop at end of missing pupils signal
+            self.end_interval_samples = {'15909001': 24, '15912001': 24, '15910001': 62, '15950001': 62, '15911001': 62,
+                                         '11535009': 48, '16191001': 68, '16200001': 48, '16201001': 48, '16256001': 48,
+                                         '09991040': 48, '10925091': 48, '16263002': 48, '16269001': 48}
+
             # Pupil size threshold to consider missing signal
-            self.pupil_thresh = {'15909001': -4.6, '15912001': -4.6, '15910001': -4.6, '15950001': -4.6, '15911001': -4.6,
+            self.pupil_thresh = {'15909001': -4.6, '15912001': -4.71, '15910001': -4.113, '15950001': -4.6, '15911001': -4.6,
                                  '11535009': -4.6, '16191001': -4.6, '16200001': -4.6, '16201001': -4.6, '16256001': -4.6,
                                  '09991040': -4.6, '10925091': -4.6, '16263002': -4.6, '16269001': -4.6}
 
@@ -140,10 +153,7 @@ class config:
                                      '16263002': {0: 144254, 1: 217256, 2: 266348, 3: 315123, 4: 405812, 5: 454113, 6: 504071},
                                      '16269001': {0: 128759, 1: 186451, 2: 191845, 3: 242896, 4: 214075, 5: 223144, 6: 247076}}
 
-            self.blink_min_dur = 70
-            self.start_interval_samples = 12
-            self.end_interval_samples = 24
-
+            
     class analysis:
         def __init__(self):
             # Trial reject parameter based on MEG peack to peack amplitude
@@ -293,7 +303,7 @@ class raw_subject:
             return raw
         # Missing data
         else:
-            print('No .ds files found in subject directory: {}'.format(subj_path))
+            raise ValueError('No .ds files found in subject directory: {}'.format(subj_path))
 
 
     # ET data
@@ -497,4 +507,4 @@ class noise:
             return raw
         # Missing data
         else:
-            print('No .ds files found in subject directory: {}'.format(subj_path))
+            raise ValueError('No .ds files found in subject directory: {}'.format(subj_path))

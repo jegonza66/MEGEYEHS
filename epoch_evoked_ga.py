@@ -70,8 +70,6 @@ for subject_code in range(13):
                         event_repeated='drop', metadata=metadata, preload=True)
     # Drop bad epochs
     epochs.drop_bad()
-    # Just for now, delete after re running preprocessing
-    epochs.rename_channels(functions.ch_name_map)
 
     if any('sac' in id for id in epoch_ids):
         saccades = subject.saccades

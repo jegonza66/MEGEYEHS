@@ -32,6 +32,13 @@ def preprocess(subject_code, exp_info, config, plot=False):
                                                                                                         meg_pupils_data_raw=meg_pupils_data_raw,
                                                                                                         config=subject.config.preproc)
 
+
+    peaks = sgn.find_peaks(-meg_pupils_data_clean, prominence=0.15, width=[0, 160])
+    plt.figure()
+    plt.plot(meg_pupils_data_raw)
+    plt.plot(meg_pupils_data_clean)
+    plt.plot(peaks[0], meg_pupils_data_clean[peaks[0]], '.')
+
     #---------------- Missing signal interpolation ----------------#
     # et_channels_meg = preproc_functions.fake_blink_interpolate(meg_gazex_data_clean=meg_gazex_data_clean,
     #                                                            meg_gazey_data_clean=meg_gazey_data_clean,

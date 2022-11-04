@@ -105,11 +105,5 @@ def preproc_subject(exp_info, subject_code):
         return preproc_subject
 
     except:
-        raise ValueError(f'Preprocessed data for subject {subject_id} not found')
-
-
-
-
-
-
-
+        print(f'Directory: {os.listdir(pathlib.Path(os.path.join(preproc_path, subject_id)))}')
+        raise ValueError(f'Preprocessed data for subject {subject_id} not found in {file_path}')
