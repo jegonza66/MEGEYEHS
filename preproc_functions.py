@@ -1294,7 +1294,7 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
         fix_time = fixation['onset']
         fix_dur = fixation['duration']
 
-        sacc_thresh = 0.002 # 2 ms change to 100 ms and keep las saccade for 0 and first saccade for 1
+        sacc_thresh = 0.002  # 2 ms change to 100 ms and keep las saccade for 0 and first saccade for 1
         # Previous and next saccades
         try:
             sac0 = saccades.loc[(saccades['onset'] + saccades['duration'] > fix_time - sacc_thresh) & (saccades['onset'] + saccades['duration'] < fix_time + sacc_thresh)].index.values[-1]
