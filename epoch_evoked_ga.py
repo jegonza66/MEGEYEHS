@@ -64,7 +64,7 @@ for subject_code in range(13):
                                                           sfreq=meg_data.info['sfreq'])
 
     # Reject based on channel amplitude
-    reject = dict(mag=1.5e-12)
+    reject = dict(mag=1e-12)
     # Epoch data
     epochs = mne.Epochs(raw=meg_data, events=events, event_id=event_id, tmin=tmin, tmax=tmax, reject=reject,
                         event_repeated='drop', metadata=metadata, preload=True)

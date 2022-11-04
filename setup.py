@@ -48,9 +48,9 @@ class exp_info:
                              '16201001', '09991040', '10925091', '16263002', '16269001']
 
         # Subjects bad channels
-        self.subjects_bad_channels = {'15909001': ['MLT11', 'MLT21'], '15912001': ['MRT53-4123'],
+        self.subjects_bad_channels = {'15909001': ['MLT11', 'MLT21'], '15912001': ['MRT53'],
                                       '15910001': [], '15950001': [], '15911001': [], '11535009': [],
-                                      '16191001': ['MRT53-4123'], '16200001': [], '16201001': [], '16256001': [],
+                                      '16191001': ['MRT53'], '16200001': [], '16201001': [], '16256001': [],
                                       '09991040': [], '10925091': [], '16263002': [], '16269001': []}
         # Subjects groups
         # For some reason participant 6 has the mapping from balanced participants
@@ -119,22 +119,38 @@ class config:
                                  '11535009': -4.6, '16191001': -4.6, '16200001': -4.6, '16201001': -4.6, '16256001': -4.6,
                                  '09991040': -4.6, '10925091': -4.6, '16263002': -4.6, '16269001': -4.6}
 
-            # Distance to the screen durin the experiment
+            # Distance to the screen during the experiment
             self.screen_distance = {'15909001': 58, '15912001': 58, '15910001': 58, '15950001': 58,
                                     '15911001': 58, '11535009': 58, '16191001': 58, '16200001': 58,
                                     '16201001': 58, '16256001': 58, '09991040': 58, '10925091': 58,
                                     '16263002': 58, '16269001': 58}
 
-            # Distance to the screen durin the experiment
-            self.reject_amp = {'15909001': 1.5e-12, '15912001': 1.5e-12, '15910001': 1.5e-12, '15950001': 1.5e-12,
-                               '15911001': 1.5e-12, '11535009': 1.5e-12, '16191001': 1.5e-12, '16200001': 1.5e-12,
-                               '16201001': 1.5e-12, '16256001': 1.5e-12, '09991040': 1.5e-12, '10925091': 1.5e-12,
-                               '16263002': 1.5e-12, '16269001': 1.5e-12}
+            # Et samples shift for ET-MEG alignment
+            self.et_samples_shift = {'15909001': {0: 105194, 1: 142301, 2: 178980, 3: 271317, 4: 308180, 5: 346960, 6: 401542},
+                                     '15912001': {0: 191406, 1: 240127, 2: 280734, 3: 318607, 4: 374598, 5: 428743, 6: 480315},
+                                     '15910001': {0: 201780, 1: 259623, 2: 301018, 3: 320036, 4: 356352, 5: 420185, 6: 434579},
+                                     '15950001': {0: 146066, 1: 175241, 2: 193623, 3: 213486, 4: 246432, 5: 261065, 6: 277778},
+                                     '15911001': {0: 92835, 1: 115144, 2: 137921, 3: 153215, 4: 174966, 5: 204540, 6: 216924},
+                                     '11535009': {0: 68464, 1: 89391, 2: 107763, 3: 145314, 4: 163715, 5: 182900, 6: 197575},
+                                     '16191001': {0: 143701, 1: 165824, 2: 207513, 3: 258317, 4: 317730, 5: 371280, 6: 403469},
+                                     '16200001': {0: 152662, 1: 186316, 2: 216280, 3: 258707, 4: 348267, 5: 377325, 6: 404956},
+                                     '16201001': {0: 96055, 1: 117631, 2: 155282, 3: 198952, 4: 266306, 5: 308630, 6: 331413},
+                                     '09991040': {0: 158146, 1: 211028, 2: 282490, 3: 286743, 4: 335281, 5: 391390, 6: 437725},
+                                     '10925091': {0: 112968, 1: 164895, 2: 216394, 3: 281356, 4: 332432, 5: 381577, 6: 429920},
+                                     '16263002': {0: 144254, 1: 217256, 2: 266348, 3: 315123, 4: 405812, 5: 454113, 6: 504071},
+                                     '16269001': {0: 128759, 1: 186451, 2: 191845, 3: 242896, 4: 214075, 5: 223144, 6: 247076}}
 
             self.blink_min_dur = 70
             self.start_interval_samples = 12
             self.end_interval_samples = 24
 
+    class analysis:
+        def __init__(self):
+            # Trial reject parameter based on MEG peack to peack amplitude
+            self.reject_amp = {'15909001': 1.5e-12, '15912001': 1e-12, '15910001': 1.5e-12, '15950001': 1.5e-12,
+                               '15911001': 1.5e-12, '11535009': 1.5e-12, '16191001': 1.5e-12, '16200001': 1.5e-12,
+                               '16201001': 1.5e-12, '16256001': 1.5e-12, '09991040': 1.5e-12, '10925091': 1.5e-12,
+                               '16263002': 1.5e-12, '16269001': 1.5e-12}
 
 class raw_subject:
     """
@@ -195,17 +211,18 @@ class raw_subject:
             self.map = {'blue': '4', 'red': '1'}
 
         # Get run configuration for subject
-        self.config = self.subject_config(exp_info=exp_info, config=config, subject_id=self.subject_id)
+        self.config = self.subject_config(config=config, subject_id=self.subject_id)
 
 
-    # Subject's run configuration
+    # Subject's parameters and configuration
     class subject_config:
 
-        def __init__(self, exp_info, config, subject_id):
-            self.preproc = self.preproc(exp_info=exp_info, config=config, subject_id=subject_id)
+        def __init__(self, config, subject_id):
+            self.preproc = self.preproc(config=config, subject_id=subject_id)
 
+        # Configuration for preprocessing run
         class preproc:
-            def __init__(self, exp_info, config, subject_id):
+            def __init__(self, config, subject_id):
 
                 # Get config.preprocessing attirbutes and get data for corresponding subject
                 preproc_attributes = config.preprocessing.__dict__.keys()
@@ -224,6 +241,28 @@ class raw_subject:
                         # If attribute is general for all subjects, get attribute
                         att_value = att
                         setattr(self, preproc_att, att_value)
+
+        # Configuration for further analysis
+        class analysis:
+            def __init__(self, config, subject_id):
+
+                # Get config.preprocessing attirbutes and get data for corresponding subject
+                analysis_attributes = config.analysis.__dict__.keys()
+
+                # Iterate over attributes and get data for conrresponding subject
+                for analysis_att in analysis_attributes:
+                    att = getattr(config.preprocessing, analysis_att)
+                    if type(att) == dict:
+                        try:
+                            # If subject_id in dictionary keys, get attribute, else pass
+                            att_value = att[subject_id]
+                            setattr(self, analysis_att, att_value)
+                        except:
+                            pass
+                    else:
+                        # If attribute is general for all subjects, get attribute
+                        att_value = att
+                        setattr(self, analysis_att, att_value)
 
 
     # MEG data

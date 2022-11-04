@@ -33,10 +33,10 @@ def preprocess(subject_code, exp_info, config, plot=False):
                                                                                                         config=subject.config.preproc)
 
     #---------------- Missing signal interpolation ----------------#
-    et_channels_meg = preproc_functions.fake_blink_interpolate(meg_gazex_data_clean=meg_gazex_data_clean,
-                                                               meg_gazey_data_clean=meg_gazey_data_clean,
-                                                               meg_pupils_data_clean=meg_pupils_data_clean,
-                                                               config=config.preprocessing, sfreq=raw.info['sfreq'])
+    # et_channels_meg = preproc_functions.fake_blink_interpolate(meg_gazex_data_clean=meg_gazex_data_clean,
+    #                                                            meg_gazey_data_clean=meg_gazey_data_clean,
+    #                                                            meg_pupils_data_clean=meg_pupils_data_clean,
+    #                                                            config=config.preprocessing, sfreq=raw.info['sfreq'])
 
     #---------------- Defining response events and trials ----------------#
     if subject.subject_id in exp_info.no_trig_subjects:
@@ -99,4 +99,4 @@ config = load.config(path=paths().config_path(), fname='config.pkl')
 
 # for subject_code in [6, 7, 8, 9, 10, 11, 12]:
 for subject_code in exp_info.subjects_ids:
-    preprocess(subject_code=subject_code, exp_info=exp_info, config=config, plot=True)
+    preprocess(subject_code=subject_code, exp_info=exp_info, config=config, plot=False)
