@@ -77,7 +77,7 @@ class exp_info:
         self.trig_ch = 'UPPT002'
 
         # DAC delay (in ms)
-        self.DAC_delay = 0
+        self.DAC_delay = 10
 
 
 class config:

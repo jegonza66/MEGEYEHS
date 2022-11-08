@@ -61,7 +61,7 @@ for subject_code in range(13):
     epochs.drop_bad()
 
     # Get evoked by averaging epochs
-    evoked = epochs.average(picks=['meg', 'misc'])
+    evoked = epochs.average(picks=['mag', 'misc'])
     # Apend to evokeds list to pass to grand average
     evokeds.append(evoked)
 
@@ -81,8 +81,8 @@ for subject_code in range(13):
         evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
 
     # Separete MEG and misc channels
-    evoked_meg = evoked.copy().pick('meg')
-    evoked_misc = evoked.pick('misc')
+    evoked_meg = evoked.copy().pick('mag')
+    evoked_misc = evoked.copy().pick('misc')
 
     # Filter evoked
     evoked_meg.filter(l_freq=l_freq, h_freq=h_freq, fir_design='firwin')
@@ -111,8 +111,8 @@ if save_data:
     grand_avg.save(ga_save_path + grand_avg_data_fname, overwrite=True)
 
 # Separate MEG and misc channels
-grand_avg_meg = grand_avg.copy().pick('meg')
-grand_avg_misc = grand_avg.pick('misc')
+grand_avg_meg = grand_avg.copy().pick('mag')
+grand_avg_misc = grand_avg.copy().pick('misc')
 
 # Filter MEG data
 grand_avg_meg.filter(l_freq=l_freq, h_freq=h_freq, fir_design='firwin')
@@ -132,8 +132,8 @@ save.fig(fig, fig_path, fname)
 
 # Plot Saccades frontal channels
 if any('sac' in id for id in epoch_ids):
-    sac_chs = ['MLF14-4123', 'MLF13-4123', 'MLF12-4123', 'MLF11-4123', 'MRF11-4123', 'MRF12-4123', 'MRF13-4123',
-               'MRF14-4123', 'MZF01-4123']
+    sac_chs = ['MLF14', 'MLF13', 'MLF12', 'MLF11', 'MRF11', 'MRF12', 'MRF13',
+               'MRF14', 'MZF01']
 
     fig, axs = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]})
     axs[1].plot(grand_avg_misc.times, grand_avg_misc.data[-7, :])
