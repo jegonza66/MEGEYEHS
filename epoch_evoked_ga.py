@@ -1,6 +1,5 @@
 import pandas as pd
 import os
-import functions
 import load
 import mne
 import save
@@ -10,6 +9,7 @@ from paths import paths
 
 save_path = paths().save_path()
 plot_path = paths().plots_path()
+exp_info = setup.exp_info()
 
 # Save data and display figures
 save_data = True
@@ -19,11 +19,15 @@ if display_figs:
 else:
     plt.ioff()
 
-# Pick MEG chs (Select channels or set picks = 'mag'/'meg')
-right_chs = ['MRT51', 'MRT52', 'MRT53']
-left_chs = ['MLT51', 'MLT52', 'MLT53']
-picks = right_chs + left_chs
-# picks = 'mag'
+# Pick MEG chs (Select channels or set picks = 'mag')
+pick_chs = 'mag'
+if pick_chs == 'mag':
+    picks = 'mag'
+elif pick_chs == 'LR':
+    right_chs = ['MRT51', 'MRT52', 'MRT53']
+    left_chs = ['MLT51', 'MLT52', 'MLT53']
+    picks = right_chs + left_chs
+
 
 # Filter evoked
 filter_evoked = False
@@ -43,9 +47,8 @@ elif any('sac' in id for id in epoch_ids):
     plot_xlim = (-0.05, 0.1)
 
 evokeds = []
-for subject_code in range(13):
+for subject_code in exp_info.subjects_ids:
 
-    exp_info = setup.exp_info()
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
     meg_data = subject.load_preproc_meg()
 
@@ -64,7 +67,7 @@ for subject_code in range(13):
                                                           sfreq=meg_data.info['sfreq'])
 
     # Reject based on channel amplitude
-    reject = dict(mag=1e-12)
+    reject = dict(mag=subject.config.general.reject_amp)
     # Epoch data
     epochs = mne.Epochs(raw=meg_data, events=events, event_id=event_id, tmin=tmin, tmax=tmax, reject=reject,
                         event_repeated='drop', metadata=metadata, preload=True)
@@ -83,7 +86,7 @@ for subject_code in range(13):
         epochs.metadata = metadata
 
     # Define evoked and append for GA
-    evoked = epochs.average(picks=['meg', 'misc'])
+    evoked = epochs.average(picks=['mag', 'misc'])
     evokeds.append(evoked)
 
     # Parameters for plotting
@@ -99,19 +102,19 @@ for subject_code in range(13):
     # Save figure
     if len(fig_ep) == 1:
         fig = fig_ep[0]
-        fname = 'Epochs_' + subject.subject_id + '.png'
+        fname = 'Epochs_' + subject.subject_id + f'_{pick_chs}.png'
         save.fig(fig=fig, path=fig_path, fname=fname)
     else:
         for i in range(len(fig_ep)):
             fig = fig_ep[i]
             group = group_by.keys()[i]
-            fname = f'Epochs_{group}' + subject.subject_id + '.png'
+            fname = f'Epochs_{group}' + subject.subject_id + f'_{pick_chs}.png'
             save.fig(fig=fig, path=fig_path, fname=fname)
 
     # Plot evoked
     # Separete MEG and misc channels
-    evoked_meg = evoked.copy().pick('meg')
-    evoked_misc = evoked.pick('misc')
+    evoked_meg = evoked.copy().pick('mag')
+    evoked_misc = evoked.copy().pick('misc')
 
     # Filter MEG evoked
     if filter_evoked:
@@ -126,7 +129,7 @@ for subject_code in range(13):
     axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
 
     fig_path = plot_path + f'Epochs/{"-".join(epoch_ids)}/'
-    fname = 'Evoked_' + subject.subject_id + '.png'
+    fname = 'Evoked_' + subject.subject_id + f'_{pick_chs}.png'
     save.fig(fig=fig_ev, path=fig_path, fname=fname)
 
     # Save data
@@ -135,13 +138,13 @@ for subject_code in range(13):
         epochs.reset_drop_log_selection()
         epoch_save_path = save_path + f'Epochs/{"-".join(epoch_ids)}/' + subject.subject_id + '/'
         os.makedirs(epoch_save_path, exist_ok=True)
-        epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+        epochs_data_fname = f'Subject_{subject.subject_id}_{pick_chs}_epo.fif'
         epochs.save(epoch_save_path + epochs_data_fname, overwrite=True)
 
         # Save evoked data
         evoked_save_path = save_path + f'Evoked/{"-".join(epoch_ids)}/' + subject.subject_id + '/'
         os.makedirs(evoked_save_path, exist_ok=True)
-        evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
+        evoked_data_fname = f'Subject_{subject.subject_id}_{pick_chs}_ave.fif'
         evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
 
 
@@ -152,12 +155,12 @@ grand_avg = mne.grand_average(evokeds, interpolate_bads=False)
 if save_data:
     ga_save_path = save_path + f'Evoked/{"-".join(epoch_ids)}/'
     os.makedirs(ga_save_path, exist_ok=True)
-    grand_avg_data_fname = f'Grand_average_ave.fif'
+    grand_avg_data_fname = f'Grand_average_{pick_chs}_ave.fif'
     grand_avg.save(ga_save_path + grand_avg_data_fname, overwrite=True)
 
 # Separate MEG and misc channels
-grand_avg_meg = grand_avg.copy().pick('meg')
-grand_avg_misc = grand_avg.pick('misc')
+grand_avg_meg = grand_avg.copy().pick('mag')
+grand_avg_misc = grand_avg.copy().pick('misc')
 
 # Filter MEG data
 grand_avg_meg.filter(l_freq=l_freq, h_freq=h_freq, fir_design='firwin')
@@ -172,7 +175,7 @@ grand_avg_meg.plot(picks=picks, gfp=True, axes=axs[0], time_unit='s', spatial_co
                    titles=f'Grand average', show=display_figs)
 axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
 fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}_lfreq{l_freq}_hfreq{h_freq}/'
-fname = 'Grand_average_gazex.png'
+fname = f'Grand_average_{pick_chs}_gazex.png'
 save.fig(fig, fig_path, fname)
 
 # Plot Saccades frontal channels
@@ -189,5 +192,5 @@ if any('sac' in id for id in epoch_ids):
                        titles=f'Grand average', show=display_figs)
     axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
     fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}_lfreq{l_freq}_hfreq{h_freq}/'
-    fname = 'Grand_average_ch_sel.png'
+    fname = 'Grand_average_front_ch.png'
     save.fig(fig, fig_path, fname)

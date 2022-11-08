@@ -5,13 +5,10 @@ import preproc_plot
 import preproc_functions
 from paths import paths
 
-import matplotlib.pyplot as plt
-from scipy import signal as sgn
 
 def preprocess(subject_code, exp_info, config, plot=False):
     #---------------- Load data ----------------#
     # Define subject
-    config = load.config(path=paths().config_path(), fname='config.pkl')
     subject = setup.raw_subject(exp_info=exp_info, config=config, subject_code=subject_code)
 
     # Load Meg data
@@ -34,13 +31,6 @@ def preprocess(subject_code, exp_info, config, plot=False):
                                                                                                         meg_gazey_data_scaled=meg_gazey_data_scaled,
                                                                                                         meg_pupils_data_raw=meg_pupils_data_raw,
                                                                                                         config=subject.config.preproc)
-
-
-    peaks = sgn.find_peaks(-meg_pupils_data_clean, prominence=0.15, width=[0, 160])
-    plt.figure()
-    plt.plot(meg_pupils_data_raw)
-    plt.plot(meg_pupils_data_clean)
-    plt.plot(peaks[0], meg_pupils_data_clean[peaks[0]], '.')
 
     #---------------- Missing signal interpolation ----------------#
     # et_channels_meg = preproc_functions.fake_blink_interpolate(meg_gazex_data_clean=meg_gazex_data_clean,
@@ -107,6 +97,5 @@ exp_info = setup.exp_info()
 # Load configuration
 config = load.config(path=paths().config_path(), fname='config.pkl')
 
-# for subject_code in [6, 7, 8, 9, 10, 11, 12]:
 for subject_code in exp_info.subjects_ids:
     preprocess(subject_code=subject_code, exp_info=exp_info, config=config, plot=False)

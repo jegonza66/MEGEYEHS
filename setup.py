@@ -111,6 +111,7 @@ class config:
     def __init__(self):
         self.update_config = True
         self.preprocessing = self.preprocessing()
+        self.general = self.general()
 
     class preprocessing:
         def __init__(self):
@@ -120,23 +121,22 @@ class config:
             # Samples drop at begining of missing pupils signal
             self.start_interval_samples = {'15909001': 12, '15912001': 12, '15910001': 62, '15950001': 62, '15911001': 62,
                                            '11535009': 48, '16191001': 62, '16200001': 48, '16201001': 48, '16256001': 48,
-                                           '09991040': 48, '10925091': 48, '16263002': 48, '16269001': 48}
+                                           '09991040': 48, '10925091': 48, '16263002': 48, '16269001': 24}
             
             # Samples drop at end of missing pupils signal
             self.end_interval_samples = {'15909001': 24, '15912001': 24, '15910001': 62, '15950001': 62, '15911001': 62,
                                          '11535009': 48, '16191001': 68, '16200001': 68, '16201001': 68, '16256001': 68,
-                                         '09991040': 72, '10925091': 72, '16263002': 68, '16269001': 68}
+                                         '09991040': 72, '10925091': 72, '16263002': 68, '16269001': 42}
 
             # Pupil size threshold to consider missing signal
             self.pupil_thresh = {'15909001': -4.6, '15912001': -4.71, '15910001': -4.113, '15950001': -4.6, '15911001': -4.6,
                                  '11535009': -4.6, '16191001': -4.58, '16200001': -4.56, '16201001': -4.58, '16256001': -4.6,
-                                 '09991040': -4.37, '10925091': -4.565, '16263002': -4.39, '16269001': -4.6}
+                                 '09991040': -4.37, '10925091': -4.565, '16263002': -4.39, '16269001': -4.57}
 
             # Distance to the screen during the experiment
-            self.screen_distance = {'15909001': 58, '15912001': 58, '15910001': 58, '15950001': 58,
-                                    '15911001': 58, '11535009': 58, '16191001': 58, '16200001': 58,
-                                    '16201001': 58, '16256001': 58, '09991040': 58, '10925091': 58,
-                                    '16263002': 58, '16269001': 58}
+            self.screen_distance = {'15909001': 58, '15912001': 58, '15910001': 58, '15950001': 58, '15911001': 58,
+                                    '11535009': 58, '16191001': 58, '16200001': 58, '16201001': 58, '16256001': 58,
+                                    '09991040': 58, '10925091': 58, '16263002': 58, '16269001': 58}
 
             # Et samples shift for ET-MEG alignment
             self.et_samples_shift = {'15909001': {0: 105194, 1: 142301, 2: 178980, 3: 271317, 4: 308180, 5: 346960, 6: 401542},
@@ -154,13 +154,13 @@ class config:
                                      '16269001': {0: 128759, 1: 186451, 2: 191845, 3: 242896, 4: 214075, 5: 223144, 6: 247076}}
 
             
-    class analysis:
+    class general:
         def __init__(self):
             # Trial reject parameter based on MEG peack to peack amplitude
-            self.reject_amp = {'15909001': 1.5e-12, '15912001': 1e-12, '15910001': 1.5e-12, '15950001': 1.5e-12,
-                               '15911001': 1.5e-12, '11535009': 1.5e-12, '16191001': 1.5e-12, '16200001': 1.5e-12,
-                               '16201001': 1.5e-12, '16256001': 1.5e-12, '09991040': 1.5e-12, '10925091': 1.5e-12,
-                               '16263002': 1.5e-12, '16269001': 1.5e-12}
+            self.reject_amp = {'15909001': 1.5e-12, '15912001': 3.5e-12, '15910001': 3e-12, '15950001': 3.5e-12,
+                               '15911001': 3.5e-12, '11535009': 3.5e-12, '16191001': 4e-12, '16200001': 2e-12,
+                               '16201001': 1.5e-12, '16256001': 3.5e-12, '09991040': 1.2e-12, '10925091': 1.4e-12,
+                               '16263002': 2.5e-12, '16269001': 2e-12}
 
 class raw_subject:
     """
@@ -229,6 +229,7 @@ class raw_subject:
 
         def __init__(self, config, subject_id):
             self.preproc = self.preproc(config=config, subject_id=subject_id)
+            self.general = self.general(config=config, subject_id=subject_id)
 
         # Configuration for preprocessing run
         class preproc:
@@ -253,26 +254,26 @@ class raw_subject:
                         setattr(self, preproc_att, att_value)
 
         # Configuration for further analysis
-        class analysis:
+        class general:
             def __init__(self, config, subject_id):
 
                 # Get config.preprocessing attirbutes and get data for corresponding subject
-                analysis_attributes = config.analysis.__dict__.keys()
+                general_attributes = config.general.__dict__.keys()
 
                 # Iterate over attributes and get data for conrresponding subject
-                for analysis_att in analysis_attributes:
-                    att = getattr(config.preprocessing, analysis_att)
+                for general_att in general_attributes:
+                    att = getattr(config.general, general_att)
                     if type(att) == dict:
                         try:
                             # If subject_id in dictionary keys, get attribute, else pass
                             att_value = att[subject_id]
-                            setattr(self, analysis_att, att_value)
+                            setattr(self, general_att, att_value)
                         except:
                             pass
                     else:
                         # If attribute is general for all subjects, get attribute
                         att_value = att
-                        setattr(self, analysis_att, att_value)
+                        setattr(self, general_att, att_value)
 
 
     # MEG data
