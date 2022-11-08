@@ -20,7 +20,7 @@ else:
     plt.ioff()
 
 # Pick MEG chs (Select channels or set picks = 'mag')
-pick_chs = 'mag'
+pick_chs = 'LR'
 if pick_chs == 'mag':
     picks = 'mag'
 elif pick_chs == 'LR':
@@ -174,14 +174,15 @@ axs[1].set_xlabel('Time')
 grand_avg_meg.plot(picks=picks, gfp=True, axes=axs[0], time_unit='s', spatial_colors=True, xlim=plot_xlim,
                    titles=f'Grand average', show=display_figs)
 axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
-fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}_lfreq{l_freq}_hfreq{h_freq}/'
-fname = f'Grand_average_{pick_chs}_gazex.png'
+axs[0].vlines(x=-12/1200, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
+fig_path = plot_path + f'Epochs/{"-".join(epoch_ids)}/'
+fname = f'Grand_average_{pick_chs}_lfreq{l_freq}_hfreq{h_freq}.png'
 save.fig(fig, fig_path, fname)
 
 # Plot Saccades frontal channels
 if any('sac' in id for id in epoch_ids):
-    sac_chs = ['MLF14-4123', 'MLF13-4123', 'MLF12-4123', 'MLF11-4123', 'MRF11-4123', 'MRF12-4123', 'MRF13-4123',
-               'MRF14-4123', 'MZF01-4123']
+    sac_chs = ['MLF14', 'MLF13', 'MLF12', 'MLF11', 'MRF11', 'MRF12', 'MRF13',
+               'MRF14', 'MZF01']
 
     fig, axs = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]})
     axs[1].plot(grand_avg_misc.times, grand_avg_misc.data[-7, :])
@@ -191,6 +192,7 @@ if any('sac' in id for id in epoch_ids):
     grand_avg_meg.plot(picks=sac_chs, gfp=True, axes=axs[0], time_unit='s', spatial_colors=True, xlim=plot_xlim,
                        titles=f'Grand average', show=display_figs)
     axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
-    fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}_lfreq{l_freq}_hfreq{h_freq}/'
-    fname = 'Grand_average_front_ch.png'
+    axs[0].vlines(x=-12/1200, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
+    fig_path = plot_path + f'Epochs/{"-".join(epoch_ids)}/'
+    fname = f'Grand_average_front_ch_lfreq{l_freq}_hfreq{h_freq}.png'
     save.fig(fig, fig_path, fname)
