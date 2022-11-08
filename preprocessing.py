@@ -5,10 +5,13 @@ import preproc_plot
 import preproc_functions
 from paths import paths
 
+import matplotlib.pyplot as plt
+from scipy import signal as sgn
 
 def preprocess(subject_code, exp_info, config, plot=False):
     #---------------- Load data ----------------#
     # Define subject
+    config = load.config(path=paths().config_path(), fname='config.pkl')
     subject = setup.raw_subject(exp_info=exp_info, config=config, subject_code=subject_code)
 
     # Load Meg data
@@ -101,7 +104,7 @@ def preprocess(subject_code, exp_info, config, plot=False):
 # Run
 # Load experiment info
 exp_info = setup.exp_info()
-# Load run configuration
+# Load configuration
 config = load.config(path=paths().config_path(), fname='config.pkl')
 
 # for subject_code in [6, 7, 8, 9, 10, 11, 12]:
