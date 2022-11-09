@@ -862,7 +862,7 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
                                  screen_resolution=1920, force_run=False):
 
     out_fname = f'Fix_Sac_detection_{subject.subject_id}.tsv'
-    out_folder = paths().save_path() + 'Preprocesed_Data/' + subject.subject_id + '/Sac-Fix_detection/'
+    out_folder = paths().preproc_path() + subject.subject_id + '/Sac-Fix_detection/'
 
     if not force_run:
         try:

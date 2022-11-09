@@ -7,9 +7,9 @@ import pandas as pd
 from paths import paths
 
 
-def preprocesed_data(raw, subject, config):
+def preprocessed_data(raw, subject, config):
     """
-    Save preprocesed data
+    Save preprocessed data
     :param raw:
     :param subject:
     :param bh_data:

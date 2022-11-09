@@ -84,7 +84,7 @@ def preprocess(subject_code, exp_info, config, plot=False):
     preproc_functions.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=exp_info.et_channel_names)
 
     #---------------- Save preprocesed data ----------------#
-    save.preprocesed_data(raw=raw, subject=subject, config=config)
+    save.preprocessed_data(raw=raw, subject=subject, config=config)
 
     # Free up memory
     del(raw)
