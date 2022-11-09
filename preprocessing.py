@@ -36,7 +36,7 @@ def preprocess(subject_code, exp_info, config, plot=False):
     et_channels_meg = preproc_functions.fake_blink_interpolate(meg_gazex_data_clean=meg_gazex_data_clean,
                                                                meg_gazey_data_clean=meg_gazey_data_clean,
                                                                meg_pupils_data_clean=meg_pupils_data_clean,
-                                                               config=config.preprocessing, sfreq=raw.info['sfreq'])
+                                                               config=subject.config.preproc, sfreq=raw.info['sfreq'])
 
     #---------------- Defining response events and trials ----------------#
     if subject.subject_id in exp_info.no_trig_subjects:
