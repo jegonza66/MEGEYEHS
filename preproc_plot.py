@@ -396,7 +396,10 @@ def performance(subject, display=False, save_fig=True):
         save.fig(fig=fig, path=save_path, fname=fname)
 
 
-def trial_gaze(raw, subject, gaze_x, gaze_y, trial_idx, display_fig=False, save_fig=True):
+def trial_gaze(raw, subject, et_channels_meg, trial_idx, display_fig=False, save_fig=True):
+
+    gaze_x = et_channels_meg[0]
+    gaze_y = et_channels_meg[1]
 
     trial = trial_idx + 1
 
@@ -448,7 +451,10 @@ def trial_gaze(raw, subject, gaze_x, gaze_y, trial_idx, display_fig=False, save_
         save.fig(fig=fig, path=save_path, fname=fname)
 
 
-def emap_gaze(raw, subject, gaze_x, gaze_y, block_num, display_fig=False, save_fig=True):
+def emap_gaze(raw, subject, et_channels_meg, block_num, display_fig=False, save_fig=True):
+
+    gaze_x = et_channels_meg[0]
+    gaze_y = et_channels_meg[1]
 
     emaps = subject.emap.iloc[block_num]
 
@@ -508,8 +514,11 @@ def emap_gaze(raw, subject, gaze_x, gaze_y, block_num, display_fig=False, save_f
             save.fig(fig=fig, path=save_path, fname=fname)
 
 
-def scanpath(raw, subject, gaze_x, gaze_y, items_pos, trial_idx,
+def scanpath(raw, subject, et_channels_meg, items_pos, trial_idx,
              screen_res_x=1920, screen_res_y=1080, img_res_x=1280, img_res_y=1024, display_fig=False, save_fig=True):
+
+    gaze_x = et_channels_meg[0]
+    gaze_y = et_channels_meg[1]
 
     trial = trial_idx + 1
 

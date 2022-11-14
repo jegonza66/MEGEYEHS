@@ -5,6 +5,7 @@ import mne
 import os
 from paths import paths
 import matplotlib.pyplot as plt
+import numpy as np
 
 save_path = paths().save_path()
 plot_path = paths().plots_path()
@@ -92,9 +93,12 @@ grand_avg_misc = grand_avg.copy().pick('misc')
 if filter_evoked:
     grand_avg_meg.filter(l_freq=l_freq, h_freq=h_freq, fir_design='firwin')
 
+# Get Gaze x ch
+gaze_x_ch_idx = np.where(np.array(evoked_misc.ch_names) == 'ET_gaze_x')[0][0]
+
 # Plot
 fig, axs = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]})
-axs[1].plot(grand_avg_misc.times, grand_avg_misc.data[-7, :])
+axs[1].plot(grand_avg_misc.times, grand_avg_misc.data[gaze_x_ch_idx, :])
 axs[1].vlines(x=0, ymin=axs[1].get_ylim()[0], ymax=axs[1].get_ylim()[1], color='grey', linestyles='--')
 axs[1].set_ylabel('Gaze x')
 axs[1].set_xlabel('Time')
@@ -113,7 +117,7 @@ if any('sac' in id for id in epoch_ids):
                'MRF14-4123', 'MZF01-4123']
 
     fig, axs = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]})
-    axs[1].plot(grand_avg_misc.times, grand_avg_misc.data[-7, :])
+    axs[1].plot(grand_avg_misc.times, grand_avg_misc.data[gaze_x_ch_idx, :])
     axs[1].vlines(x=0, ymin=axs[1].get_ylim()[0], ymax=axs[1].get_ylim()[1], color='grey', linestyles='--')
     axs[1].set_ylabel('Gaze x')
     axs[1].set_xlabel('Time')

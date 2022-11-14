@@ -275,7 +275,9 @@ def blinks_to_nan(meg_pupils_data_raw, meg_gazex_data_scaled, meg_gazey_data_sca
         meg_gazey_data_clean[peak_interval] = float('nan')
         meg_pupils_data_clean[peak_interval] = float('nan')
 
-    return meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean
+    et_channels_meg = [meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean]
+
+    return et_channels_meg
 
 
 def DAC_samples(et_channels_meg, exp_info, sfreq):
@@ -818,8 +820,7 @@ def define_events_trials_trig(raw, subject, config, exp_info):
     return raw, subject
 
 
-def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean, subject,
-                                 fix_max_vel=15, fix_max_amp=1.5, screen_size=38, screen_resolution=1920, force_run=False):
+def fixations_saccades_detection(raw, et_channels_meg, subject, screen_size=38, screen_resolution=1920, force_run=False):
 
     out_fname = f'Fix_Sac_detection_{subject.subject_id}.tsv'
     out_folder = paths().preproc_path() + subject.subject_id + '/Sac-Fix_detection/'
@@ -835,6 +836,10 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
     if force_run:
             # If not pre run data, run
             print('\nRunning saccades and fixations detection')
+
+            meg_gazex_data_clean = et_channels_meg[0]
+            meg_gazey_data_clean = et_channels_meg[1]
+            meg_pupils_data_clean = et_channels_meg[2]
 
             # Define data to save to excel file needed to run the saccades detection program Remodnav
             eye_data = {'x': meg_gazex_data_clean, 'y': meg_gazey_data_clean}

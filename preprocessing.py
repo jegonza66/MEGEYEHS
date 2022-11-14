@@ -28,10 +28,8 @@ def preprocess(subject_code, exp_info, config, plot=False):
 
     #---------------- Blinks removal ----------------#
     # Define intervals around blinks to also fill with nan. Due to conversion noise from square signal
-    meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean = preproc_functions.blinks_to_nan(meg_gazex_data_scaled=meg_gazex_data_scaled,
-                                                                                                        meg_gazey_data_scaled=meg_gazey_data_scaled,
-                                                                                                        meg_pupils_data_raw=meg_pupils_data_raw,
-                                                                                                        config=subject.config.preproc)
+    et_channels_meg = preproc_functions.blinks_to_nan(meg_gazex_data_scaled=meg_gazex_data_scaled, meg_gazey_data_scaled=meg_gazey_data_scaled,
+                                                      meg_pupils_data_raw=meg_pupils_data_raw, config=subject.config.preproc)
 
     #---------------- Defining response events and trials ----------------#
     if subject.subject_id in exp_info.no_trig_subjects:
@@ -40,9 +38,7 @@ def preprocess(subject_code, exp_info, config, plot=False):
         raw, subject = preproc_functions.define_events_trials_trig(raw=raw, subject=subject, config=config, exp_info=exp_info)
 
     #---------------- Fixations and saccades detection ----------------#
-    fixations, saccades, subject = preproc_functions.fixations_saccades_detection(raw=raw, meg_gazex_data_clean=meg_gazex_data_clean,
-                                                                                  meg_gazey_data_clean=meg_gazey_data_clean,
-                                                                                  meg_pupils_data_clean=meg_pupils_data_clean,
+    fixations, saccades, subject = preproc_functions.fixations_saccades_detection(raw=raw, et_channels_meg=et_channels_meg,
                                                                                   subject=subject, force_run=True)
 
     # ---------------- Saccades classification ----------------#
@@ -69,15 +65,12 @@ def preprocess(subject_code, exp_info, config, plot=False):
         for trial_idx in range(len(subject.bh_data)):
             print(f'\rTrial {trial_idx + 1}', end='')
 
-            preproc_plot.scanpath(raw=raw, subject=subject, items_pos=items_pos, gaze_x=meg_gazex_data_clean,
-                                  gaze_y=meg_gazey_data_clean, trial_idx=trial_idx)
+            preproc_plot.scanpath(raw=raw, subject=subject, items_pos=items_pos, et_channels_meg=et_channels_meg, trial_idx=trial_idx)
 
-            preproc_plot.trial_gaze(raw=raw, subject=subject, gaze_x=meg_gazex_data_clean, gaze_y=meg_gazey_data_clean,
-                                    trial_idx=trial_idx)
+            preproc_plot.trial_gaze(raw=raw, subject=subject, et_channels_meg=et_channels_meg, trial_idx=trial_idx)
 
         for block_num in range(len(subject.emap)):
-            preproc_plot.emap_gaze(raw=raw, subject=subject, gaze_x=meg_gazex_data_clean, gaze_y=meg_gazey_data_clean,
-                                   block_num=block_num)
+            preproc_plot.emap_gaze(raw=raw, subject=subject, et_channels_meg=et_channels_meg, block_num=block_num)
 
     #---------------- Add scaled data to meg data ----------------#
     preproc_functions.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=exp_info.et_channel_names)
