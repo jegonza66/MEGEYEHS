@@ -8,6 +8,7 @@ import pandas as pd
 
 import functions
 from paths import paths
+import save
 
 
 def get_intervals_signals(reference_signal, signal_to_scale, fig=None):
@@ -189,7 +190,7 @@ def alignment(subject, et_gazex, meg_gazex, corrs, et_block_start, meg_block_sta
     plt.savefig(save_path + f'Signals_block{block_num + 1}.png')
 
 
-def first_fixation_delay(subject, display_fig=False, save=True):
+def first_fixation_delay(subject, display_fig=False, save_fig=True):
 
     if display_fig:
         plt.ion()
@@ -202,13 +203,104 @@ def first_fixation_delay(subject, display_fig=False, save=True):
     plt.title('1st fixation delay distribution')
     plt.xlabel('Time [s]')
 
-    if save:
+    if save_fig:
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
         os.makedirs(save_path, exist_ok=True)
         plt.savefig(save_path + f'{subject.subject_id} 1st fix delay dist.png')
 
 
-def pupil_size_increase(subject, display_fig=False, save=True):
+def fixation_duration(subject, display_fig=False, save_fig=True):
+
+    if display_fig:
+        plt.ion()
+    else:
+        plt.ioff()
+
+    fixations_dur = subject.fixations['duration']
+    fig = plt.figure()
+    plt.hist(fixations_dur, bins=40, range=(0, 1))
+    plt.title('Fixation duration')
+    plt.xlabel('Time [s]')
+
+    if save_fig:
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
+        fname = f'{subject.subject_id} fix dur dist'
+        save.fig(fig=fig, path=save_path, fname=fname)
+
+
+def saccades_amplitude(subject, display_fig=False, save_fig=True):
+
+    if display_fig:
+        plt.ion()
+    else:
+        plt.ioff()
+
+    saccades_amp = subject.saccades['amp']
+    fig = plt.figure()
+    plt.hist(saccades_amp, bins=40)
+    plt.title('Saccades amplitude')
+    plt.xlabel('Time [s]')
+
+    if save_fig:
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
+        fname = f'{subject.subject_id} sac amp'
+        save.fig(fig=fig, path=save_path, fname=fname)
+
+
+def saccades_dir_hist(subject, display_fig=False, save_fig=True):
+
+    if display_fig:
+        plt.ion()
+    else:
+        plt.ioff()
+
+    saccades_deg = subject.saccades['deg']
+    saccades_rad = saccades_deg * np.pi / 180
+
+    n_bins = 24
+    ang_hist, bin_edges = np.histogram(saccades_rad, bins=24)
+    bin_centers = [np.mean((bin_edges[i], bin_edges[i+1])) for i in range(len(bin_edges) - 1)]
+
+    fig = plt.figure()
+    ax = plt.subplot(polar=True)
+    bars = ax.bar(bin_centers, ang_hist, width=2*np.pi/n_bins, bottom=0.0, alpha=0.4, edgecolor='black')
+    plt.title('Saccades direction')
+
+    for r, bar in zip(ang_hist, bars):
+        bar.set_facecolor(plt.cm.Blues(r / np.max(ang_hist)))
+
+    if save_fig:
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
+        fname = f'{subject.subject_id} sac angular hist'
+        save.fig(fig=fig, path=save_path, fname=fname)
+
+
+def sac_main_seq(subject, display_fig=False, save_fig=True):
+
+    if display_fig:
+        plt.ion()
+    else:
+        plt.ioff()
+
+    saccades_peack_vel = subject.saccades['peak_vel']
+    saccades_amp = subject.saccades['amp']
+
+    fig = plt.figure()
+    plt.plot(saccades_amp, saccades_peack_vel, '.', alpha=0.1, markersize=2)
+    plt.yscale('log')
+    plt.xscale('log')
+    plt.title('Main sequence')
+    plt.xlabel('Amplitude (deg)')
+    plt.ylabel('Peak velocity (deg)')
+    plt.grid()
+
+    if save_fig:
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
+        fname = f'{subject.subject_id} Sac Main sequence'
+        save.fig(fig=fig, path=save_path, fname=fname)
+
+
+def pupil_size_increase(subject, display_fig=False, save_fig=True):
 
     if display_fig:
         plt.ion()
@@ -231,7 +323,7 @@ def pupil_size_increase(subject, display_fig=False, save=True):
             pupil_diffs.append(pupil_diff)
             mss.append(trial_data['mss'].values[0])
         except:
-            print(f'No fix or mss data in trial {trial}')
+            print(f'No cross1 or mss data in trial {trial}')
 
     plt.figure()
     sn.boxplot(x=mss, y=pupil_diffs)
@@ -239,13 +331,13 @@ def pupil_size_increase(subject, display_fig=False, save=True):
     plt.xlabel('MSS')
     plt.ylabel('Pupil size increase (fix point 2 - 1)')
 
-    if save:
+    if save_fig:
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
         os.makedirs(save_path, exist_ok=True)
         plt.savefig(save_path + f'{subject.subject_id} Pupil size increase.png')
 
 
-def performance(subject, display=False, save=True):
+def performance(subject, display=False, save_fig=True):
 
     if display:
         plt.ion()
@@ -298,13 +390,13 @@ def performance(subject, display=False, save=True):
     axs[1].set_xlabel('MSS')
     axs[1].set_xticks([1, 2, 4])
 
-    if save:
+    if save_fig:
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id
-        os.makedirs(save_path, exist_ok=True)
-        plt.savefig(save_path + f'/{subject.subject_id} Performance.png')
+        fname = f'/{subject.subject_id} Performance'
+        save.fig(fig=fig, path=save_path, fname=fname)
 
 
-def trial_gaze(raw, subject, gaze_x, gaze_y, trial_idx, display_fig=False, save=True):
+def trial_gaze(raw, subject, gaze_x, gaze_y, trial_idx, display_fig=False, save_fig=True):
 
     trial = trial_idx + 1
 
@@ -326,7 +418,7 @@ def trial_gaze(raw, subject, gaze_x, gaze_y, trial_idx, display_fig=False, save=
     trial_end_idx = functions.find_nearest(raw.times, subject.vsend[trial_idx])[0] + 120 * 6
 
     # Plot
-    plt.figure(figsize=(15, 5))
+    fig = plt.figure(figsize=(15, 5))
     plt.title(f'Trial {trial} - {pres_abs_trial} - {correct_trial} - MSS: {int(mss)}')
 
     # Gazes
@@ -350,14 +442,13 @@ def trial_gaze(raw, subject, gaze_x, gaze_y, trial_idx, display_fig=False, save=
     by_label = dict(zip(labels, handles))
     plt.legend(by_label.values(), by_label.keys(), loc='upper right')
 
-    if save:
+    if save_fig:
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + f'/Gaze_Trials/'
-        os.makedirs(save_path + 'svg/', exist_ok=True)
-        plt.savefig(save_path + f'Trial {trial}.png')
-        plt.savefig(save_path + f'svg/Trial {trial}.svg')
+        fname = f'Trial {trial}'
+        save.fig(fig=fig, path=save_path, fname=fname)
 
 
-def emap_gaze(raw, subject, gaze_x, gaze_y, block_num, display_fig=False, save=True):
+def emap_gaze(raw, subject, gaze_x, gaze_y, block_num, display_fig=False, save_fig=True):
 
     emaps = subject.emap.iloc[block_num]
 
@@ -386,7 +477,7 @@ def emap_gaze(raw, subject, gaze_x, gaze_y, block_num, display_fig=False, save=T
         trial_end_idx = functions.find_nearest(raw.times, emaps[emap_trial+1])[0] + 120 * 6
 
         # Plot
-        plt.figure(figsize=(15, 5))
+        fig = plt.figure(figsize=(15, 5))
         plt.title(f'Eyemap {emap_trial_name.upper()}')
 
         # Gazes
@@ -411,15 +502,14 @@ def emap_gaze(raw, subject, gaze_x, gaze_y, block_num, display_fig=False, save=T
         by_label = dict(zip(labels, handles))
         plt.legend(by_label.values(), by_label.keys(), loc='upper right')
 
-        if save:
+        if save_fig:
             save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + f'/Gaze_Trials/'
-            os.makedirs(save_path + 'svg/', exist_ok=True)
-            plt.savefig(save_path + f'Eyemap_{emap_trial_name}.png')
-            plt.savefig(save_path + f'svg/Eyemap_{emap_trial_name}.svg')
+            fname = f'Eyemap_{emap_trial_name}'
+            save.fig(fig=fig, path=save_path, fname=fname)
 
 
 def scanpath(raw, subject, gaze_x, gaze_y, items_pos, trial_idx,
-             screen_res_x=1920, screen_res_y=1080, img_res_x=1280, img_res_y=1024, display_fig=False, save=True):
+             screen_res_x=1920, screen_res_y=1080, img_res_x=1280, img_res_y=1024, display_fig=False, save_fig=True):
 
     trial = trial_idx + 1
 
@@ -473,7 +563,7 @@ def scanpath(raw, subject, gaze_x, gaze_y, items_pos, trial_idx,
     else:
         plt.ioff()
 
-    plt.figure(figsize=(10, 9))
+    fig = plt.figure(figsize=(10, 9))
     plt.suptitle(f'Subject {subject.subject_id} - Trial {trial}')
 
     # Items axes
@@ -510,23 +600,24 @@ def scanpath(raw, subject, gaze_x, gaze_y, items_pos, trial_idx,
 
     # Fixations
     if len(fixations_t):
-        ax6.scatter(fixations_t['start_x'] - (screen_res_x - img_res_x) / 2,
-                    fixations_t['start_y'] - (screen_res_y - img_res_y) / 2,
+        ax6.scatter(fixations_t['mean_x'] - (screen_res_x - img_res_x) / 2,
+                    fixations_t['mean_y'] - (screen_res_y - img_res_y) / 2,
                     c=fix_num, s=sizes, cmap=cmap, norm=norm, zorder=3)
 
     # Image
     ax6.imshow(img, zorder=0)
 
-    # Items circles
-    ax6.scatter(item_pos_t['center_x'], item_pos_t['center_y'], s=1000, color='grey', alpha=0.5, zorder=1)
+    # Target circles
     target = item_pos_t.loc[item_pos_t['istarget'] == 1]
 
-    # Target green/red
     if len(target):
         if correct_ans:
-            ax6.scatter(target['center_x'], target['center_y'], s=1000, color='green', alpha=0.3, zorder=1)
+            color = 'green'
         else:
-            ax6.scatter(target['center_x'], target['center_y'], s=1000, color='red', alpha=0.3, zorder=1)
+            color = 'red'
+        circle = plt.Circle((target['center_x'], target['center_y']), radius=70, color=color, fill=False)
+        ax6.add_patch(circle)
+        # ax6.scatter(target['center_x'], target['center_y'], s=1000, color=color, alpha=0.0, zorder=1)
 
     # Scanpath
     ax6.plot(gaze_x[vs_start_idx:vs_end_idx] - (1920 - 1280) / 2,
@@ -560,11 +651,11 @@ def scanpath(raw, subject, gaze_x, gaze_y, items_pos, trial_idx,
     ax7.set_ylabel('Gaze')
     ax7.set_xlabel('Time [s]')
 
-    if save:
+    if save_fig:
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + f'/Scanpaths/'
-        os.makedirs(save_path + 'svg/', exist_ok=True)
-        plt.savefig(save_path + f'Trial{trial}.png')
-        plt.savefig(save_path + f'svg/Trial{trial}.svg')
+        fname = f'Trial{trial}'
+        save.fig(fig=fig, path=save_path, fname=fname)
+
 
 
 ## OLD out of use
@@ -698,7 +789,6 @@ def scanpath_BH(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial
         os.makedirs(save_path + 'svg/', exist_ok=True)
         plt.savefig(save_path + f'Trial{trial}.png')
         plt.savefig(save_path + f'svg/Trial{trial}.svg')
-
 
 
 def performance_BH(subject, display=False, save=True):

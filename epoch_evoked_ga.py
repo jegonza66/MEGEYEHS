@@ -21,7 +21,7 @@ else:
     plt.ioff()
 
 # Pick MEG chs (Select channels or set picks = 'mag')
-pick_chs = 'mag'
+pick_chs = 'LR'
 if pick_chs == 'mag':
     picks = 'mag'
 elif pick_chs == 'LR':
@@ -103,13 +103,13 @@ for subject_code in exp_info.subjects_ids:
     # Save figure
     if len(fig_ep) == 1:
         fig = fig_ep[0]
-        fname = 'Epochs_' + subject.subject_id + f'_{pick_chs}.png'
+        fname = 'Epochs_' + subject.subject_id + f'_{pick_chs}'
         save.fig(fig=fig, path=fig_path, fname=fname)
     else:
         for i in range(len(fig_ep)):
             fig = fig_ep[i]
             group = group_by.keys()[i]
-            fname = f'Epochs_{group}' + subject.subject_id + f'_{pick_chs}.png'
+            fname = f'Epochs_{group}' + subject.subject_id + f'_{pick_chs}'
             save.fig(fig=fig, path=fig_path, fname=fname)
 
     # Plot evoked
@@ -134,9 +134,7 @@ for subject_code in exp_info.subjects_ids:
     fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}/'
     fname = 'Evoked_' + subject.subject_id + f'_{pick_chs}'
     if filter_evoked:
-        fname += f'_lfreq{l_freq}_hfreq{h_freq}.png'
-    else:
-        fname += '.png'
+        fname += f'_lfreq{l_freq}_hfreq{h_freq}'
     save.fig(fig=fig_ev, path=fig_path, fname=fname)
 
     # Save data
@@ -187,9 +185,7 @@ axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='
 fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}/'
 fname = f'Grand_average_{pick_chs}'
 if filter_evoked:
-    fname += f'_lfreq{l_freq}_hfreq{h_freq}.png'
-else:
-    fname += '.png'
+    fname += f'_lfreq{l_freq}_hfreq{h_freq}'
 save.fig(fig, fig_path, fname)
 
 # Plot Saccades frontal channels
@@ -209,7 +205,5 @@ if any('sac' in id for id in epoch_ids):
     fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}/'
     fname = f'Grand_average_front_ch'
     if filter_evoked:
-        fname += f'_lfreq{l_freq}_hfreq{h_freq}.png'
-    else:
-        fname += '.png'
+        fname += f'_lfreq{l_freq}_hfreq{h_freq}'
     save.fig(fig, fig_path, fname)

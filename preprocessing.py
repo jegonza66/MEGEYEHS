@@ -14,6 +14,7 @@ def preprocess(subject_code, exp_info, config, plot=False):
     # Load Meg data
     raw = subject.load_raw_meg_data()
 
+    # Get ET channels from MEG
     print('\nGetting ET channels data from MEG')
     et_channels_meg = raw.get_data(picks=exp_info.et_channel_names)
 
@@ -32,12 +33,6 @@ def preprocess(subject_code, exp_info, config, plot=False):
                                                                                                         meg_pupils_data_raw=meg_pupils_data_raw,
                                                                                                         config=subject.config.preproc)
 
-    #---------------- Missing signal interpolation ----------------#
-    et_channels_meg = preproc_functions.fake_blink_interpolate(meg_gazex_data_clean=meg_gazex_data_clean,
-                                                               meg_gazey_data_clean=meg_gazey_data_clean,
-                                                               meg_pupils_data_clean=meg_pupils_data_clean,
-                                                               config=subject.config.preproc, sfreq=raw.info['sfreq'])
-
     #---------------- Defining response events and trials ----------------#
     if subject.subject_id in exp_info.no_trig_subjects:
         raw, subject = preproc_functions.define_events_trials_ET(raw=raw, subject=subject, config=config, exp_info=exp_info)
@@ -45,26 +40,30 @@ def preprocess(subject_code, exp_info, config, plot=False):
         raw, subject = preproc_functions.define_events_trials_trig(raw=raw, subject=subject, config=config, exp_info=exp_info)
 
     #---------------- Fixations and saccades detection ----------------#
-    fixations, saccades = preproc_functions.fixations_saccades_detection(raw=raw, meg_gazex_data_clean=meg_gazex_data_clean,
-                                                                         meg_gazey_data_clean=meg_gazey_data_clean,
-                                                                         subject=subject)
+    fixations, saccades, subject = preproc_functions.fixations_saccades_detection(raw=raw, meg_gazex_data_clean=meg_gazex_data_clean,
+                                                                                  meg_gazey_data_clean=meg_gazey_data_clean,
+                                                                                  meg_pupils_data_clean=meg_pupils_data_clean,
+                                                                                  subject=subject, force_run=True)
 
     # ---------------- Saccades classification ----------------#
     saccades, raw, subject = preproc_functions.saccades_classification(subject=subject, saccades=saccades, raw=raw)
 
     #---------------- Fixations classification ----------------#
-    fixations, raw = preproc_functions.fixation_classification(subject=subject, fixations=fixations, saccades=saccades,
-                                                               raw=raw, meg_pupils_data_clean=meg_pupils_data_clean)
+    fixations, raw = preproc_functions.fixation_classification(subject=subject, fixations=fixations, raw=raw)
 
     #---------------- Items classification ----------------#
     raw, subject, items_pos = preproc_functions.target_vs_distractor(fixations=fixations, subject=subject,
-                                                                     raw=raw, distance_threshold=100)
+                                                                     raw=raw, distance_threshold=70)
 
     #---------------- Save fix time distribution, pupils size vs mss, scanpath and trial gaze figures ----------------#
     if plot:
         preproc_plot.first_fixation_delay(subject=subject)
         preproc_plot.pupil_size_increase(subject=subject)
         preproc_plot.performance(subject=subject)
+        preproc_plot.fixation_duration(subject=subject)
+        preproc_plot.saccades_amplitude(subject=subject)
+        preproc_plot.saccades_dir_hist(subject=subject)
+        preproc_plot.sac_main_seq(subject=subject)
 
         print('Plotting scanpaths and trials gaze screens')
         for trial_idx in range(len(subject.bh_data)):

@@ -239,14 +239,8 @@ def blinks_to_nan(meg_pupils_data_raw, meg_gazex_data_scaled, meg_gazey_data_sca
     meg_gazey_data_clean = copy.copy(meg_gazey_data_scaled)
     meg_pupils_data_clean = copy.copy(meg_pupils_data_raw)
 
-    # Check for peaks in pupils signal
-    # pupils_diff = np.concatenate((np.array([float('nan')]), np.diff(meg_pupils_data_clean)))
-    peaks_idx, foo = sgn.find_peaks(-meg_pupils_data_clean, prominence=0.15, width=[0, 160])
-
     # Define missing values as 1 and non missing as 0 instead of True False
-    # missing = ((meg_pupils_data_clean < pupil_size_thresh) | (abs(pupils_diff) > 0.1)).astype(int)
     missing = (meg_pupils_data_clean < pupil_size_thresh).astype(int)
-    missing[peaks_idx] = 1
 
     # Get missing start/end samples and duration
     missing_start = np.where(np.diff(missing) == 1)[0]
@@ -265,50 +259,23 @@ def blinks_to_nan(meg_pupils_data_raw, meg_gazex_data_scaled, meg_gazey_data_sca
         meg_gazey_data_clean[blink_interval] = float('nan')
         meg_pupils_data_clean[blink_interval] = float('nan')
 
+    # Check for peaks in pupils signal
+    n_peaks_idx, _ = sgn.find_peaks(-meg_pupils_data_clean, prominence=0.15, width=[0, 160])
+    p_peaks_idx, _ = sgn.find_peaks(meg_pupils_data_clean, prominence=0.15, width=[0, 160])
+
+    for i in range(len(n_peaks_idx)):
+        peak_interval = np.arange(n_peaks_idx[i] - start_interval_samples, n_peaks_idx[i] + end_interval_samples)
+        meg_gazex_data_clean[peak_interval] = float('nan')
+        meg_gazey_data_clean[peak_interval] = float('nan')
+        meg_pupils_data_clean[peak_interval] = float('nan')
+
+    for i in range(len(p_peaks_idx)):
+        peak_interval = np.arange(p_peaks_idx[i] - start_interval_samples, p_peaks_idx[i] + end_interval_samples)
+        meg_gazex_data_clean[peak_interval] = float('nan')
+        meg_gazey_data_clean[peak_interval] = float('nan')
+        meg_pupils_data_clean[peak_interval] = float('nan')
+
     return meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean
-
-
-def fake_blink_interpolate(meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean, sfreq, config):
-
-    print('Interpolating fake blinks')
-
-    # Get interpolation configuration
-    blink_min_dur = config.blink_min_dur
-    start_interval_samples = config.start_interval_samples
-    end_interval_samples = config.end_interval_samples
-
-    # Missing signal
-    missing = np.isnan(meg_pupils_data_clean).astype(int)
-
-    # Get missing start/end samples and duration
-    missing_start = np.where(np.diff(missing) == 1)[0]
-    missing_end = np.where(np.diff(missing) == -1)[0]
-    missing_dur = missing_end - missing_start
-
-    # Consider we enlarged the intervals when classifying for real and fake blinks
-    blink_min_samples = blink_min_dur / 1000 * sfreq + start_interval_samples + end_interval_samples
-
-    # Get fake blinks based on duration condition (actual blinks were already filled with nan
-    fake_blinks = np.where(missing_dur <= blink_min_samples)[0]
-
-    # Interpolate fake blinks
-    for fake_blink_idx in fake_blinks:
-        blink_interval = np.arange(missing_start[fake_blink_idx] - start_interval_samples,
-                                   missing_end[fake_blink_idx] + end_interval_samples)
-
-        interpolation_x = np.linspace(meg_gazex_data_clean[blink_interval[0]], meg_gazex_data_clean[blink_interval[-1]],
-                                      len(blink_interval))
-        interpolation_y = np.linspace(meg_gazey_data_clean[blink_interval[0]], meg_gazey_data_clean[blink_interval[-1]],
-                                      len(blink_interval))
-        interpolation_pupil = np.linspace(meg_pupils_data_clean[blink_interval[0]],
-                                          meg_pupils_data_clean[blink_interval[-1]], len(blink_interval))
-        meg_gazex_data_clean[blink_interval] = interpolation_x
-        meg_gazey_data_clean[blink_interval] = interpolation_y
-        meg_pupils_data_clean[blink_interval] = interpolation_pupil
-
-    et_channels_meg = [meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean]
-
-    return et_channels_meg
 
 
 def DAC_samples(et_channels_meg, exp_info, sfreq):
@@ -533,7 +500,7 @@ def define_events_trials_ET(raw, subject, config, exp_info, force_realign=False)
             search_screen_dur = vs_end_times_meg_block[trial] - vs_times_meg_block[trial]
             late_ans_thr = -0.2
             # Answer after a 10 search screen or time difference of 100 ms -> No answer
-            if (time_diff < 0) and (vs_end_times_meg_block[trial] - vs_times_meg_block[trial] > 9.99) or time_diff < late_ans_thr or time_diff > search_screen_dur:
+            if (time_diff < 0) and (vs_end_times_meg_block[trial] - vs_times_meg_block[trial] > 9.9) or time_diff < late_ans_thr or time_diff > search_screen_dur:
                 print(f'\nNo answer in Trial {total_trial}\n'
                       f'Time difference: {round((vs_end_times_meg_block[trial] - meg_evt_time) * 1000, 1)} ms\n'
                       f'Search duration: {search_screen_dur} s')
@@ -626,7 +593,7 @@ def define_events_trials_trig(raw, subject, config, exp_info):
 
     # Get bh data from eyemap
     bh_data_emap = bh_data_raw.loc[np.logical_and(pd.notnull(bh_data_raw['emap_stim_L.started']),
-                                                    bh_data_raw['emap_stim_L.started'] != 'None')].reset_index(drop=True)
+                                                  bh_data_raw['emap_stim_L.started'] != 'None')].reset_index(drop=True)
 
     # Get only trial data rows
     bh_data = bh_data_raw.loc[~pd.isna(bh_data_raw['target.started'])].reset_index(drop=True)
@@ -682,15 +649,8 @@ def define_events_trials_trig(raw, subject, config, exp_info):
     # Define trials block by block
     for block_num in range(len(block_bounds) - 1):
         print(f'\nBlock: {block_num + 1}')
-        # block_bounds_evt = blocks_bounds_evt[block_num]
-        # block_start_evt = block_bounds[block_num]
-        # block_end_evt = block_bounds[block_num + 1] + 1  # +1 because [:] leaves out the last element
         block_trials = 30
         block_idxs = np.arange(block_num * block_trials, (block_num + 1) * block_trials)
-
-        # Get events in block from MEG data
-        # meg_evt_block_times = copy.copy(evt_times[block_start_evt:block_end_evt])
-        # meg_evt_block_buttons = copy.copy(evt_buttons[block_start_evt:block_end_evt])
 
         # Save block variables
         no_answer_block = []
@@ -774,7 +734,7 @@ def define_events_trials_trig(raw, subject, config, exp_info):
             search_screen_dur = vs_end_times_meg_block[trial] - vs_times_meg_block[trial]
             late_ans_thr = -0.2
             # Answer after a 10 search screen or time difference of 100 ms -> No answer
-            if (time_diff < 0) and (vs_end_times_meg_block[trial] - vs_times_meg_block[trial] > 9.99) or time_diff < late_ans_thr or time_diff > search_screen_dur:
+            if (time_diff < 0) and (vs_end_times_meg_block[trial] - vs_times_meg_block[trial] > 9.9) or time_diff < late_ans_thr or time_diff > search_screen_dur:
                 print(f'\nNo answer in Trial {total_trial}\n'
                       f' Time difference: {round((vs_end_times_meg_block[trial] - meg_evt_time) * 1000, 1)} ms\n'
                       f'Search duration: {search_screen_dur} s')
@@ -858,8 +818,8 @@ def define_events_trials_trig(raw, subject, config, exp_info):
     return raw, subject
 
 
-def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean, subject, screen_size=38,
-                                 screen_resolution=1920, force_run=False):
+def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean, subject,
+                                 fix_max_vel=15, fix_max_amp=1.5, screen_size=38, screen_resolution=1920, force_run=False):
 
     out_fname = f'Fix_Sac_detection_{subject.subject_id}.tsv'
     out_folder = paths().preproc_path() + subject.subject_id + '/Sac-Fix_detection/'
@@ -868,13 +828,13 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
         try:
             # Load pre run saccades and fixation detection
             sac_fix = pd.read_csv(out_folder + out_fname, sep='\t')
-            print('Saccades and fixations loaded')
+            print('\nSaccades and fixations loaded')
         except:
             force_run = True
 
     if force_run:
             # If not pre run data, run
-            print('Running saccades and fixations detection')
+            print('\nRunning saccades and fixations detection')
 
             # Define data to save to excel file needed to run the saccades detection program Remodnav
             eye_data = {'x': meg_gazex_data_clean, 'y': meg_gazey_data_clean}
@@ -890,7 +850,7 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
 
             # Run Remodnav not considering pursuit class and min fixations 100 ms
             command = f'remodnav {fname} {out_fname} {px2deg} {sfreq} --savgol-length {0.0195} --min-pursuit-duration {2} ' \
-                      f'--max-pso-duration {0.0}'
+                      f'--max-pso-duration {0.0} --min-fixation-duration {0.05} --max-vel {5000}'
             os.system(command)
 
             # Read results file with detections
@@ -910,12 +870,79 @@ def fixations_saccades_detection(raw, meg_gazex_data_clean, meg_gazey_data_clean
     saccades = copy.copy(sac_fix.loc[(sac_fix['label'] == 'SACC') | (sac_fix['label'] == 'ISAC')])
     fixations = copy.copy(sac_fix.loc[sac_fix['label'] == 'FIXA'])
 
-    return fixations, saccades
+    times = raw.times
+    mean_x = []
+    mean_y = []
+    pupil_size = []
+    prev_sac = []
+    next_sac = []
+
+    # Remove fixations from and to blink
+    print('Finding previous and next saccades')
+    i = 0
+    for fix_idx, fixation in fixations.iterrows():
+
+        fix_time = fixation['onset']
+        fix_dur = fixation['duration']
+
+        sacc_thresh = 0.002  # 2 ms
+        # Previous and next saccades
+        try:
+            sac0 = saccades.loc[(saccades['onset'] + saccades['duration'] > fix_time - sacc_thresh) & (
+                        saccades['onset'] + saccades['duration'] < fix_time + sacc_thresh)].index.values[-1]
+        except:
+            sac0 = None
+        prev_sac.append(sac0)
+
+        try:
+            sac1 = saccades.loc[(saccades['onset'] > fix_time + fix_dur - sacc_thresh) & (
+                        saccades['onset'] < fix_time + fix_dur + sacc_thresh)].index.values[0]
+        except:
+            sac1 = None
+        next_sac.append(sac1)
+
+        print("\rProgress: {}%".format(int((i + 1) * 100 / len(fixations))), end='')
+        i += 1
+
+    # Add columns
+    fixations['prev_sac'] = prev_sac
+    fixations['next_sac'] = next_sac
+
+    # Drop when None
+    fixations.dropna(subset=['prev_sac'], inplace=True)
+
+    print('\nComputing average pupil size, and x and y position')
+    i = 0
+    for fix_idx, fixation in fixations.iterrows():
+
+        fix_time = fixation['onset']
+        fix_dur = fixation['duration']
+
+        # Average pupil size, x and y position
+        fix_time_idx = np.where(np.logical_and(fix_time < times, times < fix_time + fix_dur))[0]
+
+        pupil_data_fix = meg_pupils_data_clean[fix_time_idx]
+        gazex_data_fix = meg_gazex_data_clean[fix_time_idx]
+        gazey_data_fix = meg_gazey_data_clean[fix_time_idx]
+
+        pupil_size.append(np.nanmean(pupil_data_fix))
+        mean_x.append(np.nanmean(gazex_data_fix))
+        mean_y.append(np.nanmean(gazey_data_fix))
+
+        print("\rProgress: {}%".format(int((i + 1) * 100 / len(fixations))), end='')
+        i += 1
+
+    fixations['mean_x'] = mean_x
+    fixations['mean_y'] = mean_y
+    fixations['pupil'] = pupil_size
+    fixations = fixations.astype({'mean_x': float, 'mean_y': float, 'pupil': float, 'prev_sac': 'Int64', 'next_sac': 'Int64'})
+
+    return fixations, saccades, subject
 
 
 def saccades_classification(subject, saccades, raw):
 
-    print('Classifying saccades')
+    print('\nClassifying saccades')
 
     # Eyemap trials start and end indexes
     hl_start_idx = np.where(raw.annotations.description == 'hl_start')[0]
@@ -1212,7 +1239,6 @@ def saccades_classification(subject, saccades, raw):
     col2 = saccades.pop('dir')
     saccades.insert(9, col2.name, col2)
 
-
     # Define column type
     saccades = saccades.astype({'trial': 'Int64', 'mss': 'Int64', 'target_pres': 'Int64', 'delay': float,
                                 'correct': 'Int64', 'n_sac': 'Int64', 'deg': float, 'dir': str, 'id': str})
@@ -1236,7 +1262,7 @@ def saccades_classification(subject, saccades, raw):
     return saccades, raw, subject
 
 
-def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_clean):
+def fixation_classification(subject, fixations, raw):
     
     # Eyemap trials start and end indexes
     hl_start_idx = np.where(raw.annotations.description == 'hl_start')[0]
@@ -1255,7 +1281,6 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
     bl_end_times = raw.annotations.onset[bl_end_idx]
     
     cross1_times_meg = subject.cross1
-    response_trials_meg = subject.trial
     ms_times_meg = subject.ms
     cross2_times_meg = subject.cross2
     vs_times_meg = subject.vs
@@ -1277,10 +1302,7 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
     trial_correct = []
     n_fixs = []
     fix_delay = []
-    pupil_size = []
     fix_id = []
-    prev_sac = []
-    next_sac = []
 
     description = []
     onset = []
@@ -1296,25 +1318,6 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
 
         fix_time = fixation['onset']
         fix_dur = fixation['duration']
-
-        sacc_thresh = 0.002  # 2 ms change to 100 ms and keep las saccade for 0 and first saccade for 1
-        # Previous and next saccades
-        try:
-            sac0 = saccades.loc[(saccades['onset'] + saccades['duration'] > fix_time - sacc_thresh) & (saccades['onset'] + saccades['duration'] < fix_time + sacc_thresh)].index.values[-1]
-        except:
-            sac0 = None
-        prev_sac.append(sac0)
-
-        try:
-            sac1 = saccades.loc[(saccades['onset'] > fix_time + fix_dur - sacc_thresh) & (saccades['onset'] < fix_time + fix_dur + sacc_thresh)].index.values[0]
-        except:
-            sac1 = None
-        next_sac.append(sac1)
-
-        # Average pupil size
-        fix_time_idx = np.where(np.logical_and(fix_time < times, times < fix_time + fix_dur))[0]
-        pupil_data_fix = meg_pupils_data_clean[fix_time_idx]
-        pupil_size.append(np.nanmean(pupil_data_fix))
 
         emap_fix = False
 
@@ -1511,7 +1514,6 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
         i += 1
 
     print()
-    fixations['pupil'] = pupil_size
     fixations['trial'] = fix_trial
     fixations['mss'] = trial_mss
     fixations['screen'] = fix_screen
@@ -1519,12 +1521,10 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
     fixations['correct'] = trial_correct
     fixations['n_fix'] = n_fixs
     fixations['delay'] = fix_delay
-    fixations['prev_sac'] = prev_sac
-    fixations['next_sac'] = next_sac
     fixations['id'] = fix_id
 
     fixations = fixations.astype({'trial': 'Int64', 'mss': 'Int64', 'target_pres': 'Int64', 'delay': float, 'correct': 'Int64',
-                                  'n_fix': 'Int64', 'pupil': float, 'prev_sac': 'Int64', 'next_sac': 'Int64', 'id': str})
+                                  'n_fix': 'Int64', 'id': str})
 
     # Add vs fixations data to raw annotations
     raw.annotations.description = np.concatenate((raw.annotations.description, np.array(description)))
@@ -1533,7 +1533,7 @@ def fixation_classification(subject, fixations, saccades, raw, meg_pupils_data_c
     return fixations, raw
 
 
-def target_vs_distractor(fixations, subject, raw, distance_threshold=100, screen_res_x=1920, screen_res_y=1080,
+def target_vs_distractor(fixations, subject, raw, distance_threshold=70, screen_res_x=1920, screen_res_y=1080,
                          img_res_x=1280, img_res_y=1024):
 
     print('Identifying fixated items')
@@ -1572,8 +1572,8 @@ def target_vs_distractor(fixations, subject, raw, distance_threshold=100, screen
         fix_time = fix['onset']
 
         # Get fixations x and y
-        fix_x = np.mean([fix['start_x'], fix['end_x']])
-        fix_y = np.mean([fix['start_y'], fix['end_y']])
+        fix_x = fix['mean_x']
+        fix_y = fix['mean_y']
 
         # Get trial image
         trial_image = subject.trial_imgs[trial_idx]
@@ -1683,6 +1683,102 @@ def add_et_channels(raw, et_channels_meg, et_channel_names):
 
 
 ## OLD out of use
+
+
+
+
+def fake_blink_interpolate(meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean, sfreq, config):
+
+    print('Interpolating fake blinks')
+
+    # Get interpolation configuration
+    blink_min_dur = config.blink_min_dur
+    start_interval_samples = config.start_interval_samples
+    end_interval_samples = config.end_interval_samples
+
+    # Missing signal
+    missing = np.isnan(meg_pupils_data_clean).astype(int)
+
+    # Get missing start/end samples and duration
+    missing_start = np.where(np.diff(missing) == 1)[0]
+    missing_end = np.where(np.diff(missing) == -1)[0]
+    missing_dur = missing_end - missing_start
+
+    # Consider we enlarged the intervals when classifying for real and fake blinks
+    blink_min_samples = blink_min_dur / 1000 * sfreq + start_interval_samples + end_interval_samples
+
+    # Get fake blinks based on duration condition (actual blinks were already filled with nan
+    fake_blinks = np.where(missing_dur <= blink_min_samples)[0]
+
+    # Interpolate fake blinks
+    for fake_blink_idx in fake_blinks:
+        blink_interval = np.arange(missing_start[fake_blink_idx] - start_interval_samples,
+                                   missing_end[fake_blink_idx] + end_interval_samples)
+
+        interpolation_x = np.linspace(meg_gazex_data_clean[blink_interval[0]], meg_gazex_data_clean[blink_interval[-1]],
+                                      len(blink_interval))
+        interpolation_y = np.linspace(meg_gazey_data_clean[blink_interval[0]], meg_gazey_data_clean[blink_interval[-1]],
+                                      len(blink_interval))
+        interpolation_pupil = np.linspace(meg_pupils_data_clean[blink_interval[0]],
+                                          meg_pupils_data_clean[blink_interval[-1]], len(blink_interval))
+        meg_gazex_data_clean[blink_interval] = interpolation_x
+        meg_gazey_data_clean[blink_interval] = interpolation_y
+        meg_pupils_data_clean[blink_interval] = interpolation_pupil
+
+    et_channels_meg = [meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean]
+
+    return et_channels_meg
+
+
+def fake_blink_interpolate2(meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean, sfreq, config):
+
+    print('Interpolating fake blinks')
+
+    # Get interpolation configuration
+    blink_min_dur = config.blink_min_dur
+    start_interval_samples = config.start_interval_samples
+    end_interval_samples = config.end_interval_samples
+
+    # Missing signal
+    missing = np.isnan(meg_pupils_data_clean).astype(int)
+
+    # Get missing start/end samples and duration
+    missing_start = np.where(np.diff(missing) == 1)[0]
+    missing_end = np.where(np.diff(missing) == -1)[0]
+    missing_dur = missing_end - missing_start
+
+    missing_dist_x = []
+    missing_dist_y = []
+    for i in range(len(missing_start)):
+        missing_dist_x.append(abs(meg_gazex_data_clean[missing_start[i]-1] - meg_gazex_data_clean[missing_end[i]+1]))
+        missing_dist_y.append(abs(meg_gazey_data_clean[missing_start[i]-1] - meg_gazey_data_clean[missing_end[i]+1]))
+
+    # Consider we enlarged the intervals when classifying for real and fake blinks
+    blink_min_samples = blink_min_dur / 1000 * sfreq + start_interval_samples + end_interval_samples
+    blink_min_dist = 10
+
+    # Get fake blinks based on duration condition (actual blinks were already filled with nan
+    fake_blinks = np.where(np.logical_and((missing_dur <= blink_min_samples), (np.array(missing_dist_x) < blink_min_dist),
+                                          (np.array(missing_dist_y) < blink_min_dist)))[0]
+
+    # Interpolate fake blinks
+    for fake_blink_idx in fake_blinks:
+        blink_interval = np.arange(missing_start[fake_blink_idx] - start_interval_samples,
+                                   missing_end[fake_blink_idx] + end_interval_samples)
+
+        interpolation_x = np.linspace(meg_gazex_data_clean[blink_interval[0]], meg_gazex_data_clean[blink_interval[-1]],
+                                      len(blink_interval))
+        interpolation_y = np.linspace(meg_gazey_data_clean[blink_interval[0]], meg_gazey_data_clean[blink_interval[-1]],
+                                      len(blink_interval))
+        interpolation_pupil = np.linspace(meg_pupils_data_clean[blink_interval[0]],
+                                          meg_pupils_data_clean[blink_interval[-1]], len(blink_interval))
+        meg_gazex_data_clean[blink_interval] = interpolation_x
+        meg_gazey_data_clean[blink_interval] = interpolation_y
+        meg_pupils_data_clean[blink_interval] = interpolation_pupil
+
+    et_channels_meg = [meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean]
+
+    return et_channels_meg
 
 
 def define_events_trials_BH(raw, subject):

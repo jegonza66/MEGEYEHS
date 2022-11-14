@@ -71,9 +71,7 @@ for subject_code in exp_info.subjects_ids:
     fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}_lfreq{l_freq}_hfreq{h_freq}/'
     fname = 'Evoked_' + subject.subject_id + f'_{pick_chs}'
     if filter_evoked:
-        fname += f'_lfreq{l_freq}_hfreq{h_freq}.png'
-    else:
-        fname += '.png'
+        fname += f'_lfreq{l_freq}_hfreq{h_freq}'
     save.fig(fig, fig_path, fname)
 
 # Compute grand average
@@ -106,9 +104,7 @@ axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='
 fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}/'
 fname = f'Grand_average_{pick_chs}'
 if filter_evoked:
-    fname += f'_lfreq{l_freq}_hfreq{h_freq}.png'
-else:
-    fname += '.png'
+    fname += f'_lfreq{l_freq}_hfreq{h_freq}'
 save.fig(fig, fig_path, fname)
 
 # Plot Saccades frontal channels
@@ -127,7 +123,5 @@ if any('sac' in id for id in epoch_ids):
     fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}_lfreq{l_freq}_hfreq{h_freq}/'
     fname = 'Grand_average_ch_sel.png'
     if filter_evoked:
-        fname += f'_lfreq{l_freq}_hfreq{h_freq}.png'
-    else:
-        fname += '.png'
+        fname += f'_lfreq{l_freq}_hfreq{h_freq}'
     save.fig(fig, fig_path, fname)

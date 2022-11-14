@@ -93,12 +93,12 @@ def fig(fig, path, fname):
 
     # Make dir
     os.makedirs(path, exist_ok=True)
+    # Save
+    fig.savefig(path + fname + '.png')
 
     # Create svg directory
-    svg_path = path + 'svg/'
+    svg_path = path + '/svg/'
     os.makedirs(svg_path, exist_ok=True)
-
     # Save
-    fig.savefig(path + fname)
-    fig.savefig(svg_path + fname)
+    fig.savefig(svg_path + fname + '.svg')
 
