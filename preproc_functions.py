@@ -820,7 +820,8 @@ def define_events_trials_trig(raw, subject, config, exp_info):
     return raw, subject
 
 
-def fixations_saccades_detection(raw, et_channels_meg, subject, screen_size=38, screen_resolution=1920, force_run=False):
+def fixations_saccades_detection(raw, et_channels_meg, subject, sac_max_vel=2000, fix_max_vel=20, fix_max_amp=1.5,
+                                 screen_size=38, screen_resolution=1920, force_run=False):
 
     out_fname = f'Fix_Sac_detection_{subject.subject_id}.tsv'
     out_folder = paths().preproc_path() + subject.subject_id + '/Sac-Fix_detection/'
@@ -872,8 +873,21 @@ def fixations_saccades_detection(raw, et_channels_meg, subject, screen_size=38, 
             os.replace(out_fname, out_folder + out_fname)
 
     # Get saccades and fixations
-    saccades = copy.copy(sac_fix.loc[(sac_fix['label'] == 'SACC') | (sac_fix['label'] == 'ISAC')])
-    fixations = copy.copy(sac_fix.loc[sac_fix['label'] == 'FIXA'])
+    saccades_all = copy.copy(sac_fix.loc[(sac_fix['label'] == 'SACC') | (sac_fix['label'] == 'ISAC')])
+    fixations_all = copy.copy(sac_fix.loc[sac_fix['label'] == 'FIXA'])
+
+    # Drop saccades and fixations based on conditions
+    fixations = copy.copy(fixations_all[(fixations_all['amp'] <= fix_max_amp)])
+    saccades = copy.copy(saccades_all[saccades_all['peak_vel'] <= sac_max_vel])
+
+    print(f'Dropping saccades with average vel > {sac_max_vel}, and fixations with amplitude > {fix_max_amp}')
+    print(f'Kept {len(fixations)} out of {len(fixations_all)} fixations')
+    print(f'Kept {len(saccades)} out of {len(saccades_all)} saccades')
+
+    subject.len_all_sac = len(saccades_all)
+    subject.len_all_fix = len(fixations_all)
+    subject.len_sac_drop = len(saccades)
+    subject.len_fix_drop = len(fixations)
 
     times = raw.times
     mean_x = []
@@ -915,6 +929,7 @@ def fixations_saccades_detection(raw, et_channels_meg, subject, screen_size=38, 
 
     # Drop when None
     fixations.dropna(subset=['prev_sac'], inplace=True)
+    print(f'Kept {len(fixations)} fixations with previous saccade')
 
     print('\nComputing average pupil size, and x and y position')
     i = 0

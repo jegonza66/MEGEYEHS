@@ -428,7 +428,7 @@ class raw_subject:
 
 
     # MEG data
-    def load_preproc_meg(self):
+    def load_preproc_meg(self, preload=False):
         """
         Preprocessed MEG data for parent subject as raw instance of MNE.
         """
@@ -439,7 +439,7 @@ class raw_subject:
         file_path = pathlib.Path(os.path.join(preproc_path, self.subject_id, f'Subject_{self.subject_id}_meg.fif'))
 
         # Load data
-        fif = mne.io.read_raw_fif(file_path)
+        fif = mne.io.read_raw_fif(file_path, preload=preload)
 
         return fif
 

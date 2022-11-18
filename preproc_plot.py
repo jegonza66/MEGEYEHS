@@ -192,6 +192,7 @@ def alignment(subject, et_gazex, meg_gazex, corrs, et_block_start, meg_block_sta
 
 def first_fixation_delay(subject, display_fig=False, save_fig=True):
 
+    print('Plotting first fixation delay histogram')
     if display_fig:
         plt.ion()
     else:
@@ -211,6 +212,7 @@ def first_fixation_delay(subject, display_fig=False, save_fig=True):
 
 def fixation_duration(subject, display_fig=False, save_fig=True):
 
+    print('Plotting fixation duration histogram')
     if display_fig:
         plt.ion()
     else:
@@ -230,6 +232,7 @@ def fixation_duration(subject, display_fig=False, save_fig=True):
 
 def saccades_amplitude(subject, display_fig=False, save_fig=True):
 
+    print('Plotting saccades amplitude histogram')
     if display_fig:
         plt.ion()
     else:
@@ -237,9 +240,9 @@ def saccades_amplitude(subject, display_fig=False, save_fig=True):
 
     saccades_amp = subject.saccades['amp']
     fig = plt.figure()
-    plt.hist(saccades_amp, bins=40)
+    plt.hist(saccades_amp, bins=40, range=(0, 30))
     plt.title('Saccades amplitude')
-    plt.xlabel('Time [s]')
+    plt.xlabel('Amplitude [deg]')
 
     if save_fig:
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
@@ -249,6 +252,7 @@ def saccades_amplitude(subject, display_fig=False, save_fig=True):
 
 def saccades_dir_hist(subject, display_fig=False, save_fig=True):
 
+    print('Plotting saccades direction histogram')
     if display_fig:
         plt.ion()
     else:
@@ -277,6 +281,7 @@ def saccades_dir_hist(subject, display_fig=False, save_fig=True):
 
 def sac_main_seq(subject, display_fig=False, save_fig=True):
 
+    print('Plotting main sequence')
     if display_fig:
         plt.ion()
     else:
@@ -302,6 +307,7 @@ def sac_main_seq(subject, display_fig=False, save_fig=True):
 
 def pupil_size_increase(subject, display_fig=False, save_fig=True):
 
+    print('Plotting pupil size sincrease to different MSS')
     if display_fig:
         plt.ion()
     else:
@@ -339,6 +345,7 @@ def pupil_size_increase(subject, display_fig=False, save_fig=True):
 
 def performance(subject, display=False, save_fig=True):
 
+    print('Plotting performance')
     if display:
         plt.ion()
     else:

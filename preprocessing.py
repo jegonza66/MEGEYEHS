@@ -39,7 +39,7 @@ def preprocess(subject_code, exp_info, config, plot=False):
 
     #---------------- Fixations and saccades detection ----------------#
     fixations, saccades, subject = preproc_functions.fixations_saccades_detection(raw=raw, et_channels_meg=et_channels_meg,
-                                                                                  subject=subject, force_run=True)
+                                                                                  subject=subject)
 
     # ---------------- Saccades classification ----------------#
     saccades, raw, subject = preproc_functions.saccades_classification(subject=subject, saccades=saccades, raw=raw)
