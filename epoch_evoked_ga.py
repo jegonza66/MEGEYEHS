@@ -46,13 +46,17 @@ Id Format
 Saccades: f'{dir}_sac_{screen}_t{trial}_{n_sacs[-1]}'
 Fixations: f'{prefix}_fix_{screen}_t{trial}_{n_fix}' prefix (tgt/it/none)only if vs screen
 '''
-
+evt_from_df = False
 # MSS
-mss = 1
+mss = 4
 # Id
-epoch_id = f'tgt_fix_mss{mss}'
+epoch_id = f'cross2_mss{mss}'
 # Screen
-screen = 'vs'
+screen = None
+# Duration
+dur = None  # seconds
+# Direction
+dir = None
 # Item
 if 'tgt' in epoch_id:  # 1 for target, 0 for item, None for none
     tgt = 1
@@ -60,10 +64,6 @@ elif 'it' in epoch_id:
     tgt = 0
 else:
     tgt = None
-# Duration
-dur = 0.2  # seconds
-# Direction
-dir = 'l'
 
 if 'fix' in epoch_id:
     tmin = -0.1
@@ -73,43 +73,62 @@ elif 'sac' in epoch_id:
     tmin = -0.1
     tmax = 0.1
     plot_xlim = (-0.05, 0.1)
+else:
+    tmin = -0.1
+    tmax = 0.1
+    plot_xlim = (-0.05, 0.1)
 
 evokeds = []
 for subject_code in exp_info.subjects_ids:
 
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
     meg_data = subject.load_preproc_meg()
+    # Exclude bad channels
+    bads = subject.bad_channels
+    meg_data.info['bads'].extend(bads)
 
     if 'fix' in epoch_id:
         metadata = subject.fixations
     elif 'sac' in epoch_id:
         metadata = subject.saccades
 
-    # Exclude bad channels
-    bads = subject.bad_channels
-    meg_data.info['bads'].extend(bads)
+    if evt_from_df:
+        # Get events from fix/sac Dataframe
+        if screen:
+            metadata = metadata.loc[(metadata['screen'] == screen)]
+        if mss:
+            metadata = metadata.loc[(metadata['mss'] == mss)]
+        if dur:
+            metadata = metadata.loc[(metadata['duration'] >= dur)]
+        if 'fix' in epoch_id:
+            if tgt == 1:
+                metadata = metadata.loc[(metadata['fix_target'] == tgt)]
+            elif tgt == 0:
+                metadata = metadata.loc[(metadata['fix_target'] == tgt)]
+        if 'sac' in epoch_id:
+            if dir:
+                metadata = metadata.loc[(metadata['dir'] == dir)]
 
-    # Get events
-    if screen:
-        metadata = metadata.loc[(metadata['screen'] == screen)]
-    if mss:
-        metadata = metadata.loc[(metadata['mss'] == mss)]
-    if tgt == 1:
-        metadata = metadata.loc[(metadata['fix_target'] == tgt)]
-    elif tgt == 0:
-        metadata = metadata.loc[(metadata['fix_target'] == tgt)]
-    if dur:
-        metadata = metadata.loc[(metadata['duration'] >= dur)]
-    if dir:
-        metadata = metadata.loc[(metadata['dir'] == dir)]
+        events_samples, event_times = functions.find_nearest(meg_data.times, metadata['onset'])
 
-    events_samples, event_times = functions.find_nearest(meg_data.times, metadata['onset'])
+        events = np.zeros((len(events_samples), 3)).astype(int)
+        events[:, 0] = events_samples
+        events[:, 2] = metadata.index
 
-    events = np.zeros((len(events_samples), 3)).astype(int)
-    events[:, 0] = events_samples
-    events[:, 2] = metadata.index
+        events_id = dict(zip(metadata.id, metadata.index))
 
-    events_id = dict(zip(metadata.id, metadata.index))
+    else:
+        # Get events from annotations
+        all_events, all_event_id = mne.events_from_annotations(meg_data, verbose=False)
+        # Select epochs
+        # epoch_keys = [key for key in all_event_id.keys() if epoch_id in key]
+        trials_mss = subject.bh_data.loc[subject.bh_data['Nstim'] == mss].index + 1  # add 1 due to python 0th indexing
+        epoch_keys = [f'cross2_t{trial_mss}' for trial_mss in trials_mss]
+
+        # Get events and ids matchig selection
+        metadata, events, events_id = mne.epochs.make_metadata(events=all_events, event_id=all_event_id,
+                                                              row_events=epoch_keys, tmin=0, tmax=0,
+                                                              sfreq=meg_data.info['sfreq'])
 
     # Reject based on channel amplitude
     reject = dict(mag=subject.config.general.reject_amp)
@@ -125,25 +144,29 @@ for subject_code in exp_info.subjects_ids:
     evokeds.append(evoked)
 
     # Parameters for plotting
-    overlay = epochs.metadata['duration'] # Overlay duration
-    order = overlay.argsort()  # Sorting from longer to shorter
+    overlay = None
+    if overlay:
+        order = overlay.argsort()  # Sorting from longer to shorter
+    else:
+        order = None
+    combine = 'mean'
     group_by = {}
 
     # Plot epochs
-    fig_ep = epochs.plot_image(picks=picks, order=order, sigma=5, cmap='jet', overlay_times=overlay, combine='mean',
+    fig_ep = epochs.plot_image(picks=picks, order=order, sigma=5, cmap='jet', overlay_times=overlay, combine=combine,
                                title=subject.subject_id, show=display_figs)
     fig_path = plot_path + f'Epochs/{epoch_id}/'
 
     # Save figure
     if len(fig_ep) == 1:
         fig = fig_ep[0]
-        fname = 'Epochs_' + subject.subject_id + f'_{pick_chs}'
+        fname = 'Epochs_' + subject.subject_id + f'_{pick_chs}_{combine}'
         save.fig(fig=fig, path=fig_path, fname=fname)
     else:
         for i in range(len(fig_ep)):
             fig = fig_ep[i]
             group = group_by.keys()[i]
-            fname = f'Epochs_{group}' + subject.subject_id + f'_{pick_chs}'
+            fname = f'Epochs_{group}' + subject.subject_id + f'_{pick_chs}_{combine}'
             save.fig(fig=fig, path=fig_path, fname=fname)
 
     # Plot evoked
