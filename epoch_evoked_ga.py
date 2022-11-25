@@ -50,7 +50,7 @@ Fixations: f'{prefix}_fix_{screen}_t{trial}_{n_fix}' prefix (tgt/it/none)only if
 # MSS
 mss = 1
 # Id
-epoch_id = f'it_fix_mss{mss}'
+epoch_id = f'tgt_fix_mss{mss}'
 # Screen
 screen = 'vs'
 # Item
@@ -61,9 +61,9 @@ elif 'it' in epoch_id:
 else:
     tgt = None
 # Duration
-dur = 200/1000  # seconds
+dur = 0.2  # seconds
 # Direction
-dir = None
+dir = 'l'
 
 if 'fix' in epoch_id:
     tmin = -0.1
@@ -94,12 +94,10 @@ for subject_code in exp_info.subjects_ids:
         metadata = metadata.loc[(metadata['screen'] == screen)]
     if mss:
         metadata = metadata.loc[(metadata['mss'] == mss)]
-    if tgt:
-        metadata = metadata.loc[(metadata['fix_target'] == 1)]
+    if tgt == 1:
+        metadata = metadata.loc[(metadata['fix_target'] == tgt)]
     elif tgt == 0:
-        metadata = metadata.loc[(metadata['fix_target'] == 0)]
-    else:
-        metadata = metadata.loc[pd.isna(metadata['fix_target'])]
+        metadata = metadata.loc[(metadata['fix_target'] == tgt)]
     if dur:
         metadata = metadata.loc[(metadata['duration'] >= dur)]
     if dir:
