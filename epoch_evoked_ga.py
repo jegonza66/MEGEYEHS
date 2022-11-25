@@ -42,16 +42,15 @@ h_freq = 100
 
 #----- Select events -----#
 '''
-Format
+Id Format
 Saccades: f'{dir}_sac_{screen}_t{trial}_{n_sacs[-1]}'
 Fixations: f'{prefix}_fix_{screen}_t{trial}_{n_fix}' prefix (tgt/it/none)only if vs screen
 '''
 
 # MSS
 mss = 1
-
 # Id
-epoch_id = f'tgt_fix_mss{mss}'
+epoch_id = f'it_fix_mss{mss}'
 # Screen
 screen = 'vs'
 # Item
@@ -102,7 +101,7 @@ for subject_code in exp_info.subjects_ids:
     else:
         metadata = metadata.loc[pd.isna(metadata['fix_target'])]
     if dur:
-        metadata = metadata.loc[(metadata['duration'] >= mss)]
+        metadata = metadata.loc[(metadata['duration'] >= dur)]
     if dir:
         metadata = metadata.loc[(metadata['dir'] == dir)]
 

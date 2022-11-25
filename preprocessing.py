@@ -89,5 +89,5 @@ exp_info = setup.exp_info()
 # Load configuration
 config = load.config(path=paths().config_path(), fname='config.pkl')
 
-for subject_code in exp_info.subjects_ids[7:]:
+for subject_code in exp_info.subjects_ids:
     preprocess(subject_code=subject_code, exp_info=exp_info, config=config, plot=True)

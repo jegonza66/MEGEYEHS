@@ -929,9 +929,9 @@ def fixations_saccades_detection(raw, et_channels_meg, subject, sac_max_vel=1500
 
     # Drop when None
     fixations.dropna(subset=['prev_sac'], inplace=True)
-    print(f'Kept {len(fixations)} fixations with previous saccade')
+    print(f'\nKept {len(fixations)} fixations with previous saccade')
 
-    print('\nComputing average pupil size, and x and y position')
+    print('Computing average pupil size, and x and y position')
     i = 0
     for fix_idx, fixation in fixations.iterrows():
 
