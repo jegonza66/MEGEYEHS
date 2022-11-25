@@ -509,3 +509,15 @@ class noise:
         # Missing data
         else:
             raise ValueError('No .ds files found in subject directory: {}'.format(subj_path))
+
+
+class all_subjects:
+
+    def __init__(self, all_fixations, all_saccades, all_bh_data, all_rt, all_corr_ans):
+        self.subject_id = 'All_Subjects'
+        self.fixations = all_fixations
+        self.saccades = all_saccades
+        self.trial = np.arange(1, 211)
+        self.bh_data = all_bh_data
+        self.rt = all_rt
+        self.corr_ans = all_corr_ans

@@ -18,7 +18,7 @@ subjects_dir = os.path.join(mri_path, 'FreeSurfer_out')
 os.environ["SUBJECTS_DIR"] = subjects_dir
 
 # Load one subject
-subject = setup.raw_subject(exp_info=exp_info, config=config, subject_code=0)
+subject = load.preproc_subject(exp_info=exp_info, subject_code=0)
 
 # PATH TO MRI <-> HEAD TRANSFORMATION (Saved from coreg)
 trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-trans.fif'.format(subject.subject_id))
@@ -33,7 +33,7 @@ raw = subject.load_raw_meg_data()
 # fid_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-fiducials.fif'.format(subject.subject_id))
 
 surfaces = dict(brain=0.6, outer_skull=0.5, head=0.4)
-fig = mne.viz.plot_alignment(raw.info, trans='fsaverage', subject=subject.subject_id,
+fig = mne.viz.plot_alignment(raw.info, trans=trans_path, subject=subject.subject_id,
                              subjects_dir=subjects_dir, surfaces=surfaces,
                              show_axes=True, dig=True, eeg=[], meg='sensors',
                              coord_frame='meg', mri_fiducials=fids_path)
@@ -52,25 +52,27 @@ raw.pick(['meg', 'misc'])
 bads = subject.bad_channels
 raw.info['bads'].extend(bads)
 
-# EPOCH DATA BASED ON BUTTON BOX
-reject = dict(mag=4e-12)
-
 # Get events from annotations
-events, event_id = mne.events_from_annotations(raw)
-
-# Epoch data
-epochs = mne.Epochs(raw, events, event_id=event_id, reject=reject, event_repeated='merge')
-
+all_events, all_event_id = mne.events_from_annotations(raw, verbose=False)
+# Reject based on channel amplitude
+reject = dict(mag=subject.config.general.reject_amp)
 # Select epochs
-epoch_id = 'fix_vs'
-epoch_keys = [key for key in event_id.keys() if epoch_id in key]
-epochs_standard = mne.concatenate_epochs([epochs[key] for key in epoch_keys])
+epoch_ids = ['fix_vs']
+epoch_keys = [key for epoch_id in epoch_ids for key in all_event_id.keys() if epoch_id in key]
+# Get events and ids matchig selection
+metadata, events, event_id = mne.epochs.make_metadata(events=all_events, event_id=all_event_id,
+                                                      row_events=epoch_keys, tmin=0, tmax=0,
+                                                      sfreq=raw.info['sfreq'])
+# Epoch data
+epochs = mne.Epochs(raw, events, event_id=event_id, reject=reject, event_repeated='drop', metadata=metadata, preload=True)
+
+# epochs_standard = mne.concatenate_epochs([epochs[key] for key in epoch_keys])
 # AVERAGE EPOCHS TO GET EVOKED
-evoked_std = epochs_standard.average()
+evoked = epochs.average()
 # GET MEG CHS ONLY
-evoked_std.pick('meg')
+evoked.pick('meg')
 # FILTER
-evoked_std.filter(l_freq=0.5, h_freq=80., fir_design='firwin')
+evoked.filter(l_freq=0.5, h_freq=80., fir_design='firwin')
 
 # LOAD BACKGROUND NOISE
 noise = setup.noise(exp_info=exp_info, id='BACK_NOISE')
@@ -81,22 +83,22 @@ cov = mne.compute_raw_covariance(raw_noise, reject=reject)
 # cov.plot(raw_noise.info)
 
 # SETUP SOURCE SPACE
-src = mne.setup_source_space(subject=subject.subject_id, spacing='oct4', subjects_dir=subjects_dir) #change oct4 to oct 6 for real analysis
+src = mne.setup_source_space(subject=subject.subject_id, spacing='oct4', subjects_dir=subjects_dir)  # change oct4 to oct 6 for real analysis
 
 # SET UP BEM MODEL
 model = mne.make_bem_model(subject=subject.subject_id, ico=4, conductivity=[0.3], subjects_dir=subjects_dir)
 bem = mne.make_bem_solution(model)
 # COMPUTE SOURCE RECONSTRUCTION
-fwd = mne.make_forward_solution(evoked_std.info, trans=trans_path, src=src, bem=bem)
+fwd = mne.make_forward_solution(evoked.info, trans=trans_path, src=src, bem=bem)
 
 # MAKE INVERSE OPERATOR FROM EVOKED
-inv = mne.minimum_norm.make_inverse_operator(evoked_std.info, fwd, cov)
+inv = mne.minimum_norm.make_inverse_operator(evoked.info, fwd, cov)
 # PARAMETROS STANDAR A CHEQUEAR
 snr = 3.0
 lambda2 = 1.0 / snr ** 2
 
 # COMPUTE INVERSE SOLUTION TO GET SOURCES TIME COURSES
-stc_standard = mne.minimum_norm.apply_inverse(evoked_std, inv, lambda2, 'dSPM')
+stc_standard = mne.minimum_norm.apply_inverse(evoked, inv, lambda2, 'dSPM')
 brain = stc_standard.plot(subjects_dir=subjects_dir, subject=subject.subject_id,
                           surface='inflated', time_viewer=True, hemi='both',
                           initial_time=0.1, time_unit='s')

@@ -210,19 +210,28 @@ def first_fixation_delay(subject, display_fig=False, save_fig=True):
         plt.savefig(save_path + f'{subject.subject_id} 1st fix delay dist.png')
 
 
-def fixation_duration(subject, display_fig=False, save_fig=True):
+def fixation_duration(subject, ax=None, display_fig=False, save_fig=True):
 
     print('Plotting fixation duration histogram')
+
+    # Use provided axes (or not)
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        display_fig = True
+        save_fig = False
+
     if display_fig:
         plt.ion()
     else:
         plt.ioff()
 
     fixations_dur = subject.fixations['duration']
-    fig = plt.figure()
-    plt.hist(fixations_dur, bins=40, range=(0, 1))
-    plt.title('Fixation duration')
-    plt.xlabel('Time [s]')
+
+    ax.hist(fixations_dur, bins=100, range=(0, 1), edgecolor='black', linewidth=1.2, density=True, stacked=True)
+    ax.set_title('Fixation duration')
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Density')
 
     if save_fig:
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
@@ -230,19 +239,28 @@ def fixation_duration(subject, display_fig=False, save_fig=True):
         save.fig(fig=fig, path=save_path, fname=fname)
 
 
-def saccades_amplitude(subject, display_fig=False, save_fig=True):
+def saccades_amplitude(subject, ax=None, display_fig=False, save_fig=True):
 
     print('Plotting saccades amplitude histogram')
+
+    # Use provided axes (or not)
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        display_fig = True
+        save_fig = False
+
     if display_fig:
         plt.ion()
     else:
         plt.ioff()
 
     saccades_amp = subject.saccades['amp']
-    fig = plt.figure()
-    plt.hist(saccades_amp, bins=40, range=(0, 30))
-    plt.title('Saccades amplitude')
-    plt.xlabel('Amplitude [deg]')
+
+    ax.hist(saccades_amp, bins=100, range=(0, 20), edgecolor='black', linewidth=1.2, density=True, stacked=True)
+    ax.set_title('Saccades amplitude')
+    ax.set_xlabel('Amplitude (deg)')
+    ax.set_ylabel('Density')
 
     if save_fig:
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
@@ -250,9 +268,20 @@ def saccades_amplitude(subject, display_fig=False, save_fig=True):
         save.fig(fig=fig, path=save_path, fname=fname)
 
 
-def saccades_dir_hist(subject, display_fig=False, save_fig=True):
+def saccades_dir_hist(subject, fig=None, ax=None, display_fig=False, save_fig=True):
 
     print('Plotting saccades direction histogram')
+
+    # Use provided axes (or not)
+    if ax is None:
+        fig = plt.figure()
+        ax = plt.subplot(polar=True)
+    else:
+        display_fig = True
+        save_fig = False
+        ax.set_axis_off()
+        ax = fig.add_subplot(2, 2, 3, projection='polar')
+
     if display_fig:
         plt.ion()
     else:
@@ -262,13 +291,12 @@ def saccades_dir_hist(subject, display_fig=False, save_fig=True):
     saccades_rad = saccades_deg * np.pi / 180
 
     n_bins = 24
-    ang_hist, bin_edges = np.histogram(saccades_rad, bins=24)
+    ang_hist, bin_edges = np.histogram(saccades_rad, bins=24, density=True)
     bin_centers = [np.mean((bin_edges[i], bin_edges[i+1])) for i in range(len(bin_edges) - 1)]
 
-    fig = plt.figure()
-    ax = plt.subplot(polar=True)
     bars = ax.bar(bin_centers, ang_hist, width=2*np.pi/n_bins, bottom=0.0, alpha=0.4, edgecolor='black')
-    plt.title('Saccades direction')
+    ax.set_xlabel('Saccades direction')
+    ax.set_yticklabels([])
 
     for r, bar in zip(ang_hist, bars):
         bar.set_facecolor(plt.cm.Blues(r / np.max(ang_hist)))
@@ -279,9 +307,17 @@ def saccades_dir_hist(subject, display_fig=False, save_fig=True):
         save.fig(fig=fig, path=save_path, fname=fname)
 
 
-def sac_main_seq(subject, display_fig=False, save_fig=True):
+def sac_main_seq(subject, hline=None, ax=None, display_fig=False, save_fig=True):
 
     print('Plotting main sequence')
+
+    # Use provided axes (or not)
+    if ax is None:
+        fig, ax = plt.subplots()
+    else:
+        display_fig = True
+        save_fig = False
+
     if display_fig:
         plt.ion()
     else:
@@ -290,14 +326,17 @@ def sac_main_seq(subject, display_fig=False, save_fig=True):
     saccades_peack_vel = subject.saccades['peak_vel']
     saccades_amp = subject.saccades['amp']
 
-    fig = plt.figure()
-    plt.plot(saccades_amp, saccades_peack_vel, '.', alpha=0.1, markersize=2)
-    plt.yscale('log')
-    plt.xscale('log')
-    plt.title('Main sequence')
-    plt.xlabel('Amplitude (deg)')
-    plt.ylabel('Peak velocity (deg)')
-    plt.grid()
+    ax.plot(saccades_amp, saccades_peack_vel, '.', alpha=0.1, markersize=2)
+    ax.set_xlim(0.01)
+    if hline:
+        ax.hlines(y=hline, xmin=plt.gca().get_xlim()[0], xmax=plt.gca().get_xlim()[1], colors='grey', linestyles='--', label=hline)
+        ax.legend()
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+    ax.set_title('Main sequence')
+    ax.set_xlabel('Amplitude (deg)')
+    ax.set_ylabel('Peak velocity (deg)')
+    ax.grid()
 
     if save_fig:
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'

@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import functions
 import load
 import mne
 import save
@@ -8,11 +9,13 @@ import setup
 from paths import paths
 import numpy as np
 
+#----- Path -----#
 save_path = paths().save_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
-# Save data and display figures
+
+#----- Save data and display figures -----#
 save_data = True
 display_figs = False
 if display_figs:
@@ -20,8 +23,11 @@ if display_figs:
 else:
     plt.ioff()
 
-# Pick MEG chs (Select channels or set picks = 'mag')
-pick_chs = 'LR'
+#-----  Select MEG channels -----#
+'''
+Select channels or set picks = 'mag')
+'''
+pick_chs = 'mag'
 if pick_chs == 'mag':
     picks = 'mag'
 elif pick_chs == 'LR':
@@ -29,19 +35,42 @@ elif pick_chs == 'LR':
     left_chs = ['MLT51', 'MLT52', 'MLT53']
     picks = right_chs + left_chs
 
-# Filter evoked
+#-----  Filter evoked -----#
 filter_evoked = False
 l_freq = 0.5
 h_freq = 100
 
-# Select events
-epoch_ids = ['l_sac']
+#----- Select events -----#
+'''
+Format
+Saccades: f'{dir}_sac_{screen}_t{trial}_{n_sacs[-1]}'
+Fixations: f'{prefix}_fix_{screen}_t{trial}_{n_fix}' prefix (tgt/it/none)only if vs screen
+'''
 
-if any('fix' in id for id in epoch_ids):
+# MSS
+mss = 1
+
+# Id
+epoch_id = f'tgt_fix_mss{mss}'
+# Screen
+screen = 'vs'
+# Item
+if 'tgt' in epoch_id:  # 1 for target, 0 for item, None for none
+    tgt = 1
+elif 'it' in epoch_id:
+    tgt = 0
+else:
+    tgt = None
+# Duration
+dur = 200/1000  # seconds
+# Direction
+dir = None
+
+if 'fix' in epoch_id:
     tmin = -0.1
-    tmax = 0.4
+    tmax = 0.2
     plot_xlim = (tmin, tmax)
-elif any('sac' in id for id in epoch_ids):
+elif 'sac' in epoch_id:
     tmin = -0.1
     tmax = 0.1
     plot_xlim = (-0.05, 0.1)
@@ -52,39 +81,47 @@ for subject_code in exp_info.subjects_ids:
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
     meg_data = subject.load_preproc_meg()
 
+    if 'fix' in epoch_id:
+        metadata = subject.fixations
+    elif 'sac' in epoch_id:
+        metadata = subject.saccades
+
     # Exclude bad channels
     bads = subject.bad_channels
     meg_data.info['bads'].extend(bads)
 
-    # Get events from annotations
-    all_events, all_event_id = mne.events_from_annotations(meg_data, verbose=False)
-    # Select epochs
-    epoch_keys = [key for epoch_id in epoch_ids for key in all_event_id.keys() if epoch_id in key]
+    # Get events
+    if screen:
+        metadata = metadata.loc[(metadata['screen'] == screen)]
+    if mss:
+        metadata = metadata.loc[(metadata['mss'] == mss)]
+    if tgt:
+        metadata = metadata.loc[(metadata['fix_target'] == 1)]
+    elif tgt == 0:
+        metadata = metadata.loc[(metadata['fix_target'] == 0)]
+    else:
+        metadata = metadata.loc[pd.isna(metadata['fix_target'])]
+    if dur:
+        metadata = metadata.loc[(metadata['duration'] >= mss)]
+    if dir:
+        metadata = metadata.loc[(metadata['dir'] == dir)]
 
-    # Get events and ids matchig selection
-    metadata, events, event_id = mne.epochs.make_metadata(events=all_events, event_id=all_event_id,
-                                                          row_events=epoch_keys, tmin=0, tmax=0,
-                                                          sfreq=meg_data.info['sfreq'])
+    events_samples, event_times = functions.find_nearest(meg_data.times, metadata['onset'])
+
+    events = np.zeros((len(events_samples), 3)).astype(int)
+    events[:, 0] = events_samples
+    events[:, 2] = metadata.index
+
+    events_id = dict(zip(metadata.id, metadata.index))
 
     # Reject based on channel amplitude
     reject = dict(mag=subject.config.general.reject_amp)
 
     # Epoch data
-    epochs = mne.Epochs(raw=meg_data, events=events, event_id=event_id, tmin=tmin, tmax=tmax, reject=reject,
+    epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=tmin, tmax=tmax, reject=reject,
                         event_repeated='drop', metadata=metadata, preload=True)
     # Drop bad epochs
     epochs.drop_bad()
-
-    if any('sac' in id for id in epoch_ids):
-        saccades = subject.saccades
-        metadata = saccades.loc[(~pd.isna(saccades['screen'])) &
-                                (saccades['id'].isin(epochs.metadata['event_name']))].reset_index(drop=True)
-        epochs.metadata = metadata
-    elif any('fix' in id for id in epoch_ids):
-        fixations = subject.fixations
-        metadata = fixations.loc[(~pd.isna(fixations['screen'])) &
-                                 (fixations['id'].isin(epochs.metadata['event_name']))].reset_index(drop=True)
-        epochs.metadata = metadata
 
     # Define evoked and append for GA
     evoked = epochs.average(picks=['mag', 'misc'])
@@ -96,9 +133,9 @@ for subject_code in exp_info.subjects_ids:
     group_by = {}
 
     # Plot epochs
-    fig_ep = epochs.plot_image(picks=picks, order=order, sigma=5, cmap='jet', overlay_times=overlay, combine='std',
+    fig_ep = epochs.plot_image(picks=picks, order=order, sigma=5, cmap='jet', overlay_times=overlay, combine='mean',
                                title=subject.subject_id, show=display_figs)
-    fig_path = plot_path + f'Epochs/{"-".join(epoch_ids)}/'
+    fig_path = plot_path + f'Epochs/{epoch_id}/'
 
     # Save figure
     if len(fig_ep) == 1:
@@ -131,7 +168,7 @@ for subject_code in exp_info.subjects_ids:
     axs[1].set_xlabel('Time')
     evoked_meg.plot(picks=picks, gfp=True, axes=axs[0], time_unit='s', spatial_colors=True, xlim=plot_xlim, show=display_figs)
     axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
-    fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}/'
+    fig_path = plot_path + f'Evoked/{epoch_id}/'
     fname = 'Evoked_' + subject.subject_id + f'_{pick_chs}'
     if filter_evoked:
         fname += f'_lfreq{l_freq}_hfreq{h_freq}'
@@ -141,13 +178,13 @@ for subject_code in exp_info.subjects_ids:
     if save_data:
         # Save epoched data
         epochs.reset_drop_log_selection()
-        epoch_save_path = save_path + f'Epochs/{"-".join(epoch_ids)}/' + subject.subject_id + '/'
+        epoch_save_path = save_path + f'Epochs/{epoch_id}/' + subject.subject_id + '/'
         os.makedirs(epoch_save_path, exist_ok=True)
         epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
         epochs.save(epoch_save_path + epochs_data_fname, overwrite=True)
 
         # Save evoked data
-        evoked_save_path = save_path + f'Evoked/{"-".join(epoch_ids)}/' + subject.subject_id + '/'
+        evoked_save_path = save_path + f'Evoked/{epoch_id}/' + subject.subject_id + '/'
         os.makedirs(evoked_save_path, exist_ok=True)
         evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
         evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
@@ -157,7 +194,7 @@ grand_avg = mne.grand_average(evokeds, interpolate_bads=False)
 
 # Save grand average
 if save_data:
-    ga_save_path = save_path + f'Evoked/{"-".join(epoch_ids)}/'
+    ga_save_path = save_path + f'Evoked/{epoch_id}/'
     os.makedirs(ga_save_path, exist_ok=True)
     grand_avg_data_fname = f'Grand_average_ave.fif'
     grand_avg.save(ga_save_path + grand_avg_data_fname, overwrite=True)
@@ -182,14 +219,14 @@ axs[1].set_xlabel('Time')
 grand_avg_meg.plot(picks=picks, gfp=True, axes=axs[0], time_unit='s', spatial_colors=True, xlim=plot_xlim,
                    titles=f'Grand average', show=display_figs)
 axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
-fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}/'
+fig_path = plot_path + f'Evoked/{epoch_id}/'
 fname = f'Grand_average_{pick_chs}'
 if filter_evoked:
     fname += f'_lfreq{l_freq}_hfreq{h_freq}'
 save.fig(fig, fig_path, fname)
 
 # Plot Saccades frontal channels
-if any('sac' in id for id in epoch_ids):
+if 'sac' in epoch_id:
 
     sac_chs = ['MLF14', 'MLF13', 'MLF12', 'MLF11', 'MRF11', 'MRF12', 'MRF13',
                'MRF14', 'MZF01']
@@ -202,7 +239,7 @@ if any('sac' in id for id in epoch_ids):
     grand_avg_meg.plot(picks=sac_chs, gfp=True, axes=axs[0], time_unit='s', spatial_colors=True, xlim=plot_xlim,
                        titles=f'Grand average', show=display_figs)
     axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
-    fig_path = plot_path + f'Evoked/{"-".join(epoch_ids)}/'
+    fig_path = plot_path + f'Evoked/{epoch_id}/'
     fname = f'Grand_average_front_ch'
     if filter_evoked:
         fname += f'_lfreq{l_freq}_hfreq{h_freq}'

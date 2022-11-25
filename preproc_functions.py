@@ -820,11 +820,15 @@ def define_events_trials_trig(raw, subject, config, exp_info):
     return raw, subject
 
 
-def fixations_saccades_detection(raw, et_channels_meg, subject, sac_max_vel=2000, fix_max_vel=20, fix_max_amp=1.5,
+def fixations_saccades_detection(raw, et_channels_meg, subject, sac_max_vel=1500, fix_max_amp=1.5,
                                  screen_size=38, screen_resolution=1920, force_run=False):
 
     out_fname = f'Fix_Sac_detection_{subject.subject_id}.tsv'
     out_folder = paths().preproc_path() + subject.subject_id + '/Sac-Fix_detection/'
+
+    meg_gazex_data_clean = et_channels_meg[0]
+    meg_gazey_data_clean = et_channels_meg[1]
+    meg_pupils_data_clean = et_channels_meg[2]
 
     if not force_run:
         try:
@@ -837,10 +841,6 @@ def fixations_saccades_detection(raw, et_channels_meg, subject, sac_max_vel=2000
     if force_run:
             # If not pre run data, run
             print('\nRunning saccades and fixations detection')
-
-            meg_gazex_data_clean = et_channels_meg[0]
-            meg_gazey_data_clean = et_channels_meg[1]
-            meg_pupils_data_clean = et_channels_meg[2]
 
             # Define data to save to excel file needed to run the saccades detection program Remodnav
             eye_data = {'x': meg_gazex_data_clean, 'y': meg_gazey_data_clean}
@@ -878,9 +878,9 @@ def fixations_saccades_detection(raw, et_channels_meg, subject, sac_max_vel=2000
 
     # Drop saccades and fixations based on conditions
     fixations = copy.copy(fixations_all[(fixations_all['amp'] <= fix_max_amp)])
-    saccades = copy.copy(saccades_all[saccades_all['peak_vel'] <= sac_max_vel])
-
     print(f'Dropping saccades with average vel > {sac_max_vel}, and fixations with amplitude > {fix_max_amp}')
+
+    saccades = copy.copy(saccades_all[saccades_all['peak_vel'] <= sac_max_vel])
     print(f'Kept {len(fixations)} out of {len(fixations_all)} fixations')
     print(f'Kept {len(saccades)} out of {len(saccades_all)} saccades')
 
@@ -1170,7 +1170,7 @@ def saccades_classification(subject, saccades, raw):
                     n_sacs.append(sac_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    id = f'{dir}_sac_{screen}{trial}_{n_sacs[-1]}'
+                    id = f'{dir}_sac_{screen}_t{trial}_{n_sacs[-1]}'
                     sac_id.append(id)
                     description.append(id)
                     onset.append([sac_time])
@@ -1185,7 +1185,7 @@ def saccades_classification(subject, saccades, raw):
                     n_sacs.append(sac_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    id = f'{dir}_sac_{screen}{trial}_{n_sacs[-1]}'
+                    id = f'{dir}_sac_{screen}_t{trial}_{n_sacs[-1]}'
                     sac_id.append(id)
                     description.append(id)
                     onset.append([sac_time])
@@ -1200,7 +1200,7 @@ def saccades_classification(subject, saccades, raw):
                     n_sacs.append(sac_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    id = f'{dir}_sac_{screen}{trial}_{n_sacs[-1]}'
+                    id = f'{dir}_sac_{screen}_t{trial}_{n_sacs[-1]}'
                     sac_id.append(id)
                     description.append(id)
                     onset.append([sac_time])
@@ -1215,7 +1215,7 @@ def saccades_classification(subject, saccades, raw):
                     n_sacs.append(sac_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    id = f'{dir}_sac_{screen}{trial}_{n_sacs[-1]}'
+                    id = f'{dir}_sac_{screen}_t{trial}_{n_sacs[-1]}'
                     sac_id.append(id)
                     description.append(id)
                     onset.append([sac_time])
@@ -1305,7 +1305,6 @@ def fixation_classification(subject, fixations, raw):
     cross2_times_meg = subject.cross2
     vs_times_meg = subject.vs
     vsend_times_meg = subject.vsend
-    times = raw.times
 
     # Get mss and target pres/abs from bh data
     mss = subject.bh_data['Nstim'].astype(int)
@@ -1337,7 +1336,6 @@ def fixation_classification(subject, fixations, raw):
     for fix_idx, fixation in fixations.iterrows():
 
         fix_time = fixation['onset']
-        fix_dur = fixation['duration']
 
         emap_fix = False
 
@@ -1466,7 +1464,7 @@ def fixation_classification(subject, fixations, raw):
                     n_fixs.append(fix_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    id = f'fix_{screen}{trial}_{n_fixs[-1]}'
+                    id = f'fix_{screen}_t{trial}_{n_fixs[-1]}'
                     fix_id.append(id)
                     description.append(id)
                     onset.append([fix_time])
@@ -1481,7 +1479,7 @@ def fixation_classification(subject, fixations, raw):
                     n_fixs.append(fix_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    id = f'fix_{screen}{trial}_{n_fixs[-1]}'
+                    id = f'fix_{screen}_t{trial}_{n_fixs[-1]}'
                     fix_id.append(id)
                     description.append(id)
                     onset.append([fix_time])
@@ -1496,7 +1494,7 @@ def fixation_classification(subject, fixations, raw):
                     n_fixs.append(fix_numbers[block_num][f'trial_{trial}'][screen])
 
                     # Save to raw
-                    id = f'fix_{screen}{trial}_{n_fixs[-1]}'
+                    id = f'fix_{screen}_t{trial}_{n_fixs[-1]}'
                     fix_id.append(id)
                     description.append(id)
                     onset.append([fix_time])
@@ -1588,6 +1586,8 @@ def target_vs_distractor(fixations, subject, raw, distance_threshold=70, screen_
         trial = fix['trial']
         trial_idx = trial - 1
 
+        mss = fix['mss']
+
         n_fix = fix['n_fix']
         fix_time = fix['onset']
 
@@ -1645,7 +1645,7 @@ def target_vs_distractor(fixations, subject, raw, distance_threshold=70, screen_
         else:
             prefix = 'none'
 
-        id = f'{prefix}_fix_vs{trial}_{n_fix}'
+        id = f'{prefix}_fix_vs_t{trial}_{n_fix}'
         fix_id.append(id)
         description.append(id)
         onset.append([fix_time])

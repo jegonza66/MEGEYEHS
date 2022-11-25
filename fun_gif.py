@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-
+import setup
 import load
 from paths import paths
 import pathlib
@@ -8,9 +8,12 @@ from nibabel.viewers import OrthoSlicer3D
 import os
 from scipy import ndimage
 
+# Load experiment info
+exp_info = setup.exp_info()
+
 mri_path = paths().mri_path()
-subject_id = '15909001'
-subject = load.raw_subject(subject_id)
+subject = load.preproc_subject(exp_info=exp_info, subject_code=3)
+
 
 subj_path = pathlib.Path(os.path.join(mri_path, subject.subject_id))
 mri_file_path = list(subj_path.glob('*.nii'))[1]
@@ -100,7 +103,7 @@ renderer.show()
 ## Full brain color plot
 # https://mne.tools/stable/auto_tutorials/forward/10_background_freesurfer.html#sphx-glr-auto-tutorials-forward-10-background-freesurfer-py
 Brain = mne.viz.get_brain_class()
-brain = Brain(subject_id, hemi='both', surf='pial', size=(800, 600))
+brain = Brain(subject.subject_id, hemi='rh', surf='sphere', size=(800, 600))
 # brain.add_annotation('aparc.a2009s', borders=False)
 
 ##
@@ -110,9 +113,9 @@ Brain = mne.viz.get_brain_class()
 mne.datasets.fetch_aparc_sub_parcellation(subjects_dir=subjects_dir, verbose=True)
 
 # Candidate parc: aparc, aparc.a2009s, aparc.DKTatlas40, BA, BA.thresh
-labels = mne.read_labels_from_annot(subject=subject_id, parc='aparc', subjects_dir=subjects_dir)
+labels = mne.read_labels_from_annot(subject=subject.subject_id, parc='aparc', subjects_dir=subjects_dir)
 
-brain = Brain(subject_id, 'both', 'inflated', subjects_dir=subjects_dir, cortex='low_contrast', background='white',
+brain = Brain(subject.subject_id, 'both', 'inflated', subjects_dir=subjects_dir, cortex='low_contrast', background='white',
               size=(800, 600))
 # brain.add_annotation('aparc.a2009s')
 # aud_label = [label for label in labels if label.name == 'bankssts-lh'][0]
