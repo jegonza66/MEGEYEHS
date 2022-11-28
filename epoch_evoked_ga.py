@@ -1,6 +1,6 @@
 import pandas as pd
 import os
-import functions
+import functions_general
 import load
 import mne
 import save
@@ -47,6 +47,8 @@ Saccades: f'{dir}_sac_{screen}_t{trial}_{n_sacs[-1]}'
 Fixations: f'{prefix}_fix_{screen}_t{trial}_{n_fix}' prefix (tgt/it/none)only if vs screen
 '''
 evt_from_df = False
+evt_from_annot = True
+
 # MSS
 mss = 4
 # Id
@@ -109,7 +111,7 @@ for subject_code in exp_info.subjects_ids:
             if dir:
                 metadata = metadata.loc[(metadata['dir'] == dir)]
 
-        events_samples, event_times = functions.find_nearest(meg_data.times, metadata['onset'])
+        events_samples, event_times = functions_general.find_nearest(meg_data.times, metadata['onset'])
 
         events = np.zeros((len(events_samples), 3)).astype(int)
         events[:, 0] = events_samples
@@ -117,7 +119,7 @@ for subject_code in exp_info.subjects_ids:
 
         events_id = dict(zip(metadata.id, metadata.index))
 
-    else:
+    elif evt_from_annot:
         # Get events from annotations
         all_events, all_event_id = mne.events_from_annotations(meg_data, verbose=False)
         # Select epochs

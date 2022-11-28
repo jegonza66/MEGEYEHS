@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-import functions
+import functions_general
 import load
 
 
@@ -56,7 +56,7 @@ Scaled = False
 while not Scaled:
     # Plot EDF and MEG signals to select ranges for scaling and get plot lims for scaling signals in those ranges
     fig1, eyemap_interval_edf, eyemap_interval_meg = \
-        plot.get_intervals_signals(reference_signal=edf_gazex_data, signal_to_scale=meg_gazex_data_raw)
+        plot_preproc.get_intervals_signals(reference_signal=edf_gazex_data, signal_to_scale=meg_gazex_data_raw)
 
     print('Scaling MEG Eye-Tracker data')
     for meg_gaze_data, edf_gaze_data, offset, title in zip((meg_gazex_data_raw, meg_gazey_data_raw, meg_pupils_data_raw),
@@ -68,25 +68,25 @@ while not Scaled:
         eyemap_interval_meg_offset = (eyemap_interval_meg[0] + meg_offset_y, eyemap_interval_meg[1] + meg_offset_y)
 
         # Re-scale MEG ET data
-        functions.scale_from_interval(signal_to_scale=meg_gaze_data,
-                                      reference_signal=edf_gaze_data,
-                                      interval_signal=eyemap_interval_meg_offset,
-                                      interval_ref=eyemap_interval_edf_offset)
+        functions_general.scale_from_interval(signal_to_scale=meg_gaze_data,
+                                              reference_signal=edf_gaze_data,
+                                              interval_signal=eyemap_interval_meg_offset,
+                                              interval_ref=eyemap_interval_edf_offset)
 
     # Plot scaled signals
-    fig2 = plot.scaled_signals(time=edf_time, scaled_signals=[meg_gazex_data_raw, meg_gazey_data_raw, meg_pupils_data_raw],
+    fig2 = plot_preproc.scaled_signals(time=edf_time, scaled_signals=[meg_gazex_data_raw, meg_gazey_data_raw, meg_pupils_data_raw],
                                reference_signals=[edf_gazex_data, edf_gazey_data, edf_pupils_data],
                                interval_signal=eyemap_interval_meg, interval_ref=eyemap_interval_edf,
                                ref_offset=[0, y_offset, 0], signal_offset=[0, meg_offset, 0],
                                ylabels=['Gaze x', 'Gaze y', 'Pupil size'])
 
     # Plotting and choosing different time in signal to check scaling
-    fig1, eyemap_interval_edf, eyemap_interval_meg = plot.get_intervals_signals(reference_signal=edf_gazex_data,
+    fig1, eyemap_interval_edf, eyemap_interval_meg = plot_preproc.get_intervals_signals(reference_signal=edf_gazex_data,
                                                                                 signal_to_scale=meg_gazex_data_raw,
                                                                                 fig=fig1)
 
     # Plot scaled signals
-    fig2 = plot.scaled_signals(time=edf_time, scaled_signals=[meg_gazex_data_raw, meg_gazey_data_raw, meg_pupils_data_raw],
+    fig2 = plot_preproc.scaled_signals(time=edf_time, scaled_signals=[meg_gazex_data_raw, meg_gazey_data_raw, meg_pupils_data_raw],
                                reference_signals=[edf_gazex_data, edf_gazey_data, edf_pupils_data],
                                interval_signal=eyemap_interval_meg, interval_ref=eyemap_interval_edf,
                                ref_offset=[0, y_offset, 0], signal_offset=[0, meg_offset, 0],
@@ -103,44 +103,3 @@ while not Scaled:
         else:
             print('Please answer y/n')
             Answer = False
-
-
-
-## Plot data with and without blinks to compare
-
-plt.figure()
-plt.title('Gaze x')
-plt.plot(meg_gazex_data_scaled, label='Blinks')
-plt.plot(meg_gazex_data_clean, label='Clean')
-plt.legend()
-
-plt.figure()
-plt.title('Gaze y')
-plt.plot(meg_gazey_data_scaled, label='Blinks')
-plt.plot(meg_gazey_data_clean, label='Clean')
-plt.legend()
-
-plt.figure()
-plt.title('Pupils')
-plt.plot(meg_pupils_data_raw, label='Blinks')
-plt.plot(meg_pupils_data_clean, label='Clean')
-plt.grid()
-plt.legend()
-
-plt.figure()
-plt.title('EDF')
-plt.plot(edf_gazex_data, label='EDF')
-plt.plot(meg_gazex_data_clean, label='MEG')
-
-
-## PLOTS
-
-# Evts
-plt.figure()
-plt.title('Behavioural and MEG data mapping')
-plt.plot(meg_evt_block_times, meg_evt_block_times, 'o', label='MEG evts')
-plt.plot(bh_evt_block_times, bh_evt_block_times, '.', label='BH evts')
-plt.xlabel('time [s]')
-plt.ylabel('time [s]')
-plt.legend()
-plt.savefig('Good_scale.png')

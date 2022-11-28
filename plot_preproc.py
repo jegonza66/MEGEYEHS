@@ -6,7 +6,7 @@ import os
 import seaborn as sn
 import pandas as pd
 
-import functions
+import functions_general
 from paths import paths
 import save
 
@@ -463,8 +463,8 @@ def trial_gaze(raw, subject, et_channels_meg, trial_idx, display_fig=False, save
     mss = subject.bh_data['Nstim'][trial_idx]
 
     # Get trial start and end samples
-    trial_start_idx = functions.find_nearest(raw.times, subject.cross1[trial_idx])[0] - 120 * 2
-    trial_end_idx = functions.find_nearest(raw.times, subject.vsend[trial_idx])[0] + 120 * 6
+    trial_start_idx = functions_general.find_nearest(raw.times, subject.cross1[trial_idx])[0] - 120 * 2
+    trial_end_idx = functions_general.find_nearest(raw.times, subject.vsend[trial_idx])[0] + 120 * 6
 
     # Plot
     fig = plt.figure(figsize=(15, 5))
@@ -525,8 +525,8 @@ def emap_gaze(raw, subject, et_channels_meg, block_num, display_fig=False, save_
                                             (subject.fixations['onset'] < emaps[emap_trial+1])]
 
         # Get trial start and end samples
-        trial_start_idx = functions.find_nearest(raw.times, emaps[emap_trial])[0] - 120 * 2
-        trial_end_idx = functions.find_nearest(raw.times, emaps[emap_trial+1])[0] + 120 * 6
+        trial_start_idx = functions_general.find_nearest(raw.times, emaps[emap_trial])[0] - 120 * 2
+        trial_end_idx = functions_general.find_nearest(raw.times, emaps[emap_trial + 1])[0] + 120 * 6
 
         # Plot
         fig = plt.figure(figsize=(15, 5))
@@ -583,8 +583,8 @@ def scanpath(raw, subject, et_channels_meg, items_pos, trial_idx,
     item_pos_t = items_pos.loc[items_pos['folder'] == subject.trial_imgs[trial_idx]]
 
     # Get vs from trial
-    vs_start_idx = functions.find_nearest(raw.times, subject.vs[trial_idx])[0]
-    vs_end_idx = functions.find_nearest(raw.times, subject.vsend[trial_idx])[0]
+    vs_start_idx = functions_general.find_nearest(raw.times, subject.vs[trial_idx])[0]
+    vs_end_idx = functions_general.find_nearest(raw.times, subject.vsend[trial_idx])[0]
 
     # Load search image
     img = mpimg.imread(exp_path + 'cmp_' + subject.trial_imgs[trial_idx] + '.jpg')
@@ -732,8 +732,8 @@ def scanpath_BH(fixations, items_pos, bh_data, raw, gazex, gazey, subject, trial
     item_pos_t = items_pos.loc[items_pos['folder'] == subject.trial_imgs[trial_idx]]
 
     # Get vs from trial
-    vs_start_idx = functions.find_nearest(raw.times, subject.vs[np.where(subject.trial == trial)[0]])[0]
-    vs_end_idx = functions.find_nearest(raw.times, subject.onset[np.where(subject.trial == trial)[0]])[0]
+    vs_start_idx = functions_general.find_nearest(raw.times, subject.vs[np.where(subject.trial == trial)[0]])[0]
+    vs_end_idx = functions_general.find_nearest(raw.times, subject.onset[np.where(subject.trial == trial)[0]])[0]
 
     # Load search image
     img = mpimg.imread(exp_path + 'cmp_' + subject.trial_imgs[trial_idx] + '.jpg')

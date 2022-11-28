@@ -1,5 +1,5 @@
 import pandas as pd
-import preproc_plot
+import plot_preproc
 from paths import paths
 import setup
 import load
@@ -46,17 +46,17 @@ for subject_code in exp_info.subjects_ids:
 # Define all subjects class instance
 subjects = setup.all_subjects(all_fixations, all_saccades, all_bh_data, all_rt, all_corr_ans)
 
-preproc_plot.first_fixation_delay(subject=subjects)
-preproc_plot.pupil_size_increase(subject=subjects)
+plot_preproc.first_fixation_delay(subject=subjects)
+plot_preproc.pupil_size_increase(subject=subjects)
 
 
 plt.rcParams.update({'font.size': 12})
 fig, axs = plt.subplots(2, 2, figsize=(12, 7))
 
-preproc_plot.fixation_duration(subject=subjects, ax=axs[0, 0])
-preproc_plot.saccades_amplitude(subject=subjects, ax=axs[0, 1])
-preproc_plot.saccades_dir_hist(subject=subjects, fig=fig, ax=axs[1, 0])
-preproc_plot.sac_main_seq(subject=subjects, ax=axs[1, 1])
+plot_preproc.fixation_duration(subject=subjects, ax=axs[0, 0])
+plot_preproc.saccades_amplitude(subject=subjects, ax=axs[0, 1])
+plot_preproc.saccades_dir_hist(subject=subjects, fig=fig, ax=axs[1, 0])
+plot_preproc.sac_main_seq(subject=subjects, ax=axs[1, 1])
 
 fig.tight_layout()
 

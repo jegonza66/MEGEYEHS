@@ -1,11 +1,11 @@
 import setup
 import load
 import save
-import preproc_plot
-import preproc_functions
+import plot_preproc
+import functions_preproc
 from paths import paths
 import numpy as np
-import functions
+import functions_general
 import matplotlib.pyplot as plt
 import scipy.signal as sgn
 
@@ -35,7 +35,7 @@ print('Downsampling MEG data')
 raw.resample(1000)
 
 # Get sample num of vs start
-vs_start_meg_ds, _ = functions.find_nearest(array=raw.times, values=vs_start_meg_times)
+vs_start_meg_ds, _ = functions_general.find_nearest(array=raw.times, values=vs_start_meg_times)
 
 # Get et data
 et_chs = raw.get_data(picks=exp_info.et_channel_names)
@@ -50,7 +50,7 @@ et_times = np.asarray(et_data['time'])
 # Ge vs start from et
 vs_start_msg = 'ETSYNC 250'
 vs_starttime_et = et_data['msg'].loc[et_data['msg'][1].str.contains(vs_start_msg)][1].str.split(vs_start_msg, expand=True)[0].values.astype(float)
-vs_start_et, _ = functions.find_nearest(array=et_times, values=vs_starttime_et)
+vs_start_et, _ = functions_general.find_nearest(array=et_times, values=vs_starttime_et)
 
 trig_num = 0
 samples_lag = []
@@ -63,7 +63,7 @@ for trig_num in range(len(vs_start_et)-1):
     meg_gaze_trial = meg_gazex_data_raw[vs_start_meg_ds[trig_num]:vs_start_meg_ds[trig_num+1]]
 
     et_drop = 500
-    max_sample, corrs = functions.align_signals(signal_1=meg_gaze_trial, signal_2=et_gaze_trial[et_drop:-et_drop])
+    max_sample, corrs = functions_general.align_signals(signal_1=meg_gaze_trial, signal_2=et_gaze_trial[et_drop:-et_drop])
 
     samples_lag_trial = -(max_sample - et_drop)
     samples_lag.append(samples_lag_trial)

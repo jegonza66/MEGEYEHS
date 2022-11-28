@@ -5,8 +5,8 @@ import os
 import math
 import mne
 import scipy.signal as sgn
-import functions
-import preproc_plot
+import functions_general
+import plot_preproc
 from paths import paths
 import save
 
@@ -120,14 +120,14 @@ def et_screen_samples(et_data, subject, et_times, exp_info):
 
     # ET screen samples
     print('Mapping ET times to samples')
-    blocks_start_et, _ = functions.find_nearest(array=et_times, values=blocks_starttime_et)
-    eyemap_start_et, _ = functions.find_nearest(array=et_times, values=eyemap_starttime_et)
-    eyemap_end_et, _ = functions.find_nearest(array=et_times, values=eyemap_endtime_et)
-    ms_start_et, _ = functions.find_nearest(array=et_times, values=ms_starttime_et)
-    ms_end_et, _ = functions.find_nearest(array=et_times, values=ms_endtime_et)
-    cross1_start_et, _ = functions.find_nearest(array=et_times, values=cross1_starttime_et)
-    vs_start_et, _ = functions.find_nearest(array=et_times, values=vs_starttime_et)
-    vs_end_et, _ = functions.find_nearest(array=et_times, values=vs_endtime_et)
+    blocks_start_et, _ = functions_general.find_nearest(array=et_times, values=blocks_starttime_et)
+    eyemap_start_et, _ = functions_general.find_nearest(array=et_times, values=eyemap_starttime_et)
+    eyemap_end_et, _ = functions_general.find_nearest(array=et_times, values=eyemap_endtime_et)
+    ms_start_et, _ = functions_general.find_nearest(array=et_times, values=ms_starttime_et)
+    ms_end_et, _ = functions_general.find_nearest(array=et_times, values=ms_endtime_et)
+    cross1_start_et, _ = functions_general.find_nearest(array=et_times, values=cross1_starttime_et)
+    vs_start_et, _ = functions_general.find_nearest(array=et_times, values=vs_starttime_et)
+    vs_end_et, _ = functions_general.find_nearest(array=et_times, values=vs_endtime_et)
 
     return blocks_start_et, eyemap_start_et, eyemap_end_et, ms_start_et, ms_end_et, cross1_start_et, vs_start_et, vs_end_et
 
@@ -167,8 +167,8 @@ def meg_blocks_bounds_evt(raw, et_channel_names):
                     range(len(blocks_bounds_evt))]
 
     # Map MEG times to MEG samples
-    blocks_bounds_meg = [(functions.find_nearest(raw_et.times, blocks_times[i][0])[0],
-                          functions.find_nearest(raw_et.times, blocks_times[i][1])[0])
+    blocks_bounds_meg = [(functions_general.find_nearest(raw_et.times, blocks_times[i][0])[0],
+                          functions_general.find_nearest(raw_et.times, blocks_times[i][1])[0])
                          for i in range(len(blocks_bounds_evt))]
 
     return raw_et, meg_gazex, evt_buttons, evt_times, blocks_bounds_evt, blocks_bounds_meg
@@ -394,14 +394,14 @@ def define_events_trials_ET(raw, subject, config, exp_info, force_realign=False)
             if len(et_gazex_block) > len(meg_gazex_block):
                 raise ValueError('ET data is longer than MEG data. Please change the meg_drop_start parameter to a smaller one')
             else:
-                max_sample, corrs = functions.align_signals(signal_1=meg_gazex_block, signal_2=et_gazex_block)
+                max_sample, corrs = functions_general.align_signals(signal_1=meg_gazex_block, signal_2=et_gazex_block)
                 samples_shift = meg_block_start + meg_drop_start + max_sample - et_drop_start - et_block_start
                 max_sample = samples_shift - meg_block_start - meg_drop_start + et_drop_start + et_block_start
 
             # Save samples shift
             subject.config.preproc.et_samples_shift[block_num] = samples_shift
 
-            preproc_plot.alignment(subject=subject, et_gazex=et_gazex, meg_gazex=meg_gazex, corrs=corrs,
+            plot_preproc.alignment(subject=subject, et_gazex=et_gazex, meg_gazex=meg_gazex, corrs=corrs,
                                    et_block_start=et_block_start, meg_block_start=meg_block_start, max_sample=max_sample,
                                    et_block_end=et_block_end, meg_block_end=meg_block_end, et_drop_start=et_drop_start,
                                    meg_drop_start=meg_drop_start, block_num=block_num, block_trials=block_trials,
@@ -479,8 +479,8 @@ def define_events_trials_ET(raw, subject, config, exp_info, force_realign=False)
                                                                                    int((block_num + 1) * block_trials + 1))])
 
         # Flatten lists to append trial data
-        onset_block = functions.flatten_list(onset_block)
-        description_block = functions.flatten_list(description_block)
+        onset_block = functions_general.flatten_list(onset_block)
+        description_block = functions_general.flatten_list(description_block)
 
         # Iterate over trials
         print('Identifying responses in trials')
@@ -489,13 +489,13 @@ def define_events_trials_ET(raw, subject, config, exp_info, force_realign=False)
 
             if subject.subject_id in exp_info.missing_bh_subjects:
                 # Find last meg response in vs screen:
-                idx, meg_evt_time = functions.find_last_within(array=meg_evt_block_times,
-                                                               low_bound=vs_times_meg_block[trial],
-                                                               up_bound=vs_end_times_meg_block[trial])
+                idx, meg_evt_time = functions_general.find_last_within(array=meg_evt_block_times,
+                                                                       low_bound=vs_times_meg_block[trial],
+                                                                       up_bound=vs_end_times_meg_block[trial])
             else:
                 # Find nearest answer to vs end time
-                idx, meg_evt_time = functions.find_nearest(array=meg_evt_block_times,
-                                                           values=vs_end_times_meg_block[trial])
+                idx, meg_evt_time = functions_general.find_nearest(array=meg_evt_block_times,
+                                                                   values=vs_end_times_meg_block[trial])
 
             # Evaluate answer parameters
             time_diff = vs_end_times_meg_block[trial] - meg_evt_time
@@ -541,19 +541,19 @@ def define_events_trials_ET(raw, subject, config, exp_info, force_realign=False)
         onset.append(onset_block)
 
     # Flatten variables over blocks
-    cross1_times_meg = functions.flatten_list(cross1_times_meg)
-    ms_times_meg = functions.flatten_list(ms_times_meg)
-    cross2_times_meg = functions.flatten_list(cross2_times_meg)
-    vs_times_meg = functions.flatten_list(vs_times_meg)
-    vsend_times_meg = functions.flatten_list(vsend_times_meg)
-    buttons_meg = functions.flatten_list(buttons_meg)
-    response_times_meg = functions.flatten_list(response_times_meg)
-    time_differences = functions.flatten_list(time_differences)
-    response_trials_meg = functions.flatten_list(response_trials_meg)
-    no_answer = functions.flatten_list(no_answer)
+    cross1_times_meg = functions_general.flatten_list(cross1_times_meg)
+    ms_times_meg = functions_general.flatten_list(ms_times_meg)
+    cross2_times_meg = functions_general.flatten_list(cross2_times_meg)
+    vs_times_meg = functions_general.flatten_list(vs_times_meg)
+    vsend_times_meg = functions_general.flatten_list(vsend_times_meg)
+    buttons_meg = functions_general.flatten_list(buttons_meg)
+    response_times_meg = functions_general.flatten_list(response_times_meg)
+    time_differences = functions_general.flatten_list(time_differences)
+    response_trials_meg = functions_general.flatten_list(response_trials_meg)
+    no_answer = functions_general.flatten_list(no_answer)
 
-    description = functions.flatten_list(description)
-    onset = functions.flatten_list(onset)
+    description = functions_general.flatten_list(description)
+    onset = functions_general.flatten_list(onset)
 
     # Save clean events to MEG data
     raw.annotations.description = np.array(description)
@@ -713,8 +713,8 @@ def define_events_trials_trig(raw, subject, config, exp_info):
                                                                                     int((block_num + 1) * block_trials + 1))])
 
         # Flatten lists to append trial data
-        onset_block = functions.flatten_list(onset_block)
-        description_block = functions.flatten_list(description_block)
+        onset_block = functions_general.flatten_list(onset_block)
+        description_block = functions_general.flatten_list(description_block)
 
         # Iterate over trials
         print('Identifying responses in trials')
@@ -723,13 +723,13 @@ def define_events_trials_trig(raw, subject, config, exp_info):
 
             if subject.subject_id in exp_info.missing_bh_subjects:
                 # Find last meg response in vs screen:
-                idx, meg_evt_time = functions.find_last_within(array=evt_times,
-                                                               low_bound=vs_times_meg_block[trial],
-                                                               up_bound=vs_end_times_meg_block[trial])
+                idx, meg_evt_time = functions_general.find_last_within(array=evt_times,
+                                                                       low_bound=vs_times_meg_block[trial],
+                                                                       up_bound=vs_end_times_meg_block[trial])
             else:
                 # Find nearest answer to vs end time
-                idx, meg_evt_time = functions.find_nearest(array=evt_times,
-                                                           values=vs_end_times_meg_block[trial])
+                idx, meg_evt_time = functions_general.find_nearest(array=evt_times,
+                                                                   values=vs_end_times_meg_block[trial])
 
             # Evaluate answer parameters
             time_diff = vs_end_times_meg_block[trial] - meg_evt_time
@@ -775,19 +775,19 @@ def define_events_trials_trig(raw, subject, config, exp_info):
         onset.append(onset_block)
 
     # Flatten variables over blocks
-    cross1_times_meg = functions.flatten_list(cross1_times_meg)
-    ms_times_meg = functions.flatten_list(ms_times_meg)
-    cross2_times_meg = functions.flatten_list(cross2_times_meg)
-    vs_times_meg = functions.flatten_list(vs_times_meg)
-    vsend_times_meg = functions.flatten_list(vsend_times_meg)
-    buttons_meg = functions.flatten_list(buttons_meg)
-    response_times_meg = functions.flatten_list(response_times_meg)
-    time_differences = functions.flatten_list(time_differences)
-    response_trials_meg = functions.flatten_list(response_trials_meg)
-    no_answer = functions.flatten_list(no_answer)
+    cross1_times_meg = functions_general.flatten_list(cross1_times_meg)
+    ms_times_meg = functions_general.flatten_list(ms_times_meg)
+    cross2_times_meg = functions_general.flatten_list(cross2_times_meg)
+    vs_times_meg = functions_general.flatten_list(vs_times_meg)
+    vsend_times_meg = functions_general.flatten_list(vsend_times_meg)
+    buttons_meg = functions_general.flatten_list(buttons_meg)
+    response_times_meg = functions_general.flatten_list(response_times_meg)
+    time_differences = functions_general.flatten_list(time_differences)
+    response_trials_meg = functions_general.flatten_list(response_trials_meg)
+    no_answer = functions_general.flatten_list(no_answer)
 
-    description = functions.flatten_list(description)
-    onset = functions.flatten_list(onset)
+    description = functions_general.flatten_list(description)
+    onset = functions_general.flatten_list(onset)
 
     # Save clean events to MEG data
     raw.annotations.description = np.array(description)
@@ -1268,7 +1268,7 @@ def saccades_classification(subject, saccades, raw):
 
     # Add vs fixations data to raw annotations
     raw.annotations.description = np.concatenate((raw.annotations.description, np.array(description)))
-    raw.annotations.onset = np.concatenate((raw.annotations.onset, np.array(functions.flatten_list(onset))))
+    raw.annotations.onset = np.concatenate((raw.annotations.onset, np.array(functions_general.flatten_list(onset))))
 
     # Order raw.annotations chronologically
     raw_annot = np.array([raw.annotations.onset, raw.annotations.description])
@@ -1546,7 +1546,7 @@ def fixation_classification(subject, fixations, raw):
 
     # Add vs fixations data to raw annotations
     raw.annotations.description = np.concatenate((raw.annotations.description, np.array(description)))
-    raw.annotations.onset = np.concatenate((raw.annotations.onset, np.array(functions.flatten_list(onset))))
+    raw.annotations.onset = np.concatenate((raw.annotations.onset, np.array(functions_general.flatten_list(onset))))
 
     return fixations, raw
 
@@ -1662,7 +1662,7 @@ def target_vs_distractor(fixations, subject, raw, distance_threshold=70, screen_
 
     # Save to raw annotations
     raw.annotations.description = np.concatenate((raw.annotations.description, np.array(description)))
-    raw.annotations.onset = np.concatenate((raw.annotations.onset, np.array(functions.flatten_list(onset))))
+    raw.annotations.onset = np.concatenate((raw.annotations.onset, np.array(functions_general.flatten_list(onset))))
 
     raw_annot = np.array([raw.annotations.onset, raw.annotations.description])
     raw_annot = raw_annot[:, raw_annot[0].astype(float).argsort()]
@@ -1690,7 +1690,7 @@ def add_et_channels(raw, et_channels_meg, et_channel_names):
     channel_idx = np.append(channel_idx, mne.pick_channels(raw.info['ch_names'], ['UPPT001', 'UADC001-4123', 'UADC002-4123', 'UADC013-4123']))
     raw.pick(channel_idx)
     # Rename channels removing '-4123'
-    raw.rename_channels(functions.ch_name_map)
+    raw.rename_channels(functions_general.ch_name_map)
 
     # save to original raw structure (requires to load data)
     print('Loading MEG data')
@@ -1810,7 +1810,7 @@ def define_events_trials_BH(raw, subject):
     evt_buttons = evt_buttons[(evt_buttons == 'red') | (evt_buttons == 'blue') | (evt_buttons == 'green')]
 
     # Check for first trial when first response is not green
-    first_trial = functions.first_trial(evt_buttons)
+    first_trial = functions_general.first_trial(evt_buttons)
 
     # Drop events before 1st trial
     evt_buttons = evt_buttons[first_trial:]
@@ -1935,7 +1935,7 @@ def define_events_trials_BH(raw, subject):
                     if not np.isnan(bh_evt_times_block[trial]):
                         total_trial = int(block_num * block_trials + trial + 1)
 
-                        idx, meg_evt_time = functions.find_nearest(meg_evt_block_times, bh_evt_times_block[trial])
+                        idx, meg_evt_time = functions_general.find_nearest(meg_evt_block_times, bh_evt_times_block[trial])
                         onset_block.append(meg_evt_time)
                         description_block.append(meg_evt_block_buttons[idx])
 
@@ -2022,18 +2022,18 @@ def define_events_trials_BH(raw, subject):
             raise ValueError(f'Could not align MEG and BH responses in block {block_num + 1}')
 
     # flatten variables over blocks
-    response_trials_meg = functions.flatten_list(response_trials_meg)
-    cross1_times_meg = functions.flatten_list(cross1_times_meg)
-    ms_times_meg = functions.flatten_list(ms_times_meg)
-    cross2_times_meg = functions.flatten_list(cross2_times_meg)
-    vs_times_meg = functions.flatten_list(vs_times_meg)
-    buttons_meg = functions.flatten_list(buttons_meg)
-    response_times_meg = functions.flatten_list(response_times_meg)
-    time_differences = functions.flatten_list(time_differences)
-    no_answer = functions.flatten_list(no_answer)
+    response_trials_meg = functions_general.flatten_list(response_trials_meg)
+    cross1_times_meg = functions_general.flatten_list(cross1_times_meg)
+    ms_times_meg = functions_general.flatten_list(ms_times_meg)
+    cross2_times_meg = functions_general.flatten_list(cross2_times_meg)
+    vs_times_meg = functions_general.flatten_list(vs_times_meg)
+    buttons_meg = functions_general.flatten_list(buttons_meg)
+    response_times_meg = functions_general.flatten_list(response_times_meg)
+    time_differences = functions_general.flatten_list(time_differences)
+    no_answer = functions_general.flatten_list(no_answer)
 
-    description = functions.flatten_list(description)
-    onset = functions.flatten_list(onset)
+    description = functions_general.flatten_list(description)
+    onset = functions_general.flatten_list(onset)
 
     # Save clean events to MEG data
     raw.annotations.description = np.array(description)
@@ -2222,7 +2222,7 @@ def fixation_classification_BH(subject, bh_data, fixations, raw, meg_pupils_data
 
     # Add vs fixations data to raw annotations
     raw.annotations.description = np.concatenate((raw.annotations.description, np.array(description)))
-    raw.annotations.onset = np.concatenate((raw.annotations.onset, np.array(functions.flatten_list(onset))))
+    raw.annotations.onset = np.concatenate((raw.annotations.onset, np.array(functions_general.flatten_list(onset))))
 
     # Order raw.annotations chronologically
     raw_annot = np.array([raw.annotations.onset, raw.annotations.description])

@@ -1,8 +1,8 @@
 import setup
 import load
 import save
-import preproc_plot
-import preproc_functions
+import plot_preproc
+import functions_preproc
 from paths import paths
 
 
@@ -20,60 +20,60 @@ def preprocess(subject_code, exp_info, config, plot=False):
 
     #---------------- Remove DAC delay samples ----------------#
     meg_gazex_data_raw, meg_gazey_data_raw, meg_pupils_data_raw = \
-        preproc_functions.DAC_samples(et_channels_meg=et_channels_meg, exp_info=exp_info, sfreq=raw.info['sfreq'])
+        functions_preproc.DAC_samples(et_channels_meg=et_channels_meg, exp_info=exp_info, sfreq=raw.info['sfreq'])
 
     #---------------- Reescaling based on conversion parameters ----------------#
-    meg_gazex_data_scaled, meg_gazey_data_scaled = preproc_functions.reescale_et_channels(meg_gazex_data_raw=meg_gazex_data_raw,
+    meg_gazex_data_scaled, meg_gazey_data_scaled = functions_preproc.reescale_et_channels(meg_gazex_data_raw=meg_gazex_data_raw,
                                                                                           meg_gazey_data_raw=meg_gazey_data_raw)
 
     #---------------- Blinks removal ----------------#
     # Define intervals around blinks to also fill with nan. Due to conversion noise from square signal
-    et_channels_meg = preproc_functions.blinks_to_nan(meg_gazex_data_scaled=meg_gazex_data_scaled, meg_gazey_data_scaled=meg_gazey_data_scaled,
+    et_channels_meg = functions_preproc.blinks_to_nan(meg_gazex_data_scaled=meg_gazex_data_scaled, meg_gazey_data_scaled=meg_gazey_data_scaled,
                                                       meg_pupils_data_raw=meg_pupils_data_raw, config=subject.config.preproc)
 
     #---------------- Defining response events and trials ----------------#
     if subject.subject_id in exp_info.no_trig_subjects:
-        raw, subject = preproc_functions.define_events_trials_ET(raw=raw, subject=subject, config=config, exp_info=exp_info)
+        raw, subject = functions_preproc.define_events_trials_ET(raw=raw, subject=subject, config=config, exp_info=exp_info)
     else:
-        raw, subject = preproc_functions.define_events_trials_trig(raw=raw, subject=subject, config=config, exp_info=exp_info)
+        raw, subject = functions_preproc.define_events_trials_trig(raw=raw, subject=subject, config=config, exp_info=exp_info)
 
     #---------------- Fixations and saccades detection ----------------#
-    fixations, saccades, subject = preproc_functions.fixations_saccades_detection(raw=raw, et_channels_meg=et_channels_meg,
+    fixations, saccades, subject = functions_preproc.fixations_saccades_detection(raw=raw, et_channels_meg=et_channels_meg,
                                                                                   subject=subject)
 
     # ---------------- Saccades classification ----------------#
-    saccades, raw, subject = preproc_functions.saccades_classification(subject=subject, saccades=saccades, raw=raw)
+    saccades, raw, subject = functions_preproc.saccades_classification(subject=subject, saccades=saccades, raw=raw)
 
     #---------------- Fixations classification ----------------#
-    fixations, raw = preproc_functions.fixation_classification(subject=subject, fixations=fixations, raw=raw)
+    fixations, raw = functions_preproc.fixation_classification(subject=subject, fixations=fixations, raw=raw)
 
     #---------------- Items classification ----------------#
-    raw, subject, items_pos = preproc_functions.target_vs_distractor(fixations=fixations, subject=subject,
+    raw, subject, items_pos = functions_preproc.target_vs_distractor(fixations=fixations, subject=subject,
                                                                      raw=raw, distance_threshold=70)
 
     #---------------- Save fix time distribution, pupils size vs mss, scanpath and trial gaze figures ----------------#
     if plot:
-        preproc_plot.first_fixation_delay(subject=subject)
-        preproc_plot.pupil_size_increase(subject=subject)
-        preproc_plot.performance(subject=subject)
-        preproc_plot.fixation_duration(subject=subject)
-        preproc_plot.saccades_amplitude(subject=subject)
-        preproc_plot.saccades_dir_hist(subject=subject)
-        preproc_plot.sac_main_seq(subject=subject)
+        plot_preproc.first_fixation_delay(subject=subject)
+        plot_preproc.pupil_size_increase(subject=subject)
+        plot_preproc.performance(subject=subject)
+        plot_preproc.fixation_duration(subject=subject)
+        plot_preproc.saccades_amplitude(subject=subject)
+        plot_preproc.saccades_dir_hist(subject=subject)
+        plot_preproc.sac_main_seq(subject=subject)
 
         print('Plotting scanpaths and trials gaze screens')
         for trial_idx in range(len(subject.bh_data)):
             print(f'\rTrial {trial_idx + 1}', end='')
 
-            preproc_plot.scanpath(raw=raw, subject=subject, items_pos=items_pos, et_channels_meg=et_channels_meg, trial_idx=trial_idx)
+            plot_preproc.scanpath(raw=raw, subject=subject, items_pos=items_pos, et_channels_meg=et_channels_meg, trial_idx=trial_idx)
 
-            preproc_plot.trial_gaze(raw=raw, subject=subject, et_channels_meg=et_channels_meg, trial_idx=trial_idx)
+            plot_preproc.trial_gaze(raw=raw, subject=subject, et_channels_meg=et_channels_meg, trial_idx=trial_idx)
 
         for block_num in range(len(subject.emap)):
-            preproc_plot.emap_gaze(raw=raw, subject=subject, et_channels_meg=et_channels_meg, block_num=block_num)
+            plot_preproc.emap_gaze(raw=raw, subject=subject, et_channels_meg=et_channels_meg, block_num=block_num)
 
     #---------------- Add scaled data to meg data ----------------#
-    preproc_functions.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=exp_info.et_channel_names)
+    functions_preproc.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=exp_info.et_channel_names)
 
     #---------------- Save preprocesed data ----------------#
     save.preprocessed_data(raw=raw, subject=subject, config=config)
