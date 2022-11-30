@@ -3,6 +3,8 @@ import setup
 import os
 import pathlib
 import pickle
+import mne
+import functions_general
 
 
 def config(path, fname):
@@ -107,3 +109,30 @@ def preproc_subject(exp_info, subject_code):
     except:
         print(f'Directory: {os.listdir(pathlib.Path(os.path.join(preproc_path, subject_id)))}')
         raise ValueError(f'Preprocessed data for subject {subject_id} not found in {file_path}')
+
+
+def filtered_data(subject, band_id, preload=False):
+
+    filtered_path = paths().filtered_path() + f'{band_id}/{subject.subject_id}/'
+
+    # Try to load filtered data
+    try:
+        print(f'Loading filtered data for subject {subject.subject_id} in band {band_id}')
+        file_path = pathlib.Path(os.path.join(filtered_path, f'Subject_{subject.subject_id}_meg.fif'))
+        # Load data
+        filtered_data = mne.io.read_raw_fif(file_path, preload=preload)
+
+    except:
+        print(f'No previous filtered data found for subject {subject.subject_id} in band {band_id}.\n'
+              f'Filtering data...')
+        preproc_data = subject.load_preproc_meg(preload=True)
+        l_freq, h_freq = functions_general.get_freq_band(band_id)
+        filtered_data = preproc_data.filter(l_freq=l_freq, h_freq=h_freq)
+
+        print('Saving filtered data')
+        # Save MEG
+        os.makedirs(filtered_path, exist_ok=True)
+        filtered_meg_data_fname = f'Subject_{subject.subject_id}_meg.fif'
+        filtered_data.save(filtered_path + filtered_meg_data_fname, overwrite=True)
+
+    return filtered_data

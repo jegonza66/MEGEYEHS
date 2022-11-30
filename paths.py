@@ -173,6 +173,29 @@ class paths:
         return preproc_path
 
 
+    def filtered_path(self):
+        """
+        Paths to the filtered data folder.
+
+        Returns
+        -------
+        filtered_path: str
+            Path in str format to the folder containing the filtered data.
+        """
+
+        if self.name == 'laptop-5i5qsv76\\joaco\n':
+            filtered_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/Python/Save/Filtered_Data/'
+        elif self.name == 'usuario\n': # Liaa Colores
+            filtered_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Python/Save/Filtered_Data/'
+        else:
+            filtered_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/Save/Filtered_Data/'
+
+        # Create directory if it doesn't exist
+        os.makedirs(filtered_path, exist_ok=True)
+
+        return filtered_path
+
+
     def results_path(self):
         """
         Paths to the results folder.
@@ -194,6 +217,7 @@ class paths:
         os.makedirs(results_path, exist_ok=True)
 
         return results_path
+
 
     def plots_path(self):
         """

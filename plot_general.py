@@ -1,12 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib.image as mpimg
-import matplotlib as mpl
-import os
-import seaborn as sn
-import pandas as pd
-
-import functions_general
 from paths import paths
 import save
 
@@ -14,38 +7,45 @@ save_path = paths().save_path()
 plot_path = paths().plots_path()
 
 
-def epochs(subject, epochs, picks, epoch_id, pick_chs, order=None, overlay=None, combine='mean', display_figs=False, group_by=None):
-    fig_ep = epochs.plot_image(picks=picks, order=order, sigma=5, cmap='jet', overlay_times=overlay, combine=combine,
+def epochs(subject, epochs, picks, order=None, overlay=None, combine='mean', sigma=5, display_figs=False,
+           save_fig=None, fig_path=None, fname=None, group_by=None):
+
+    if save_fig and (not fname or not fig_path):
+        raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
+
+    fig_ep = epochs.plot_image(picks=picks, order=order, sigma=sigma, cmap='jet', overlay_times=overlay, combine=combine,
                                title=subject.subject_id, show=display_figs)
-    fig_path = plot_path + f'Epochs/{epoch_id}/'
 
     # Save figure
-    if len(fig_ep) == 1:
-        fig = fig_ep[0]
-        fname = 'Epochs_' + subject.subject_id + f'_{pick_chs}_{combine}'
-        save.fig(fig=fig, path=fig_path, fname=fname)
-    else:
-        for i in range(len(fig_ep)):
-            fig = fig_ep[i]
-            group = group_by.keys()[i]
-            fname = f'Epochs_{group}' + subject.subject_id + f'_{pick_chs}_{combine}'
+    if save_fig:
+        if len(fig_ep) == 1:
+            fig = fig_ep[0]
             save.fig(fig=fig, path=fig_path, fname=fname)
+        else:
+            for i in range(len(fig_ep)):
+                fig = fig_ep[i]
+                group = group_by.keys()[i]
+                fname += f'{group}'
+                save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def evoked(subject, evoked_meg, evoked_misc, picks, filter_evoked, l_freq, h_freq, plot_gaze=False,
+def evoked(evoked_meg, evoked_misc, picks, plot_gaze=False, fig=None,
            axes=None, plot_xlim=None, display_figs=False, save_fig=True, fig_path=None, fname=None):
 
     # Sanity check
-    if save_fig and (not fname or not subject):
+    if save_fig and (not fname or not fig_path):
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
     if axes:
         plot_gaze = False
 
+        if save_fig and not fig:
+            raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
+
     if plot_gaze:
         # Get Gaze x ch
         gaze_x_ch_idx = np.where(np.array(evoked_misc.ch_names) == 'ET_gaze_x')[0][0]
-        fig_ev, axs = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]})
+        fig, axs = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]})
 
         axs[1].plot(evoked_misc.times, evoked_misc.data[gaze_x_ch_idx, :])
         axs[1].vlines(x=0, ymin=axs[1].get_ylim()[0], ymax=axs[1].get_ylim()[1], color='grey', linestyles='--')
@@ -56,25 +56,28 @@ def evoked(subject, evoked_meg, evoked_misc, picks, filter_evoked, l_freq, h_fre
         axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
 
         if save_fig:
-            if filter_evoked:
-                fname += f'_lfreq{l_freq}_hfreq{h_freq}'
-            save.fig(fig=fig_ev, path=fig_path, fname=fname)
+            save.fig(fig=fig, path=fig_path, fname=fname)
 
     else:
         evoked_meg.plot(picks=picks, gfp=True, axes=axes, time_unit='s', spatial_colors=True, xlim=plot_xlim,
                         show=display_figs)
         axes.vlines(x=0, ymin=axes.get_ylim()[0], ymax=axes.get_ylim()[1], color='grey', linestyles='--')
 
+        if save_fig:
+            save.fig(fig=fig, path=fig_path, fname=fname)
 
-def evoked_topo(evoked_meg, picks, filter_evoked, l_freq, h_freq, topo_times, title=None,
-                axes_ev=None, axes_topo=None, xlim=None, ylim=None, display_figs=False, save_fig=False, fig_path=None,
-                fname=None):
+
+def evoked_topo(evoked_meg, picks, topo_times, title=None, fig=None, axes_ev=None, axes_topo=None, xlim=None, ylim=None,
+                display_figs=False, save_fig=False, fig_path=None, fname=None):
 
     # Sanity check
     if save_fig and (not fig_path or not fname):
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
     if axes_ev and axes_topo:
+        if save_fig and not fig:
+            raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
+
         display_figs = True
 
         evoked_meg.plot_joint(times=topo_times, title=title, picks=picks, show=display_figs,
@@ -82,6 +85,9 @@ def evoked_topo(evoked_meg, picks, filter_evoked, l_freq, h_freq, topo_times, ti
                               topomap_args={'axes': axes_topo})
 
         axes_ev.vlines(x=0, ymin=axes_ev.get_ylim()[0], ymax=axes_ev.get_ylim()[1], color='grey', linestyles='--')
+
+        if save_fig:
+            save.fig(fig=fig, path=fig_path, fname=fname)
 
     else:
         fig = evoked_meg.plot_joint(times=topo_times, title=title, picks=picks, show=display_figs,
@@ -92,8 +98,6 @@ def evoked_topo(evoked_meg, picks, filter_evoked, l_freq, h_freq, topo_times, ti
         axes_ev.vlines(x=0, ymin=axes_ev.get_ylim()[0], ymax=axes_ev.get_ylim()[1], color='grey', linestyles='--')
 
         if save_fig:
-            if filter_evoked:
-                fname += f'_lfreq{l_freq}_hfreq{h_freq}'
             save.fig(fig=fig, path=fig_path, fname=fname)
 
 

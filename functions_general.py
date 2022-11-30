@@ -269,3 +269,111 @@ def pick_chs(chs_id, info):
         picks = right_chs + left_chs
 
     return picks
+
+
+def get_freq_band(band_id):
+    '''
+    :param band_id: str ('Delta/Theta/Alpha/Beta/Gamma
+        String determining the frequency bands to get.
+
+    :return: l_freq: int
+        Lower edge of frequency band.
+    :return: h_freq: int
+        High edge of frequency band.
+    '''
+    if type(band_id) == str:
+
+        # Get multiple frequency bands
+        bands = band_id.split('_')
+        l_freqs = []
+        h_freqs = []
+
+        for band in bands:
+            if band == 'Delta':
+                l_freq = 1
+                h_freq = 4
+            elif band == 'Theta':
+                l_freq = 4
+                h_freq = 8
+            elif band == 'Alpha':
+                l_freq = 8
+                h_freq = 13
+            elif band == 'Beta':
+                l_freq = 13
+                h_freq = 25
+            elif band == 'Gamma':
+                l_freq = 25
+                h_freq = 80
+            elif band == 'Broad':
+                l_freq = 0.5
+                h_freq = 100
+
+            l_freqs.append(l_freq)
+            h_freqs.append(h_freq)
+
+        l_freq = np.min(l_freqs)
+        h_freq = np.max(h_freqs)
+
+    elif type(band_id) == tuple:
+        l_freq = band_id[0]
+        h_freq = band_id[1]
+
+    elif band_id == None:
+
+        l_freq = None
+        h_freq = None
+
+    return l_freq, h_freq
+
+
+def get_time_lims(epoch_id, map=None):
+    '''
+
+    :param epoch_id: str
+        String with the name of the epochs to select.
+    :param map: dict
+        Dictionary of dictionaries indicating the times associated to each type of epoch id.
+        Keys should be 'fix', 'sac', and within those keys, a dictionary with keys 'tmin', 'tmax', 'plot_xlim' with their corresponding values.
+
+    :return: tmin: float
+        time corresponding to time start of the epochs.
+    :return: tmax: float
+        time corresponding to time end of the epochs.
+    :return: plot_xlim: tuple of float
+        time start and end to plot.
+
+    '''
+    if map:
+        for key in map.keys():
+            if key in epoch_id:
+                tmin = map[key]['tmin']
+                tmax = map[key]['tmax']
+                plot_xlim = map[key]['plot_xlim']
+            else:
+                raise ValueError('No key matched the epoch id.')
+    else:
+        if 'fix' in epoch_id:
+            tmin = -0.1
+            tmax = 0.2
+            plot_xlim = (tmin, tmax)
+        elif 'sac' in epoch_id:
+            tmin = -0.1
+            tmax = 0.1
+            plot_xlim = (-0.05, 0.1)
+        else:
+            tmin = -0.1
+            tmax = 0.1
+            plot_xlim = (-0.05, 0.1)
+
+    return tmin, tmax, plot_xlim
+
+def get_item(epoch_id):
+
+    if 'tgt' in epoch_id:  # 1 for target, 0 for item, None for none
+        tgt = 1
+    elif 'it' in epoch_id:
+        tgt = 0
+    else:
+        tgt = None
+
+    return tgt
