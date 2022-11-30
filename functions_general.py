@@ -59,7 +59,7 @@ def find_nearest(array, values):
     -------
     idx: int
       The index of the element in the array that is nearest to the given value.
-    element:
+    element: int float
         The nearest element to the specified value
     """
     array = np.asarray(array)
@@ -237,3 +237,35 @@ def ch_name_map(orig_ch_name):
     else:
         new_ch_name = orig_ch_name
     return new_ch_name
+
+
+def pick_chs(chs_id, info):
+    '''
+
+    :param chs_id: 'mag'/'LR'/'parietal/occipital/'frontal'/sac_chs/parietal+'
+        String identifying the channels to pick.
+    :param info: class attribute
+        info attribute from the evoked data.
+    :return: picks: list
+        List of chosen channel names.
+    '''
+
+    if chs_id == 'mag':
+        picks = 'mag'
+    elif chs_id == 'parietal':
+        ch_names = info.ch_names
+        picks = [ch_name for ch_name in ch_names if 'M' in ch_name and 'P' in ch_name]
+    elif chs_id == 'occipital':
+        ch_names = info.ch_names
+        picks = [ch_name for ch_name in ch_names if 'M' in ch_name and 'O' in ch_name]
+    elif chs_id == 'frontal':
+        ch_names = info.ch_names
+        picks = [ch_name for ch_name in ch_names if 'M' in ch_name and 'F' in ch_name]
+    elif chs_id == 'sac_chs':
+        picks = ['MLF14', 'MLF13', 'MLF12', 'MLF11', 'MRF11', 'MRF12', 'MRF13', 'MRF14', 'MZF01']
+    elif chs_id == 'LR':
+        right_chs = ['MRT51', 'MRT52', 'MRT53']
+        left_chs = ['MLT51', 'MLT52', 'MLT53']
+        picks = right_chs + left_chs
+
+    return picks

@@ -1,8 +1,10 @@
-import pandas as pd
 import os
 import functions_general
+import functions_analysis
 import load
 import mne
+
+import plot_general
 import save
 import matplotlib.pyplot as plt
 import setup
@@ -27,10 +29,10 @@ else:
 '''
 Select channels or set picks = 'mag')
 '''
-pick_chs = 'mag'
-if pick_chs == 'mag':
+chs_id = 'mag'
+if chs_id == 'mag':
     picks = 'mag'
-elif pick_chs == 'LR':
+elif chs_id == 'LR':
     right_chs = ['MRT51', 'MRT52', 'MRT53']
     left_chs = ['MLT51', 'MLT52', 'MLT53']
     picks = right_chs + left_chs
@@ -46,17 +48,17 @@ Id Format
 Saccades: f'{dir}_sac_{screen}_t{trial}_{n_sacs[-1]}'
 Fixations: f'{prefix}_fix_{screen}_t{trial}_{n_fix}' prefix (tgt/it/none)only if vs screen
 '''
-evt_from_df = False
-evt_from_annot = True
+evt_from_df = True
+evt_from_annot = False
 
 # MSS
-mss = 4
+mss = None
 # Id
-epoch_id = f'cross2_mss{mss}'
+epoch_id = f'fix_ms'
 # Screen
-screen = None
+screen = 'ms'
 # Duration
-dur = None  # seconds
+dur = 0.2  # seconds
 # Direction
 dir = None
 # Item
@@ -89,48 +91,10 @@ for subject_code in exp_info.subjects_ids:
     bads = subject.bad_channels
     meg_data.info['bads'].extend(bads)
 
-    if 'fix' in epoch_id:
-        metadata = subject.fixations
-    elif 'sac' in epoch_id:
-        metadata = subject.saccades
-
-    if evt_from_df:
-        # Get events from fix/sac Dataframe
-        if screen:
-            metadata = metadata.loc[(metadata['screen'] == screen)]
-        if mss:
-            metadata = metadata.loc[(metadata['mss'] == mss)]
-        if dur:
-            metadata = metadata.loc[(metadata['duration'] >= dur)]
-        if 'fix' in epoch_id:
-            if tgt == 1:
-                metadata = metadata.loc[(metadata['fix_target'] == tgt)]
-            elif tgt == 0:
-                metadata = metadata.loc[(metadata['fix_target'] == tgt)]
-        if 'sac' in epoch_id:
-            if dir:
-                metadata = metadata.loc[(metadata['dir'] == dir)]
-
-        events_samples, event_times = functions_general.find_nearest(meg_data.times, metadata['onset'])
-
-        events = np.zeros((len(events_samples), 3)).astype(int)
-        events[:, 0] = events_samples
-        events[:, 2] = metadata.index
-
-        events_id = dict(zip(metadata.id, metadata.index))
-
-    elif evt_from_annot:
-        # Get events from annotations
-        all_events, all_event_id = mne.events_from_annotations(meg_data, verbose=False)
-        # Select epochs
-        # epoch_keys = [key for key in all_event_id.keys() if epoch_id in key]
-        trials_mss = subject.bh_data.loc[subject.bh_data['Nstim'] == mss].index + 1  # add 1 due to python 0th indexing
-        epoch_keys = [f'cross2_t{trial_mss}' for trial_mss in trials_mss]
-
-        # Get events and ids matchig selection
-        metadata, events, events_id = mne.epochs.make_metadata(events=all_events, event_id=all_event_id,
-                                                              row_events=epoch_keys, tmin=0, tmax=0,
-                                                              sfreq=meg_data.info['sfreq'])
+    metadata, events, events_id = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
+                                                                   evt_from_df=evt_from_df, evt_from_annot=evt_from_annot,
+                                                                   screen=screen, mss=mss, dur=dur, tgt=tgt, dir=dir,
+                                                                   meg_data=meg_data)
 
     # Reject based on channel amplitude
     reject = dict(mag=subject.config.general.reject_amp)
@@ -140,10 +104,6 @@ for subject_code in exp_info.subjects_ids:
                         event_repeated='drop', metadata=metadata, preload=True)
     # Drop bad epochs
     epochs.drop_bad()
-
-    # Define evoked and append for GA
-    evoked = epochs.average(picks=['mag', 'misc'])
-    evokeds.append(evoked)
 
     # Parameters for plotting
     overlay = None
@@ -155,23 +115,14 @@ for subject_code in exp_info.subjects_ids:
     group_by = {}
 
     # Plot epochs
-    fig_ep = epochs.plot_image(picks=picks, order=order, sigma=5, cmap='jet', overlay_times=overlay, combine=combine,
-                               title=subject.subject_id, show=display_figs)
-    fig_path = plot_path + f'Epochs/{epoch_id}/'
+    plot_general.epochs(subject=subject, epochs=epochs, picks=picks, epoch_id=epoch_id, chs_id=chs_id,
+                        order=order, overlay=overlay, combine=combine, display_figs=display_figs, group_by=group_by)
 
-    # Save figure
-    if len(fig_ep) == 1:
-        fig = fig_ep[0]
-        fname = 'Epochs_' + subject.subject_id + f'_{pick_chs}_{combine}'
-        save.fig(fig=fig, path=fig_path, fname=fname)
-    else:
-        for i in range(len(fig_ep)):
-            fig = fig_ep[i]
-            group = group_by.keys()[i]
-            fname = f'Epochs_{group}' + subject.subject_id + f'_{pick_chs}_{combine}'
-            save.fig(fig=fig, path=fig_path, fname=fname)
+    #----- Evoked -----#
+    # Define evoked and append for GA
+    evoked = epochs.average(picks=['mag', 'misc'])
+    evokeds.append(evoked)
 
-    # Plot evoked
     # Separete MEG and misc channels
     evoked_meg = evoked.copy().pick('mag')
     evoked_misc = evoked.copy().pick('misc')
@@ -180,21 +131,12 @@ for subject_code in exp_info.subjects_ids:
     if filter_evoked:
         evoked_meg.filter(l_freq=l_freq, h_freq=h_freq, fir_design='firwin')
 
-    # Get Gaze x ch
-    gaze_x_ch_idx = np.where(np.array(evoked_misc.ch_names) == 'ET_gaze_x')[0][0]
-
-    fig_ev, axs = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]})
-    axs[1].plot(evoked_misc.times, evoked_misc.data[gaze_x_ch_idx, :])
-    axs[1].vlines(x=0, ymin=axs[1].get_ylim()[0], ymax=axs[1].get_ylim()[1], color='grey', linestyles='--')
-    axs[1].set_ylabel('Gaze x')
-    axs[1].set_xlabel('Time')
-    evoked_meg.plot(picks=picks, gfp=True, axes=axs[0], time_unit='s', spatial_colors=True, xlim=plot_xlim, show=display_figs)
-    axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
+    # Plot evoked
     fig_path = plot_path + f'Evoked/{epoch_id}/'
-    fname = 'Evoked_' + subject.subject_id + f'_{pick_chs}'
-    if filter_evoked:
-        fname += f'_lfreq{l_freq}_hfreq{h_freq}'
-    save.fig(fig=fig_ev, path=fig_path, fname=fname)
+    fname = 'Evoked_' + subject.subject_id + f'_{chs_id}'
+    plot_general.evoked(subject=subject, evoked_meg=evoked_meg, evoked_misc=evoked_misc, picks=picks,
+                        filter_evoked=filter_evoked, l_freq=l_freq, h_freq=h_freq, plot_gaze=True,
+                        plot_xlim=plot_xlim, display_figs=display_figs, save_fig=True, fig_path=fig_path, fname=fname)
 
     # Save data
     if save_data:
@@ -229,40 +171,25 @@ grand_avg_misc = grand_avg.copy().pick('misc')
 if filter_evoked:
     grand_avg_meg.filter(l_freq=l_freq, h_freq=h_freq, fir_design='firwin')
 
-# Get Gaze x ch
-gaze_x_ch_idx = np.where(np.array(grand_avg_misc.ch_names) == 'ET_gaze_x')[0][0]
-
-# Plot
-fig, axs = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]})
-axs[1].plot(grand_avg_misc.times, grand_avg_misc.data[gaze_x_ch_idx, :])
-axs[1].vlines(x=0, ymin=axs[1].get_ylim()[0], ymax=axs[1].get_ylim()[1], color='grey', linestyles='--')
-axs[1].set_ylabel('Gaze x')
-axs[1].set_xlabel('Time')
-grand_avg_meg.plot(picks=picks, gfp=True, axes=axs[0], time_unit='s', spatial_colors=True, xlim=plot_xlim,
-                   titles=f'Grand average', show=display_figs)
-axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
+# Plot evoked
+save_fig = True
 fig_path = plot_path + f'Evoked/{epoch_id}/'
-fname = f'Grand_average_{pick_chs}'
-if filter_evoked:
-    fname += f'_lfreq{l_freq}_hfreq{h_freq}'
-save.fig(fig, fig_path, fname)
+fname = f'Grand_average_{chs_id}'
+
+plot_general.evoked(subject=None, evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
+                    filter_evoked=filter_evoked, l_freq=l_freq, h_freq=h_freq, plot_gaze=True,
+                    plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path, fname=fname)
 
 # Plot Saccades frontal channels
 if 'sac' in epoch_id:
 
+    save_fig = True
+    fig_path = plot_path + f'Evoked/{epoch_id}/'
+    fname = f'Grand_average_front_ch'
     sac_chs = ['MLF14', 'MLF13', 'MLF12', 'MLF11', 'MRF11', 'MRF12', 'MRF13',
                'MRF14', 'MZF01']
 
-    fig, axs = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]})
-    axs[1].plot(grand_avg_misc.times, grand_avg_misc.data[gaze_x_ch_idx, :])
-    axs[1].vlines(x=0, ymin=axs[1].get_ylim()[0], ymax=axs[1].get_ylim()[1], color='grey', linestyles='--')
-    axs[1].set_ylabel('Gaze x')
-    axs[1].set_xlabel('Time')
-    grand_avg_meg.plot(picks=sac_chs, gfp=True, axes=axs[0], time_unit='s', spatial_colors=True, xlim=plot_xlim,
-                       titles=f'Grand average', show=display_figs)
-    axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
-    fig_path = plot_path + f'Evoked/{epoch_id}/'
-    fname = f'Grand_average_front_ch'
-    if filter_evoked:
-        fname += f'_lfreq{l_freq}_hfreq{h_freq}'
-    save.fig(fig, fig_path, fname)
+    plot_general.evoked(subject=None, evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc,
+                        picks=sac_chs, filter_evoked=filter_evoked, l_freq=l_freq, h_freq=h_freq,
+                        plot_gaze=True, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path,
+                        fname=fname)
