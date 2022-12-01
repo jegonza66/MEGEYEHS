@@ -24,7 +24,7 @@ chs_id = 'mag'
 #-----  Select frequency band -----#
 band_id = 'Theta'
 
-epoch_id = 'it_fix'
+epoch_id = 'it_fix_vs'
 
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
@@ -37,22 +37,29 @@ for subject_code in exp_info.subjects_ids:
 
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
 
-    epochs_save_path = save_path + f'Epochs/' + run_path + subject.subject_id + '/'
-    epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
-    epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
-
-    # Get evoked by averaging epochs
-    evoked = epochs.average(picks=['mag', 'misc'])
-    # Apend to evokeds list to pass to grand average
-    evokeds.append(evoked)
-
-    # Save data
-    if save_data:
-        # Save evoked data
+    try:
+        # Load evoked data
         evoked_save_path = save_path + f'Evoked/' + run_path + subject.subject_id + '/'
-        os.makedirs(evoked_save_path, exist_ok=True)
         evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
-        evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
+        evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, condition=0)
+    except:
+        # Load epoched data
+        epochs_save_path = save_path + f'Epochs/' + run_path + subject.subject_id + '/'
+        epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+        epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+
+        # Get evoked by averaging epochs
+        evoked = epochs.average(picks=['mag', 'misc'])
+        # Apend to evokeds list to pass to grand average
+        evokeds.append(evoked)
+
+        # Save data
+        if save_data:
+            # Save evoked data
+            evoked_save_path = save_path + f'Evoked/' + run_path + subject.subject_id + '/'
+            os.makedirs(evoked_save_path, exist_ok=True)
+            evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
+            evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
 
     # Separete MEG and misc channels
     evoked_meg = evoked.copy().pick('mag')

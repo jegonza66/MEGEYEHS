@@ -27,7 +27,7 @@ else:
 
 #----- Parameters -----#
 # Frequency band
-band_id = 'Theta'
+band_id = 'Alpha'
 # Id
 epoch_id = f'it_fix_vs'
 # MSS
@@ -58,31 +58,47 @@ evokeds = []
 for subject_code in exp_info.subjects_ids:
 
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-    if band_id:
-        meg_data = load.filtered_data(subject=subject, band_id=band_id)
-    else:
-        meg_data = subject.load_preproc_meg()
 
-    # Pick MEG channels to plot
-    picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
+    try:
+        # Load epoched data
+        epochs_save_path = save_path + f'Epochs/' + run_path + subject.subject_id + '/'
+        epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+        epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+    except:
+        # Compute
+        if band_id:
+            meg_data = load.filtered_data(subject=subject, band_id=band_id, save_data=False)
+        else:
+            meg_data = subject.load_preproc_meg()
 
-    # Exclude bad channels
-    bads = subject.bad_channels
-    meg_data.info['bads'].extend(bads)
+        # Pick MEG channels to plot
+        picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
 
-    metadata, events, events_id = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
-                                                                   evt_from_df=evt_from_df, evt_from_annot=evt_from_annot,
-                                                                   screen=screen, mss=mss, dur=dur, tgt=tgt, dir=dir,
-                                                                   meg_data=meg_data)
+        # Exclude bad channels
+        bads = subject.bad_channels
+        meg_data.info['bads'].extend(bads)
 
-    # Reject based on channel amplitude
-    reject = dict(mag=subject.config.general.reject_amp)
+        metadata, events, events_id = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
+                                                                       evt_from_df=evt_from_df, evt_from_annot=evt_from_annot,
+                                                                       screen=screen, mss=mss, dur=dur, tgt=tgt, dir=dir,
+                                                                       meg_data=meg_data)
 
-    # Epoch data
-    epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=tmin, tmax=tmax, reject=reject,
-                        event_repeated='drop', metadata=metadata, preload=True)
-    # Drop bad epochs
-    epochs.drop_bad()
+        # Reject based on channel amplitude
+        reject = dict(mag=subject.config.general.reject_amp)
+
+        # Epoch data
+        epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=tmin, tmax=tmax, reject=reject,
+                            event_repeated='drop', metadata=metadata, preload=True)
+        # Drop bad epochs
+        epochs.drop_bad()
+
+        if save_data:
+            # Save epoched data
+            epochs.reset_drop_log_selection()
+            epoch_save_path = save_path + f'Epochs/' + run_path + subject.subject_id + '/'
+            os.makedirs(epoch_save_path, exist_ok=True)
+            epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+            epochs.save(epoch_save_path + epochs_data_fname, overwrite=True)
 
     # Parameters for plotting
     overlay = None
@@ -117,15 +133,7 @@ for subject_code in exp_info.subjects_ids:
                         plot_gaze=True, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
                         fig_path=fig_path, fname=fname)
 
-    # Save data
     if save_data:
-        # Save epoched data
-        epochs.reset_drop_log_selection()
-        epoch_save_path = save_path + f'Epochs/' + run_path + subject.subject_id + '/'
-        os.makedirs(epoch_save_path, exist_ok=True)
-        epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
-        epochs.save(epoch_save_path + epochs_data_fname, overwrite=True)
-
         # Save evoked data
         evoked_save_path = save_path + f'Evoked/' + run_path + subject.subject_id + '/'
         os.makedirs(evoked_save_path, exist_ok=True)

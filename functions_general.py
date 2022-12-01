@@ -241,7 +241,6 @@ def ch_name_map(orig_ch_name):
 
 def pick_chs(chs_id, info):
     '''
-
     :param chs_id: 'mag'/'LR'/'parietal/occipital/'frontal'/sac_chs/parietal+'
         String identifying the channels to pick.
     :param info: class attribute
@@ -249,18 +248,10 @@ def pick_chs(chs_id, info):
     :return: picks: list
         List of chosen channel names.
     '''
+    picks = info.ch_names
 
     if chs_id == 'mag':
         picks = 'mag'
-    elif chs_id == 'parietal':
-        ch_names = info.ch_names
-        picks = [ch_name for ch_name in ch_names if 'M' in ch_name and 'P' in ch_name]
-    elif chs_id == 'occipital':
-        ch_names = info.ch_names
-        picks = [ch_name for ch_name in ch_names if 'M' in ch_name and 'O' in ch_name]
-    elif chs_id == 'frontal':
-        ch_names = info.ch_names
-        picks = [ch_name for ch_name in ch_names if 'M' in ch_name and 'F' in ch_name]
     elif chs_id == 'sac_chs':
         picks = ['MLF14', 'MLF13', 'MLF12', 'MLF11', 'MRF11', 'MRF12', 'MRF13', 'MRF14', 'MZF01']
     elif chs_id == 'LR':
@@ -268,6 +259,19 @@ def pick_chs(chs_id, info):
         left_chs = ['MLT51', 'MLT52', 'MLT53']
         picks = right_chs + left_chs
 
+    else:
+        ids = chs_id.split('_')
+        for id in ids:
+            if id == 'parietal':
+                picks = [ch_name for ch_name in picks if 'M' in ch_name and 'P' in ch_name]
+            elif id == 'occipital':
+                picks = [ch_name for ch_name in picks if 'M' in ch_name and 'O' in ch_name]
+            elif id == 'frontal':
+                picks = [ch_name for ch_name in picks if 'M' in ch_name and 'F' in ch_name]
+            elif id == 'L':
+                picks = [ch_name for ch_name in picks if 'M' in ch_name and 'L' in ch_name]
+            elif id == 'R':
+                picks = [ch_name for ch_name in picks if 'M' in ch_name and 'R' in ch_name]
     return picks
 
 
