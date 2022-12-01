@@ -9,7 +9,6 @@ save_path = paths().save_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
-save_data = False
 display_figs = True
 if display_figs:
     plt.ion()
@@ -30,7 +29,7 @@ chs_id_list = ['mag', 'mag', 'parietal', 'parietal']  # ('mag'/'LR'/'parietal/oc
 ax_evoked_list = [ax_evoked_vs_1, ax_evoked_ms_1, ax_evoked_vs_2, ax_evoked_ms_2]
 ax_topo_list = [ax_topo_vs_1, ax_topo_ms_1, ax_topo_vs_2, ax_topo_ms_2]
 
-topo_times_list = [[0.088, 0.11], [0.105], [0.11], [0.105]]
+topo_times_list = [[0.09, 0.11], [0.105], [0.11], [0.105]]
 ylim_list = [dict(mag=[-110, 110]), dict(mag=[-110, 110]), dict(mag=[-50, 60]), dict(mag=[-50, 60])]
 
 
@@ -56,7 +55,7 @@ for epoch_id, chs_id, ax_evoked, ax_topo, topo_times, ylim in zip(epoch_ids, chs
 
     # Plot evoked
     save_fig = False
-    fig_path = plot_path + f'Evoked/' + run_path
+    fig_path = plot_path + f'Evoked/' + f'{band_id}/'
     fname = f'Grand_average_{chs_id}'
 
     plot_general.evoked_topo(evoked_meg=grand_avg_meg, picks=picks, fig=fig,
@@ -67,12 +66,14 @@ for epoch_id, chs_id, ax_evoked, ax_topo, topo_times, ylim in zip(epoch_ids, chs
 
 #----- Load Grand Average data -----#
 epoch_id = 'it_fix_vs'
+run_path = f'/{band_id}/{epoch_id}_{tmin}_{tmax}/'
 ga_save_path = save_path + f'Evoked/' + run_path
 grand_avg_data_fname = f'Grand_average_ave.fif'
 grand_avg_vs = mne.read_evokeds(ga_save_path + grand_avg_data_fname, condition=0)
 grand_avg_vs_meg = grand_avg_vs.copy().pick('meg')
 
 epoch_id = 'fix_ms'
+run_path = f'/{band_id}/{epoch_id}_{tmin}_{tmax}/'
 ga_save_path = save_path + f'Evoked/' + run_path
 grand_avg_data_fname = f'Grand_average_ave.fif'
 grand_avg_ms = mne.read_evokeds(ga_save_path + grand_avg_data_fname, condition=0)
@@ -91,7 +92,7 @@ chs_id = 'parietal'
 picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg_vs_meg.info)
 
 # Plot
-save_fig = False
+save_fig = True
 fig_path = plot_path + f'Evoked/' + f'{band_id}/'
 fname = f'Grand_Average_VS_MS_{chs_id}'
 

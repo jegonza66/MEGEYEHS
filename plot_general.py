@@ -1,3 +1,4 @@
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from paths import paths
@@ -156,3 +157,40 @@ def fig_vs_ms():
 
     return fig, ax_evoked_vs_1, ax_topo_vs_1, ax_evoked_ms_1, ax_topo_ms_1, ax_evoked_vs_2, ax_topo_vs_2, \
            ax_evoked_ms_2, ax_topo_ms_2, ax_evoked_diff, ax_topo_diff
+
+
+def fig_psd():
+
+    fig = plt.figure(figsize=(15, 5))
+
+    # 1st row Topoplots
+    ax1 = fig.add_axes([0.05, 0.6, 0.15, 0.3])
+    ax2 = fig.add_axes([0.225, 0.6, 0.15, 0.3])
+    ax3 = fig.add_axes([0.4, 0.6, 0.15, 0.3])
+    ax4 = fig.add_axes([0.575, 0.6, 0.15, 0.3])
+    ax5 = fig.add_axes([0.75,  0.6, 0.15, 0.3])
+
+    # 2nd row PSD
+    ax6 = fig.add_axes([0.15,  0.1, 0.7, 0.4])
+
+    # Group axes
+    axs_topo = [ax1, ax2, ax3, ax4, ax5]
+    ax_psd = ax6
+
+    return fig, axs_topo, ax_psd
+
+
+def fig_time_frequency(fontsize=None):
+
+    if fontsize:
+        matplotlib.rcParams.update({'font.size': fontsize})
+
+    fig, axes_topo = plt.subplots(3, 3, figsize=(15, 8), gridspec_kw={'width_ratios': [5, 1, 1]})
+
+    for ax in axes_topo[:, 0]:
+        ax.remove()
+    axes_topo = [ax for ax_arr in axes_topo[:, 1:] for ax in ax_arr ]
+
+    ax1 = fig.add_axes([0.1, 0.1, 0.5, 0.8])
+
+    return fig, axes_topo, ax1
