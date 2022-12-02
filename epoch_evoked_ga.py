@@ -64,6 +64,8 @@ for subject_code in exp_info.subjects_ids:
         epochs_save_path = save_path + f'Epochs/' + run_path + subject.subject_id + '/'
         epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
         epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+        # Pick MEG channels to plot
+        picks = functions_general.pick_chs(chs_id=chs_id, info=epochs.info)
     except:
         # Compute
         if band_id:
