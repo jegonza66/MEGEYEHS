@@ -8,14 +8,14 @@ save_path = paths().save_path()
 plot_path = paths().plots_path()
 
 
-def epochs(subject, epochs, picks, order=None, overlay=None, combine='mean', sigma=5, display_figs=False,
-           save_fig=None, fig_path=None, fname=None, group_by=None):
+def epochs(subject, epochs, picks, order=None, overlay=None, combine='mean', sigma=5, group_by=None, cmap='jet',
+           vmin=None, vmax=None, display_figs=False, save_fig=None, fig_path=None, fname=None):
 
     if save_fig and (not fname or not fig_path):
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
-    fig_ep = epochs.plot_image(picks=picks, order=order, sigma=sigma, cmap='jet', overlay_times=overlay, combine=combine,
-                               title=subject.subject_id, show=display_figs)
+    fig_ep = epochs.plot_image(picks=picks, order=order, sigma=sigma, cmap=cmap, overlay_times=overlay, combine=combine,
+                               vmin=vmin, vmax=vmax, title=subject.subject_id, show=display_figs)
 
     # Save figure
     if save_fig:
@@ -38,12 +38,18 @@ def evoked(evoked_meg, evoked_misc, picks, plot_gaze=False, fig=None,
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
     if axes:
-        plot_gaze = False
-
         if save_fig and not fig:
             raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
-    if plot_gaze:
+        evoked_meg.plot(picks=picks, gfp=True, axes=axes, time_unit='s', spatial_colors=True, xlim=plot_xlim,
+                        show=display_figs)
+        axes.vlines(x=0, ymin=axes.get_ylim()[0], ymax=axes.get_ylim()[1], color='grey', linestyles='--')
+
+        if save_fig:
+            save.fig(fig=fig, path=fig_path, fname=fname)
+        plot_gaze = False
+
+    elif plot_gaze:
         # Get Gaze x ch
         gaze_x_ch_idx = np.where(np.array(evoked_misc.ch_names) == 'ET_gaze_x')[0][0]
         fig, axs = plt.subplots(2, 1, sharex=True, gridspec_kw={'height_ratios': [3, 1]})
@@ -60,8 +66,9 @@ def evoked(evoked_meg, evoked_misc, picks, plot_gaze=False, fig=None,
             save.fig(fig=fig, path=fig_path, fname=fname)
 
     else:
-        evoked_meg.plot(picks=picks, gfp=True, axes=axes, time_unit='s', spatial_colors=True, xlim=plot_xlim,
+        fig = evoked_meg.plot(picks=picks, gfp=True, axes=axes, time_unit='s', spatial_colors=True, xlim=plot_xlim,
                         show=display_figs)
+        axes = fig.get_axes()[0]
         axes.vlines(x=0, ymin=axes.get_ylim()[0], ymax=axes.get_ylim()[1], color='grey', linestyles='--')
 
         if save_fig:

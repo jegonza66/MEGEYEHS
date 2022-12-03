@@ -1,6 +1,7 @@
 import os
 import matplotlib.pyplot as plt
 import mne
+import pandas as pd
 
 import functions_general
 import functions_analysis
@@ -18,35 +19,36 @@ exp_info = setup.exp_info()
 
 #----- Save data and display figures -----#
 save_data = True
+save_fig = True
 display_figs = False
 if display_figs:
     plt.ion()
 else:
     plt.ioff()
 
+plot_epochs = False
+plot_gaze = False
+
 
 #----- Parameters -----#
 # Frequency band
-band_id = 'Alpha'
+band_id = None
 # Id
-epoch_id = f'it_fix_vs'
-# MSS
-mss = None
+epoch_id = 'fix_ms'
 # Duration
-dur = 0.2  # seconds
-# Saccades direction
-dir = None
-# Event definition
-evt_from_df = True
-evt_from_annot = False
+dur = None  # seconds
 # Plot channels
 chs_id = 'mag'
 
 
 # Screen
-screen = epoch_id.split('_')[-1]
+screen = functions_general.get_screen(epoch_id=epoch_id)
+# MSS
+mss = functions_general.get_mss(epoch_id=epoch_id)
 # Item
 tgt = functions_general.get_item(epoch_id=epoch_id)
+# Saccades direction
+dir = functions_general.get_dir(epoch_id=epoch_id)
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
 # Specific run path for saving data and plots
@@ -80,10 +82,9 @@ for subject_code in exp_info.subjects_ids:
         bads = subject.bad_channels
         meg_data.info['bads'].extend(bads)
 
-        metadata, events, events_id = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
-                                                                       evt_from_df=evt_from_df, evt_from_annot=evt_from_annot,
-                                                                       screen=screen, mss=mss, dur=dur, tgt=tgt, dir=dir,
-                                                                       meg_data=meg_data)
+        metadata, events, events_id, metadata_sup = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
+                                                                                     screen=screen, mss=mss, dur=dur,
+                                                                                     tgt=tgt, dir=dir, meg_data=meg_data)
 
         # Reject based on channel amplitude
         reject = dict(mag=subject.config.general.reject_amp)
@@ -94,6 +95,10 @@ for subject_code in exp_info.subjects_ids:
         # Drop bad epochs
         epochs.drop_bad()
 
+        if metadata_sup is not None:
+            metadata_sup = metadata_sup.loc[(metadata_sup['id'].isin(epochs.metadata['event_name']))].reset_index(drop=True)
+            epochs.metadata = metadata_sup
+
         if save_data:
             # Save epoched data
             epochs.reset_drop_log_selection()
@@ -102,22 +107,24 @@ for subject_code in exp_info.subjects_ids:
             epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
             epochs.save(epoch_save_path + epochs_data_fname, overwrite=True)
 
-    # Parameters for plotting
-    overlay = None
-    if overlay:
-        order = overlay.argsort()  # Sorting from longer to shorter
-    else:
-        order = None
-    combine = 'mean'
-    group_by = {}
+    if plot_epochs:
+        # Parameters for plotting
+        overlay = epochs.metadata['duration']
+        if overlay is not None:
+            order = overlay.argsort()  # Sorting from longer to shorter
+        else:
+            order = None
+        sigma = 5
+        combine = 'std'
+        group_by = {}
 
-    save_fig = True
-    fig_path = plot_path + f'Epochs/' + run_path
-    fname = 'Epochs_' + subject.subject_id + f'_{chs_id}_{combine}'
 
-    # Plot epochs
-    plot_general.epochs(subject=subject, epochs=epochs, picks=picks, order=order, overlay=overlay, combine=combine,
-                        group_by=group_by, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path, fname=fname)
+        fig_path = plot_path + f'Epochs/' + run_path
+        fname = 'Epochs_' + subject.subject_id + f'_{chs_id}_{combine}'
+
+        # Plot epochs
+        plot_general.epochs(subject=subject, epochs=epochs, picks=picks, order=order, overlay=overlay, combine=combine, sigma=sigma,
+                            group_by=group_by, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path, fname=fname)
 
     #----- Evoked -----#
     # Define evoked and append for GA
@@ -132,7 +139,7 @@ for subject_code in exp_info.subjects_ids:
     fig_path = plot_path + f'Evoked/' + run_path
     fname = 'Evoked_' + subject.subject_id + f'_{chs_id}'
     plot_general.evoked(evoked_meg=evoked_meg, evoked_misc=evoked_misc, picks=picks,
-                        plot_gaze=True, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
+                        plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
                         fig_path=fig_path, fname=fname)
 
     if save_data:
@@ -157,17 +164,15 @@ grand_avg_meg = grand_avg.copy().pick('mag')
 grand_avg_misc = grand_avg.copy().pick('misc')
 
 # Plot evoked
-save_fig = True
 fig_path = plot_path + f'Evoked/' + run_path
 fname = f'Grand_average_{chs_id}'
 
 plot_general.evoked(evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
-                    plot_gaze=True, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
+                    plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
                     fig_path=fig_path, fname=fname)
 
 # Plot Saccades frontal channels
 if 'sac' in epoch_id:
-    save_fig = True
     fig_path = plot_path + f'Evoked/' + run_path
     fname = f'Grand_average_front_ch'
 
@@ -175,6 +180,6 @@ if 'sac' in epoch_id:
     chs_id = 'sac_chs'
     picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg_meg.info)
 
-    plot_general.evoked(subject=None, evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
-                        plot_gaze=True, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
+    plot_general.evoked(evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
+                        plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
                         fig_path=fig_path, fname=fname)

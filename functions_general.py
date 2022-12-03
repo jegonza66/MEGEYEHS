@@ -264,6 +264,13 @@ def pick_chs(chs_id, info):
         for id in ids:
             if id == 'parietal':
                 picks = [ch_name for ch_name in picks if 'M' in ch_name and 'P' in ch_name]
+            if id == 'parietal+':
+                picks = [ch_name for ch_name in picks if 'M' in ch_name and 'P' in ch_name]
+                picks = picks + ['MLT25', 'MLT26', 'MLT27', 'MLO24', 'MLO23', 'MLO22', 'MLO21', 'MLT15', 'MLT16',
+                                 'MLO14', 'MLO13', 'MLO12', 'MLO11',
+                                 'MZO01',
+                                 'MRT25', 'MRT26', 'MRT27', 'MRO24', 'MRO23', 'MRO22', 'MRO21', 'MRT15', 'MRT16',
+                                 'MRO14', 'MRO13', 'MRO12', 'MRO11']
             elif id == 'occipital':
                 picks = [ch_name for ch_name in picks if 'M' in ch_name and 'O' in ch_name]
             elif id == 'frontal':
@@ -360,16 +367,21 @@ def get_time_lims(epoch_id, map=None):
             tmin = -0.1
             tmax = 0.2
             plot_xlim = (tmin, tmax)
-        elif 'sac' in epoch_id:
+        elif '_sac' in epoch_id:
             tmin = -0.1
             tmax = 0.1
-            plot_xlim = (-0.05, 0.1)
+            plot_xlim = (-0.05, tmax)
+        elif 'sac' in epoch_id:
+            tmin = -0.05
+            tmax = 0.1
+            plot_xlim = (tmin, tmax)
         else:
             tmin = -0.1
             tmax = 0.1
             plot_xlim = (-0.05, 0.1)
 
     return tmin, tmax, plot_xlim
+
 
 def get_item(epoch_id):
 
@@ -381,3 +393,34 @@ def get_item(epoch_id):
         tgt = None
 
     return tgt
+
+
+def get_dir(epoch_id):
+
+    if '_sac' in epoch_id:
+        dir = epoch_id.split('_sac')[0]
+    else:
+        dir = None
+
+    return dir
+
+
+def get_screen(epoch_id):
+
+    screens = ['emap', 'cross1', 'ms', 'vs', 'cross2']
+    screen = epoch_id.split('_')[-1]
+
+    if screen not in screens:
+        screen = None
+
+    return screen
+
+
+def get_mss(epoch_id):
+
+    if 'mss' in epoch_id:
+        mss = epoch_id.split('mss')[-1][0]
+    else:
+        mss = None
+
+    return mss

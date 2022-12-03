@@ -27,11 +27,7 @@ else:
     plt.ioff()
 
 #-----  Select MEG channels -----#
-chs_id = 'frontal_L'
-
-#----- Select events -----#
-evt_from_df = False
-evt_from_annot = True
+chs_id = 'mag'
 
 # MSS
 mss = 1
