@@ -46,11 +46,15 @@ def define_events(subject, epoch_id, screen, mss, dur, tgt, dir, meg_data, evt_f
 
         # Select epochs
         epoch_keys = [key for key in all_event_id.keys() if epoch_id in key]
+        if 'sac' not in epoch_id:
+            epoch_keys = [key for key in epoch_keys if 'sac' not in key]
+        if 'fix' not in epoch_id:
+            epoch_keys = [key for key in epoch_keys if 'fix' not in key]
         if screen:
-            epoch_keys = [epoch_key for epoch_key in epoch_keys if f'_{screen}_' in epoch_key]
+            epoch_keys = [epoch_key for epoch_key in epoch_keys if f'_{screen}' in epoch_key]
         if mss:
             trials_mss = subject.bh_data.loc[subject.bh_data['Nstim'] == mss].index + 1  # add 1 due to python 0th indexing
-            epoch_keys = [epoch_key for epoch_key in epoch_keys for trial_mss in trials_mss if f'_t{trial_mss}_' in epoch_key]
+            epoch_keys = [epoch_key for epoch_key in epoch_keys if int(epoch_key.split('t')[-1]) in trials_mss]
 
         # Get events and ids matchig selection
         metadata, events, events_id = mne.epochs.make_metadata(events=all_events, event_id=all_event_id,

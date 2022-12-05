@@ -35,13 +35,14 @@ mss_duration = {1: 2, 2: 3.5, 4: 5}
 cross1_dur = 0.75
 cross2_dur = 1
 # Id
-epoch_id = f'mss{mss}_cross1_ms_cross2'
+save_id = f'mss{mss}_cross1_ms_cross2'
+epoch_id = 'cross1_'
 # Duration
-dur = cross1_dur + mss_duration[mss] + cross2_dur # seconds
+dur = cross1_dur + mss_duration[mss] + cross2_dur  # seconds
 # Direction
 dir = None
 # Screen
-screen = epoch_id.split('_')[-1]
+screen = None
 # Item
 tgt = functions_general.get_item(epoch_id=epoch_id)
 
@@ -53,7 +54,7 @@ baseline = (tmin, tmin+cross1_dur)
 bline_mode = 'logratio'
 
 # Specific run path for saving data and plots
-run_path = f'/{epoch_id}_{tmin}_{tmax}/'
+run_path = f'/{save_id}_{tmin}_{tmax}/'
 
 averages = []
 for subject_code in exp_info.subjects_ids:
@@ -76,10 +77,9 @@ for subject_code in exp_info.subjects_ids:
         bads = subject.bad_channels
         meg_data.info['bads'].extend(bads)
 
-        metadata, events, events_id = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
-                                                                       evt_from_df=evt_from_df, evt_from_annot=evt_from_annot,
-                                                                       screen=screen, mss=mss, dur=dur, tgt=tgt, dir=dir,
-                                                                       meg_data=meg_data)
+        metadata, events, events_id, metadata_sup = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
+                                                                                     screen=screen, mss=mss, dur=dur, tgt=tgt,
+                                                                                     dir=dir, meg_data=meg_data)
 
         # Reject based on channel amplitude
         reject = dict(mag=subject.config.general.reject_amp)
