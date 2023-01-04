@@ -196,6 +196,29 @@ class paths:
         return filtered_path
 
 
+    def ica_path(self):
+        """
+        Paths to the filtered data folder.
+
+        Returns
+        -------
+        filtered_path: str
+            Path in str format to the folder containing the filtered data.
+        """
+
+        if self.name == 'laptop-5i5qsv76\\joaco\n':
+            ica_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/Python/Save/ICA_Data/'
+        elif self.name == 'usuario\n': # Liaa Colores
+            ica_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Python/Save/ICA_Data/'
+        else:
+            ica_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/Save/ICA_Data/'
+
+        # Create directory if it doesn't exist
+        os.makedirs(ica_path, exist_ok=True)
+
+        return ica_path
+
+
     def results_path(self):
         """
         Paths to the results folder.
