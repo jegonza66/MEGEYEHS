@@ -1,5 +1,4 @@
 import os
-from mne.preprocessing import annotate_muscle_zscore
 from mne.preprocessing import ICA
 
 from paths import paths
@@ -10,60 +9,31 @@ ica_path = paths().ica_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
+display = False
+
 for subject_code in exp_info.subjects_ids:
 
     # Load data
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
     meg_data = subject.load_preproc_meg(preload=True)
 
-    # Visual annotation
-    # fig = meg_data.plot(start=0, duration=6)
-    # fig.fake_keypress('a')
-
-    # #--------- Cardiac artifacts ---------#
-    # ecg_events = mne.preprocessing.find_ecg_events(meg_data)[0]
-    #
-    # n_beats = len(ecg_events)
-    # onset = ecg_events[:, 0] / meg_data.info['sfreq'] - 0.25
-    # duration = np.repeat(0.5, n_beats)
-    # description = ['beats'] * n_beats
-    # orig_time = meg_data.info['meas_date']
-    # annotations_heart = mne.Annotations(onset, duration, description, orig_time)
-    #
-    # # Make epochs
-    # ecg_epochs = mne.preprocessing.create_ecg_epochs(meg_data)
-    # ecg_epochs.plot_image(combine='mean')
-    #
-    # # Average evoked
-    # ecg_evoked = ecg_epochs.average()
-    # ecg_evoked.apply_baseline((None, -0.2))
-    # ecg_evoked.plot_joint()
-
-    #--------- Muscle artifacts ---------#
-    threshold_muscle = 5
-    annotations_muscle, scores_muscle = annotate_muscle_zscore(meg_data, ch_type="mag", threshold=threshold_muscle,
-                                                               min_length_good=0.2, filter_freq=[110, 140])
-
-    # Include annotations in data
-    meg_data.set_annotations(annotations_muscle)
-
-    # --------- ICA ---------#
-    # Downsamples for ica
+    # Downsample
     meg_downsampled = meg_data.copy().pick_types(meg=True)
     meg_downsampled.resample(200)
     meg_downsampled.filter(1, 40)
 
-    # Define iCA
+    # Define ICA
     ica = ICA(method='fastica', random_state=97, n_components=16)
 
     # Apply ICA
     ica.fit(meg_downsampled)
 
-    # Plot sources and components
-    ica.plot_sources(meg_downsampled, title='ICA')
-    ica.plot_components()
+    if display:
+        # Plot sources and components
+        ica.plot_sources(meg_downsampled, title='ICA')
+        ica.plot_components()
 
-    # Exclude bad components from data
+    # Select bad components
     answer = None
     while answer != 'y':
         answer = input('Enter the component numbers to exclude separated by dashes\n'
@@ -81,6 +51,7 @@ for subject_code in exp_info.subjects_ids:
                   f'Please re-enter the components to exclude')
             answer = None
 
+    # Exclude bad components from data
     ica.exclude = components
     meg_ica = meg_data.copy()
     ica.apply(meg_ica)
@@ -91,10 +62,11 @@ for subject_code in exp_info.subjects_ids:
     path_file_results = os.path.join(save_path_ica, f'Subject_{subject.subject_id}_ICA.fif')
     meg_data.save(path_file_results, overwrite=True)
 
-    # Plot to check
-    chs = ['MLF14', 'MLF13', 'MLF12', 'MLF11', 'MRF11', 'MRF12', 'MRF13', 'MRF14', 'MZF01']
-    chan_idxs = [meg_data.ch_names.index(ch) for ch in chs]
+    if display:
+        # Plot to check
+        chs = ['MLF14', 'MLF13', 'MLF12', 'MLF11', 'MRF11', 'MRF12', 'MRF13', 'MRF14', 'MZF01']
+        chan_idxs = [meg_data.ch_names.index(ch) for ch in chs]
 
-    meg_data.plot(order=chan_idxs, duration=5)
-    meg_ica.plot(order=chan_idxs, duration=5)
+        meg_data.plot(order=chan_idxs, duration=5)
+        meg_ica.plot(order=chan_idxs, duration=5)
 
