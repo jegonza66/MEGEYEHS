@@ -1,6 +1,7 @@
 import os
 from mne.preprocessing import ICA
 
+import save
 from paths import paths
 import setup
 import load
@@ -9,13 +10,13 @@ ica_path = paths().ica_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
-display = False
+display = True
 
 for subject_code in exp_info.subjects_ids:
 
     # Load data
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-    meg_data = subject.load_preproc_meg(preload=True)
+    meg_data = subject.load_preproc_meg()
 
     # Downsample
     meg_downsampled = meg_data.copy().pick_types(meg=True)
@@ -23,7 +24,7 @@ for subject_code in exp_info.subjects_ids:
     meg_downsampled.filter(1, 40)
 
     # Define ICA
-    ica = ICA(method='fastica', random_state=97, n_components=16)
+    ica = ICA(method='fastica', random_state=97, n_components=64)
 
     # Apply ICA
     ica.fit(meg_downsampled)
@@ -53,14 +54,19 @@ for subject_code in exp_info.subjects_ids:
 
     # Exclude bad components from data
     ica.exclude = components
+    subject.ex_components = components
     meg_ica = meg_data.copy()
+    meg_ica.load_data()
     ica.apply(meg_ica)
 
     # Save ICA clean data
     save_path_ica = ica_path + subject.subject_id + '/'
     os.makedirs(save_path_ica, exist_ok=True)
     path_file_results = os.path.join(save_path_ica, f'Subject_{subject.subject_id}_ICA.fif')
-    meg_data.save(path_file_results, overwrite=True)
+    meg_ica.save(path_file_results, overwrite=True)
+
+    # Save subject
+    save.var(var=subject, path=save_path_ica, fname='Subject_data.pkl')
 
     if display:
         # Plot to check
