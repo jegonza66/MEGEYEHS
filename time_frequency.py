@@ -50,13 +50,18 @@ tgt = functions_general.get_item(epoch_id=epoch_id)
 map_times = dict(cross={'tmin': 0, 'tmax': dur, 'plot_xlim': (dur-1, dur-0.2)})
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
 
+# Power computation parameters
 baseline = (tmin, tmin+cross1_dur)
 bline_mode = 'logratio'
+l_freq = 1
+h_freq = 100
 
 # Specific run path for saving data and plots
 run_path = f'/{save_id}_{tmin}_{tmax}/'
 
+# Grand average data variable
 averages = []
+
 for subject_code in exp_info.subjects_ids:
 
     # Load subject, meg data and pick channels
@@ -65,7 +70,7 @@ for subject_code in exp_info.subjects_ids:
     try:
         # Load previous data
         tf_save_path = save_path + f'Time_Frequency/' + run_path + subject.subject_id + '/'
-        tf_data_fname = f'Subject_{subject.subject_id}_tfr.h5'
+        tf_data_fname = f'Subject_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
         power = mne.time_frequency.read_tfrs(tf_save_path + tf_data_fname, condition=0)
         picks = functions_general.pick_chs(chs_id=chs_id, info=power.info)
     except:
@@ -93,8 +98,6 @@ for subject_code in exp_info.subjects_ids:
         epochs.drop_bad()
 
         # Compute power over frequencies
-        l_freq = 1
-        h_freq = 100
         freqs = np.logspace(*np.log10([l_freq, h_freq]), num=40)
         n_cycles = freqs / 2.  # different number of cycle per frequency
         power = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
@@ -104,7 +107,7 @@ for subject_code in exp_info.subjects_ids:
             # Save evoked data
             tf_save_path = save_path + f'Time_Frequency/' + run_path + subject.subject_id + '/'
             os.makedirs(tf_save_path, exist_ok=True)
-            tf_data_fname = f'Subject_{subject.subject_id}_tfr.h5'
+            tf_data_fname = f'Subject_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
             power.save(tf_save_path + tf_data_fname, overwrite=True)
 
     averages.append(power)
@@ -140,7 +143,7 @@ for subject_code in exp_info.subjects_ids:
 try:
     # Load previous data
     tf_save_path = save_path + f'Time_Frequency/' + run_path
-    tf_data_fname = f'Grand_Average_tfr.h5'
+    tf_data_fname = f'Grand_Average_{l_freq}_{h_freq}_tfr.h5'
     grand_avg = mne.time_frequency.read_tfrs(tf_save_path + tf_data_fname, condition=0)
 except:
     # Compute grand average
@@ -150,7 +153,7 @@ except:
         # Save evoked data
         tf_save_path = save_path + f'Time_Frequency/' + run_path
         os.makedirs(tf_save_path, exist_ok=True)
-        tf_data_fname = f'Grand_average_tfr.h5'
+        tf_data_fname = f'Grand_average_{l_freq}_{h_freq}tfr.h5'
         grand_avg.save(tf_save_path + tf_data_fname, overwrite=True)
 
 # Define figure
