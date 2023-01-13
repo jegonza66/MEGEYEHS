@@ -20,14 +20,14 @@ exp_info = setup.exp_info()
 #----- Save data and display figures -----#
 save_data = True
 save_fig = True
-display_figs = False
+display_figs = True
 if display_figs:
     plt.ion()
 else:
     plt.ioff()
 
 #-----  Select MEG channels -----#
-chs_id = 'mag'
+chs_id = 'parietal'
 
 # MSS
 mss = 1
@@ -70,7 +70,7 @@ for subject_code in exp_info.subjects_ids:
         picks = functions_general.pick_chs(chs_id=chs_id, info=power.info)
     except:
         # No previous data. Compute
-        meg_data = subject.load_preproc_meg()
+        meg_data = load.ica_data(subject=subject)
         picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
 
         # Exclude bad channels
@@ -93,7 +93,7 @@ for subject_code in exp_info.subjects_ids:
         epochs.drop_bad()
 
         # Compute power over frequencies
-        l_freq = 4
+        l_freq = 1
         h_freq = 100
         freqs = np.logspace(*np.log10([l_freq, h_freq]), num=40)
         n_cycles = freqs / 2.  # different number of cycle per frequency
