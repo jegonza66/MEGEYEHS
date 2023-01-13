@@ -137,3 +137,20 @@ def filtered_data(subject, band_id, preload=False, save_data=False):
             filtered_data.save(filtered_path + filtered_meg_data_fname, overwrite=True)
 
     return filtered_data
+
+
+def ica_data(subject, preload=False):
+
+    filtered_path = paths().ica_path() + f'{subject.subject_id}/'
+
+    # Try to load ica data
+    try:
+        print(f'Loading ica data for subject {subject.subject_id}')
+        file_path = pathlib.Path(os.path.join(filtered_path, f'Subject_{subject.subject_id}_ICA.fif'))
+        # Load data
+        ica_data = mne.io.read_raw_fif(file_path, preload=preload)
+
+    except:
+        raise ValueError(f'No previous ica data found for subject {subject.subject_id}')
+
+    return ica_data

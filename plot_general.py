@@ -1,5 +1,7 @@
-import matplotlib
 import matplotlib.pyplot as plt
+plt.figure()
+plt.close('all')
+import matplotlib
 import numpy as np
 from paths import paths
 import save

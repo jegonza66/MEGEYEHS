@@ -1,33 +1,72 @@
 import os
 from mne.preprocessing import ICA
-
+import matplotlib.pyplot as plt
+import mne
+import pathlib
 import save
 from paths import paths
 import setup
 import load
 
+fig = plt.figure()
+plt.close(fig)
+
+preproc_path = paths().preproc_path()
 ica_path = paths().ica_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
 display = True
 
-for subject_code in exp_info.subjects_ids:
+for subject_code in exp_info.subjects_ids[4:6]:
 
     # Load data
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
     meg_data = subject.load_preproc_meg()
 
-    # Downsample
-    meg_downsampled = meg_data.copy().pick_types(meg=True)
-    meg_downsampled.resample(200)
-    meg_downsampled.filter(1, 40)
+    # Downsample and filter
+    sfreq = 200
+    lfreq = 1
+    hfreq = 40
+    downsampled_path = pathlib.Path(os.path.join(preproc_path, subject.subject_id, f'down-filt_meg({sfreq}_{lfreq}_{hfreq}).fif'))
+    loaded_data = False
 
-    # Define ICA
-    ica = ICA(method='fastica', random_state=97, n_components=64)
+    try:
+        # Load
+        meg_downsampled = mne.io.read_raw_fif(downsampled_path, preload=False)
+        loaded_data = True
+        print('Downsampled data laoded')
+    except:
+        # Compute and save
+        print('Downsampling and filtering...')
+        meg_downsampled = meg_data.copy().pick_types(meg=True)
+        meg_downsampled.resample(sfreq)
+        meg_downsampled.filter(lfreq, hfreq)
+        meg_downsampled.save(downsampled_path, overwrite=True)
 
-    # Apply ICA
-    ica.fit(meg_downsampled)
+    # ICA
+    save_path_ica = ica_path + subject.subject_id + '/'
+    ica_fname = 'ICA.pkl'
+
+    try:
+        if loaded_data:
+            # Load ICA
+            ica = load.var(file_path=save_path_ica + ica_fname)
+            print('ICA object loaded')
+        else:
+            raise ValueError('No loaded data. Running ICA on new data')
+    except:
+        # Define ICA
+        print('Running ICA...')
+        ica_components = 64
+        ica = ICA(method='fastica', random_state=97, n_components=ica_components)
+
+        # Apply ICA
+        ica.fit(meg_downsampled)
+
+        # Save ICA
+        os.makedirs(save_path_ica, exist_ok=True)
+        save.var(var=ica, path=save_path_ica, fname=ica_fname)
 
     if display:
         # Plot sources and components
@@ -52,6 +91,20 @@ for subject_code in exp_info.subjects_ids:
                   f'Please re-enter the components to exclude')
             answer = None
 
+    # Save components figures
+    if display:
+        # Create directory
+        fig_path = plot_path + f'ICA/{subject.subject_id}/'
+        os.makedirs(fig_path, exist_ok=True)
+
+        # Plot properties of excluded components
+        ica.plot_properties(meg_downsampled, picks=components, show=False)
+
+        # Get figures
+        figs = [plt.figure(n) for n in plt.get_fignums()]
+        for i, fig in enumerate(figs):
+            save.fig(fig=fig, path=fig_path, fname=f'figure_{i}')
+
     # Exclude bad components from data
     ica.exclude = components
     subject.ex_components = components
@@ -62,8 +115,8 @@ for subject_code in exp_info.subjects_ids:
     # Save ICA clean data
     save_path_ica = ica_path + subject.subject_id + '/'
     os.makedirs(save_path_ica, exist_ok=True)
-    path_file_results = os.path.join(save_path_ica, f'Subject_{subject.subject_id}_ICA.fif')
-    meg_ica.save(path_file_results, overwrite=True)
+    path_file = os.path.join(save_path_ica, f'Subject_{subject.subject_id}_ICA.fif')
+    meg_ica.save(path_file, overwrite=True)
 
     # Save subject
     save.var(var=subject, path=save_path_ica, fname='Subject_data.pkl')
