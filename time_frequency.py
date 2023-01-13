@@ -18,13 +18,9 @@ exp_info = setup.exp_info()
 
 
 #----- Save data and display figures -----#
-save_data = True
-save_fig = True
+save_data = False
+save_fig = False
 display_figs = True
-if display_figs:
-    plt.ion()
-else:
-    plt.ioff()
 
 #-----  Select MEG channels -----#
 chs_id = 'parietal'
@@ -36,7 +32,7 @@ cross1_dur = 0.75
 cross2_dur = 1
 # Id
 save_id = f'mss{mss}_cross1_ms_cross2'
-epoch_id = 'cross1_'
+epoch_id = 'cross2_'
 # Duration
 dur = cross1_dur + mss_duration[mss] + cross2_dur  # seconds
 # Direction
@@ -53,7 +49,7 @@ tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=m
 # Power computation parameters
 baseline = (tmin, tmin+cross1_dur)
 bline_mode = 'logratio'
-l_freq = 1
+l_freq = 4
 h_freq = 100
 
 # Specific run path for saving data and plots
