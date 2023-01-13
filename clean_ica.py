@@ -18,7 +18,7 @@ exp_info = setup.exp_info()
 
 display = True
 
-for subject_code in exp_info.subjects_ids[4:6]:print(subject.subject_id)
+for subject_code in exp_info.subjects_ids[4:7]:
 
     # Load data
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
