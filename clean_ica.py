@@ -98,7 +98,7 @@ for subject_code in exp_info.subjects_ids[4:7]:
         os.makedirs(fig_path, exist_ok=True)
 
         # Plot properties of excluded components
-        ica.plot_properties(meg_downsampled, picks=components, show=False)
+        ica.plot_properties(meg_downsampled, picks=components, psd_args=dict(fmax=40), show=False)
 
         # Get figures
         figs = [plt.figure(n) for n in plt.get_fignums()]
