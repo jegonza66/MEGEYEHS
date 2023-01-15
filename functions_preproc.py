@@ -1705,6 +1705,31 @@ def add_et_channels(raw, et_channels_meg, et_channel_names):
 ## OLD out of use
 
 
+def overwrite_et_channels(raw, et_channels_meg, et_channel_names):
+    #---------------- Add scaled data to meg data ----------------#
+    print('\nSaving scaled et data to meg raw data structure')
+
+    # Get et channels idx
+    et_ch_idx = mne.pick_channels(raw.info['ch_names'], ['UADC001-4123', 'UADC002-4123', 'UADC013-4123'])
+
+    # Overwrite data in et channels idx for scaled data
+    raw.load_data()
+    raw._data[et_ch_idx, :] = et_channels_meg
+
+    # Change et channel names
+    print('Renaming and droping extra channels')
+    for ch_name, new_name in zip(et_channel_names, ['ET_gaze_x', 'ET_gaze_y', 'ET_pupils']):
+        raw.rename_channels({ch_name: new_name})
+
+    # Pick data from MEG channels and other channels of interest
+    channel_idx = mne.pick_types(raw.info, meg=True)
+    channel_idx = np.append(channel_idx, mne.pick_channels(raw.info['ch_names'], ['UPPT001', 'ET_gaze_x', 'ET_gaze_y', 'ET_pupils']))
+    raw.pick(channel_idx)
+
+    # Rename channels removing '-4123'
+    raw.rename_channels(functions_general.ch_name_map)
+
+    return raw
 
 
 def fake_blink_interpolate(meg_gazex_data_clean, meg_gazey_data_clean, meg_pupils_data_clean, sfreq, config):

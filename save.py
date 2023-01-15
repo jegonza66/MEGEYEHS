@@ -7,7 +7,7 @@ import pandas as pd
 from paths import paths
 
 
-def preprocessed_data(raw, subject, config):
+def preprocessed_data(raw, et_data_scaled, subject, config):
     """
     Save preprocessed data
     :param raw:
@@ -23,9 +23,7 @@ def preprocessed_data(raw, subject, config):
     preproc_save_path = preproc_data_path + subject.subject_id + '/'
     os.makedirs(preproc_save_path, exist_ok=True)
 
-    f = open(preproc_save_path + 'Subject_data.pkl', 'wb')
-    pickle.dump(subject, f)
-    f.close()
+    var(var=subject, path=preproc_save_path, fname='Subject_data.pkl')
 
     # Save fixations ans saccades
     subject.fixations.to_csv(preproc_save_path + 'fixations.csv')
@@ -34,6 +32,9 @@ def preprocessed_data(raw, subject, config):
     # Save MEG
     preproc_meg_data_fname = f'Subject_{subject.subject_id}_meg.fif'
     raw.save(preproc_save_path + preproc_meg_data_fname, overwrite=True)
+
+    # Save ET data
+    var(var=et_data_scaled, path=preproc_save_path, fname='et_data.pkl')
 
     # Save events
     evt, evt_id = mne.events_from_annotations(raw, verbose=False)

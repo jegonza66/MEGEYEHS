@@ -76,7 +76,7 @@ def preprocess(subject_code, exp_info, config, plot=False):
     functions_preproc.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=exp_info.et_channel_names)
 
     #---------------- Save preprocesed data ----------------#
-    save.preprocessed_data(raw=raw, subject=subject, config=config)
+    save.preprocessed_data(raw=raw, et_data_scaled=et_channels_meg, subject=subject, config=config)
 
     # Free up memory
     del(raw)
@@ -89,5 +89,6 @@ exp_info = setup.exp_info()
 # Load configuration
 config = load.config(path=paths().config_path(), fname='config.pkl')
 
-for subject_code in exp_info.subjects_ids:
-    preprocess(subject_code=subject_code, exp_info=exp_info, config=config, plot=True)
+for subject_code in exp_info.subjects_ids[1:]:
+    preprocess(subject_code=subject_code, exp_info=exp_info, config=config, plot=False)
+

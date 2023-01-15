@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+plt.figure()
+plt.close()
 import numpy as np
 import matplotlib.image as mpimg
 import matplotlib as mpl

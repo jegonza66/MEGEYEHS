@@ -511,6 +511,22 @@ class noise:
             raise ValueError('No .ds files found in subject directory: {}'.format(subj_path))
 
 
+    def load_preproc_data(self, preload=False):
+        """
+        Preprocessed MEG data for parent subject as raw instance of MNE.
+        """
+
+        print('\nLoading Preprocessed MEG data')
+        # get subject path
+        preproc_path = paths().preproc_path()
+        file_path = pathlib.Path(os.path.join(preproc_path, self.id, f'{self.id}_meg.fif'))
+
+        # Load data
+        fif = mne.io.read_raw_fif(file_path, preload=preload)
+
+        return fif
+
+
 class all_subjects:
 
     def __init__(self, all_fixations, all_saccades, all_bh_data, all_rt, all_corr_ans):
