@@ -7,9 +7,8 @@ import save
 from paths import paths
 import setup
 import load
-
-fig = plt.figure()
-plt.close(fig)
+plt.figure()
+plt.close('all')
 
 preproc_path = paths().preproc_path()
 ica_path = paths().ica_path()
@@ -18,7 +17,7 @@ exp_info = setup.exp_info()
 
 display = True
 
-for subject_code in exp_info.subjects_ids[4:7]:
+for subject_code in exp_info.subjects_ids:
 
     # Load data
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
@@ -28,7 +27,7 @@ for subject_code in exp_info.subjects_ids[4:7]:
     sfreq = 200
     lfreq = 1
     hfreq = 40
-    downsampled_path = pathlib.Path(os.path.join(preproc_path, subject.subject_id, f'down-filt_meg({sfreq}_{lfreq}_{hfreq}).fif'))
+    downsampled_path = pathlib.Path(os.path.join(preproc_path, subject.subject_id, f'down-filt({sfreq}_{lfreq}_{hfreq})_meg.fif'))
     loaded_data = False
 
     try:
@@ -70,7 +69,7 @@ for subject_code in exp_info.subjects_ids[4:7]:
 
     if display:
         # Plot sources and components
-        ica.plot_sources(meg_downsampled, title='ICA')
+        ica.plot_sources(meg_downsampled, title='ICA', n_channels=64)
         ica.plot_components()
 
     # Select bad components

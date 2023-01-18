@@ -198,12 +198,12 @@ class paths:
 
     def ica_path(self):
         """
-        Paths to the filtered data folder.
+        Paths to the ica clean data folder.
 
         Returns
         -------
         filtered_path: str
-            Path in str format to the folder containing the filtered data.
+            Path in str format to the folder containing the ica clean data.
         """
 
         if self.name == 'laptop-5i5qsv76\\joaco\n':
@@ -303,3 +303,25 @@ class paths:
             exp_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/Psychopy_Experiment/'
 
         return exp_path
+
+
+    def sources_path(self):
+        """
+        Paths to the directory containing saved data for source estimation. Such as source model, bem model, forwar model.
+
+        Returns
+        -------
+        exp_path: str
+            Path in str format to the source directory.
+        """
+
+        if self.name == 'laptop-5i5qsv76\\joaco\n':
+            sources_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/Python/Save/Source_Data/'
+        elif self.name == 'usuario\n': # Liaa Colores
+            sources_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/Python/Save/Source_Data/'
+        else:
+            sources_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/Python/Save/Source_Data/'
+
+        os.makedirs(sources_path, exist_ok=True)
+
+        return sources_path
