@@ -23,6 +23,7 @@ os.environ["SUBJECTS_DIR"] = subjects_dir
 # Load subject and meg clean data
 subject = load.preproc_subject(exp_info=exp_info, subject_code=0)
 meg_data = load.ica_data(subject=subject)
+# meg_data = subject.load_preproc_meg()
 
 # Exclude bad channels
 bads = subject.bad_channels
@@ -30,16 +31,20 @@ meg_data.info['bads'].extend(bads)
 
 # --------- Coord systems alignment ---------#
 # Path to MRI <-> HEAD Transformation (Saved from coreg)
-trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-trans.fif'.format(subject.subject_id))
+trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-trans2.fif'.format(subject.subject_id))
 fids_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-fiducials.fif'.format(subject.subject_id))
+dig_info_path = paths().opt_path() + subject.subject_id + '/info_raw.fif'
+
+# Load raw meg data with dig info
+info_raw = mne.io.read_raw_fif(dig_info_path)
 
 # Visualize MEG/MRI alignment
-# surfaces = dict(brain=0.6, outer_skull=0.5, head=0.4)
-# fig = mne.viz.plot_alignment(meg_data.info, trans=trans_path, subject=subject.subject_id,
-#                              subjects_dir=subjects_dir, surfaces=surfaces,
-#                              show_axes=True, dig=True, eeg=[], meg='sensors',
-#                              coord_frame='meg', mri_fiducials=fids_path)
-# mne.viz.set_3d_view(fig, 45, 90, distance=0.6, focalpoint=(0., 0., 0.))
+surfaces = dict(brain=0.7, outer_skull=0.5, head=0.4)
+fig = mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject.subject_id,
+                             subjects_dir=subjects_dir, surfaces=surfaces,
+                             show_axes=True, dig=True, eeg=[], meg='sensors',
+                             coord_frame='meg', mri_fiducials=fids_path)
+mne.viz.set_3d_view(fig, 45, 90, distance=0.6, focalpoint=(0., 0., 0.))
 
 # --------- Epoch data ---------#
 # Select epochs
@@ -72,6 +77,7 @@ epochs = mne.Epochs(meg_data, events, event_id=events_id, reject=reject, tmin=tm
 
 # Define evoked from epochs
 evoked = epochs.average()
+# evoked.plot(spatial_colors=True)
 
 # Pick meg channels for source modeling
 evoked.pick('meg')
@@ -81,7 +87,7 @@ evoked.pick('meg')
 
 # --------- Inverse operation computation ---------#
 # Volume vs Surface estimation
-surf_vol = 'volume'
+surf_vol = 'surface'
 # Setup
 sources_path = paths().sources_path()
 sources_path_subject = sources_path + subject.subject_id
@@ -112,7 +118,7 @@ if surf_vol == 'surface':
                          brain_kwargs=dict(silhouette=True), smoothing_steps=7)
     else:
         brain = stc.plot(subjects_dir=subjects_dir, subject=subject.subject_id,
-                         surface='white', time_viewer=False, hemi='both',
+                         surface='inflated', time_viewer=True, hemi='both',
                          initial_time=initial_time, time_unit='s')
 
 elif surf_vol == 'volume':

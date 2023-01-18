@@ -33,20 +33,13 @@ meg_data = load.ica_data(subject=subject)
 
 # Load digitalization file
 dig_path_subject = dig_path + subject.subject_id
-dig_filepath = dig_path_subject + '/Model_Mesh_5m_headers.pos'
+dig_filepath = dig_path_subject + '/Model_full_head_mesh_5m_headers.pos'
 pos = pd.read_table(dig_filepath, index_col=0)
 
 # Get fiducials from dig
 nasion = pos.loc[pos.index == 'nasion ']
 lpa = pos.loc[pos.index == 'left ']
 rpa = pos.loc[pos.index == 'right ']
-
-# Get fiducials from MEG
-meg_info = meg_data.info.copy()
-dig = meg_info['dig'][:3]
-nasion = dig[0]['r']
-lpa = dig[1]['r']
-rpa = dig[2]['r']
 
 # Get head points
 pos.drop(['nasion ', 'left ', 'right '], inplace=True)
@@ -55,8 +48,6 @@ pos_array = pos.to_numpy()
 # Make montage
 dig_montage = mne.channels.make_dig_montage(nasion=nasion.values.ravel(), lpa=lpa.values.ravel(),
                                             rpa=rpa.values.ravel(), hsp=pos_array, coord_frame='unknown')
-dig_montage = mne.channels.make_dig_montage(nasion=nasion, lpa=lpa,
-                                            rpa=rpa, hsp=pos_array, coord_frame='unknown')
 
 # Make info object
 dig_info = meg_data.info.copy()
@@ -64,14 +55,14 @@ dig_info.set_montage(montage=dig_montage)
 
 # Save raw instance with info
 info_raw = mne.io.RawArray(np.zeros((dig_info['nchan'], 1)), dig_info)
-dig_info_path = dig_path_subject + '/info_raw3.fif'
+dig_info_path = dig_path_subject + '/info_raw.fif'
 info_raw.save(dig_info_path, overwrite=True)
 
 # Align and save fiducials and transformation files to FreeSurfer/subject/bem folder
 mne.gui.coregistration(subject=subject.subject_id, subjects_dir=subjects_dir, inst=dig_info_path)
 
 # Check mean distances
-trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-trans.fif'.format(subject.subject_id))
+trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-trans2.fif'.format(subject.subject_id))
 trans = mne.read_trans(trans_path)
 print('Distance from head origin to MEG origin: %0.1f mm'
       % (1000 * np.linalg.norm(meg_data.info['dev_head_t']['trans'][:3, 3])))
