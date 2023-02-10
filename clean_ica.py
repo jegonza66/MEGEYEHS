@@ -1,4 +1,5 @@
 import os
+import time
 from mne.preprocessing import ICA
 import matplotlib.pyplot as plt
 import mne
@@ -7,8 +8,11 @@ import save
 from paths import paths
 import setup
 import load
-plt.figure()
-plt.close('all')
+import functions_analysis
+import functions_general
+import numpy as np
+# plt.figure()
+# plt.close('all')
 
 preproc_path = paths().preproc_path()
 ica_path = paths().ica_path()
@@ -69,8 +73,91 @@ for subject_code in exp_info.subjects_ids:
 
     if display:
         # Plot sources and components
-        ica.plot_sources(meg_downsampled, title='ICA', n_channels=64)
+        ica.plot_sources(meg_downsampled, title='ICA', theme='dark')
         ica.plot_components()
+
+
+
+    # Ploch's algorithm for saccadic artifacts detection by variance comparison
+
+    # Sac ID
+    emap_sac_id = 'sac_emap'
+    # Fix ID
+    emap_fix_id = 'fix_emap'
+    # Screen
+    screen = functions_general.get_screen(epoch_id=emap_sac_id)
+    # MSS
+    mss = functions_general.get_mss(epoch_id=emap_sac_id)
+    # Item
+    tgt = functions_general.get_item(epoch_id=emap_sac_id)
+    # Saccades direction
+    dir = functions_general.get_dir(epoch_id=emap_sac_id)
+
+    # Define events
+    print('Saccades')
+    sac_metadata, sac_events, sac_events_id, sac_metadata_sup = \
+        functions_analysis.define_events(subject=subject, epoch_id=emap_sac_id, screen=screen, mss=mss, dur=None,
+                                         tgt=tgt, dir=dir, meg_data=meg_data)
+
+    print('Fixations')
+    fix_metadata, fix_events, fix_events_id, fix_metadata_sup = \
+        functions_analysis.define_events(subject=subject, epoch_id=emap_fix_id, screen=screen, mss=mss, dur=None,
+                                         tgt=tgt, dir=dir, meg_data=meg_data)
+
+    # Get time windows from epoch_id name
+    sac_tmin = -0.005  # Add previous 5 ms
+    sac_tmax = sac_metadata_sup['duration'].min() + 0.01  # Min sac duration + 10 ms
+    fix_tmin = 0
+    fix_tmax = fix_metadata_sup['duration'].min()  # Min sac duration + 10 ms
+
+    # Epoch data
+    sac_epochs = mne.Epochs(raw=meg_data, events=sac_events, event_id=sac_events_id, tmin=sac_tmin, tmax=sac_tmax, reject=None,
+                        event_repeated='drop', metadata=sac_metadata, preload=True, baseline=(0,0))
+    fix_epochs = mne.Epochs(raw=meg_data, events=fix_events, event_id=fix_events_id, tmin=fix_tmin, tmax=fix_tmax, reject=None,
+                            event_repeated='drop', metadata=fix_metadata, preload=True, baseline=(0,0))
+
+    # Append saccades df as epochs metadata
+    if sac_metadata_sup is not None:
+        sac_metadata_sup = sac_metadata_sup.loc[(sac_metadata_sup['id'].isin(sac_epochs.metadata['event_name']))].reset_index(drop=True)
+        sac_epochs.metadata = sac_metadata_sup
+    if fix_metadata_sup is not None:
+        fix_metadata_sup = fix_metadata_sup.loc[(fix_metadata_sup['id'].isin(fix_epochs.metadata['event_name']))].reset_index(drop=True)
+        fix_epochs.metadata = fix_metadata_sup
+
+    # Get the ICA sources for the epoched data
+    sac_ica_sources = ica.get_sources(sac_epochs)
+    fix_ica_sources = ica.get_sources(fix_epochs)
+
+    # Get the ICA data epoched on the emap saccades
+    sac_ica_data = sac_ica_sources.get_data()
+    fix_ica_data = fix_ica_sources.get_data()
+
+    # Compute variance along 3rd axis (time)
+    sac_variance = np.var(sac_ica_data, axis=2)
+    fix_variance = np.var(fix_ica_data, axis=2)
+
+    # Create directory
+    fig_path = plot_path + f'ICA/{subject.subject_id}/Ploch/'
+    os.makedirs(fig_path, exist_ok=True)
+
+    # Disable displaying figures
+    plt.ioff()
+    time.sleep(1)
+    print('Plotting saccades and fixations variance distributions')
+    for n_comp in range(ica.n_components):
+        print(f'\rComponent {n_comp}', end='')
+        fig = plt.figure()
+        plt.hist(sac_variance[:, n_comp], bins=30, alpha=0.6, density=True, label='Saccades')
+        plt.hist(fix_variance[:, n_comp], bins=30, alpha=0.6, density=True, label='Fixations')
+        plt.legend()
+        # Save figure
+        save.fig(fig=fig, path=fig_path, fname=f'component_{n_comp}')
+    plt.close('all')
+    print()
+    # Reenable figures
+    plt.ion()
+
+
 
     # Select bad components
     answer = None

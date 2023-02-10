@@ -11,7 +11,7 @@ plot_path = paths().plots_path()
 
 
 def epochs(subject, epochs, picks, order=None, overlay=None, combine='mean', sigma=5, group_by=None, cmap='jet',
-           vmin=None, vmax=None, display_figs=False, save_fig=None, fig_path=None, fname=None):
+           vmin=None, vmax=None, display_figs=True, save_fig=None, fig_path=None, fname=None):
 
     if save_fig and (not fname or not fig_path):
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
