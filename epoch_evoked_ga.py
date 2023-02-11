@@ -11,7 +11,7 @@ import setup
 from paths import paths
 
 
-#----- Path -----#
+#----- Paths -----#
 save_path = paths().save_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
@@ -26,15 +26,17 @@ if display_figs:
 else:
     plt.ioff()
 
-plot_epochs = False
-plot_gaze = False
+plot_epochs = True
+plot_gaze = True
 
 
 #----- Parameters -----#
+# ICA vs raw data
+use_ica_data = True
 # Frequency band
 band_id = None
 # Id
-epoch_id = 'fix_ms'
+epoch_id = 'l_sac'
 # Duration
 dur = None  # seconds
 # Plot channels
@@ -61,10 +63,28 @@ for subject_code in exp_info.subjects_ids:
 
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
 
+    # Define save path and file name for loading and saving epoched, evoked, and GA data
+    if use_ica_data:
+        # Save data
+        epochs_save_path = save_path + f'Epochs_ICA/' + run_path + subject.subject_id + '/'
+        evoked_save_path = save_path + f'Evoked_ICA/' + run_path + subject.subject_id + '/'
+        # Save figures
+        epochs_fig_path = plot_path + f'Epochs_ICA/' + run_path
+        evoked_fig_path = plot_path + f'Evoked_ICA/' + run_path
+    else:
+        epochs_save_path = save_path + f'Epochs_NO_ICA/' + run_path + subject.subject_id + '/'
+        evoked_save_path = save_path + f'Evoked_NO_ICA/' + run_path + subject.subject_id + '/'
+        # Save figures
+        epochs_fig_path = plot_path + f'Epochs_NO_ICA/' + run_path
+        evoked_fig_path = plot_path + f'Evoked_NO_ICA/' + run_path
+
+    # Data filenames
+    epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+    evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
+    grand_avg_data_fname = f'Grand_average_ave.fif'
+
     try:
         # Load epoched data
-        epochs_save_path = save_path + f'Epochs/' + run_path + subject.subject_id + '/'
-        epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
         epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
         # Pick MEG channels to plot
         picks = functions_general.pick_chs(chs_id=chs_id, info=epochs.info)
@@ -72,6 +92,8 @@ for subject_code in exp_info.subjects_ids:
         # Compute
         if band_id:
             meg_data = load.filtered_data(subject=subject, band_id=band_id, save_data=False)
+        elif use_ica_data:
+            meg_data = load.ica_data(subject=subject)
         else:
             meg_data = subject.load_preproc_meg()
 
@@ -102,10 +124,8 @@ for subject_code in exp_info.subjects_ids:
         if save_data:
             # Save epoched data
             epochs.reset_drop_log_selection()
-            epoch_save_path = save_path + f'Epochs/' + run_path + subject.subject_id + '/'
-            os.makedirs(epoch_save_path, exist_ok=True)
-            epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
-            epochs.save(epoch_save_path + epochs_data_fname, overwrite=True)
+            os.makedirs(epochs_save_path, exist_ok=True)
+            epochs.save(epochs_save_path + epochs_data_fname, overwrite=True)
 
     if plot_epochs:
         # Parameters for plotting
@@ -118,13 +138,12 @@ for subject_code in exp_info.subjects_ids:
         combine = 'std'
         group_by = {}
 
-
-        fig_path = plot_path + f'Epochs/' + run_path
+        # Figure file name
         fname = 'Epochs_' + subject.subject_id + f'_{chs_id}_{combine}'
 
         # Plot epochs
         plot_general.epochs(subject=subject, epochs=epochs, picks=picks, order=order, overlay=overlay, combine=combine, sigma=sigma,
-                            group_by=group_by, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path, fname=fname)
+                            group_by=group_by, display_figs=display_figs, save_fig=save_fig, fig_path=epochs_fig_path, fname=fname)
 
     #----- Evoked -----#
     # Define evoked and append for GA
@@ -136,17 +155,14 @@ for subject_code in exp_info.subjects_ids:
     evoked_misc = evoked.copy().pick('misc')
 
     # Plot evoked
-    fig_path = plot_path + f'Evoked/' + run_path
     fname = 'Evoked_' + subject.subject_id + f'_{chs_id}'
     plot_general.evoked(evoked_meg=evoked_meg, evoked_misc=evoked_misc, picks=picks,
                         plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
-                        fig_path=fig_path, fname=fname)
+                        fig_path=evoked_fig_path, fname=fname)
 
     if save_data:
         # Save evoked data
-        evoked_save_path = save_path + f'Evoked/' + run_path + subject.subject_id + '/'
         os.makedirs(evoked_save_path, exist_ok=True)
-        evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
         evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
 
 # Compute grand average
@@ -154,26 +170,22 @@ grand_avg = mne.grand_average(evokeds, interpolate_bads=False)
 
 # Save grand average
 if save_data:
-    ga_save_path = save_path + f'Evoked/' + run_path
-    os.makedirs(ga_save_path, exist_ok=True)
-    grand_avg_data_fname = f'Grand_average_ave.fif'
-    grand_avg.save(ga_save_path + grand_avg_data_fname, overwrite=True)
+    os.makedirs(evoked_save_path, exist_ok=True)
+    grand_avg.save(evoked_save_path + grand_avg_data_fname, overwrite=True)
 
 # Separate MEG and misc channels
 grand_avg_meg = grand_avg.copy().pick('mag')
 grand_avg_misc = grand_avg.copy().pick('misc')
 
 # Plot evoked
-fig_path = plot_path + f'Evoked/' + run_path
 fname = f'Grand_average_{chs_id}'
 
 plot_general.evoked(evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
                     plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
-                    fig_path=fig_path, fname=fname)
+                    fig_path=evoked_fig_path, fname=fname)
 
 # Plot Saccades frontal channels
 if 'sac' in epoch_id:
-    fig_path = plot_path + f'Evoked/' + run_path
     fname = f'Grand_average_front_ch'
 
     # Pick MEG channels to plot
@@ -182,4 +194,4 @@ if 'sac' in epoch_id:
 
     plot_general.evoked(evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
                         plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
-                        fig_path=fig_path, fname=fname)
+                        fig_path=evoked_fig_path, fname=fname)
