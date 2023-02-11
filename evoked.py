@@ -44,6 +44,7 @@ for subject_code in exp_info.subjects_ids:
 
     try:
         # Load evoked data
+        # ACTUALIZAR A LA DATA CON ICA
         evoked_save_path = save_path + f'Evoked/' + run_path + subject.subject_id + '/'
         evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
         evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)
