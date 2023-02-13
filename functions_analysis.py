@@ -76,7 +76,7 @@ def define_events(subject, epoch_id, screen, mss, dur, tgt, dir, meg_data, evt_f
     return metadata, events, events_id, metadata_sup
 
 
-def ocular_components_ploch(subject, meg_downsampled, ica, threshold=1.1, save_distributions=True):
+def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', threshold=1.1, save_distributions=True):
     '''
     Ploch's algorithm for saccadic artifacts detection by variance comparison
 
@@ -87,30 +87,29 @@ def ocular_components_ploch(subject, meg_downsampled, ica, threshold=1.1, save_d
     :return: ocular_components
     '''
 
-    # Sac ID
-    emap_sac_id = 'sac_emap'
+
     # Fix ID
-    emap_fix_id = 'fix_emap'
+    fix_id = 'fix_emap'
     # Screen
-    screen = functions_general.get_screen(epoch_id=emap_sac_id)
+    screen = functions_general.get_screen(epoch_id=sac_id)
     # MSS
-    mss = functions_general.get_mss(epoch_id=emap_sac_id)
+    mss = functions_general.get_mss(epoch_id=sac_id)
     # Item
-    tgt = functions_general.get_item(epoch_id=emap_sac_id)
+    tgt = functions_general.get_item(epoch_id=sac_id)
     # Saccades direction
-    dir = functions_general.get_dir(epoch_id=emap_sac_id)
+    dir = functions_general.get_dir(epoch_id=sac_id)
 
     # ica_sources_meg_data = ica.get_sources(meg_downsampled)
 
     # Define events
     print('Saccades')
     sac_metadata, sac_events, sac_events_id, sac_metadata_sup = \
-        functions_analysis.define_events(subject=subject, epoch_id=emap_sac_id, screen=screen, mss=mss, dur=None,
+        functions_analysis.define_events(subject=subject, epoch_id=sac_id, screen=screen, mss=mss, dur=None,
                                          tgt=tgt, dir=dir, meg_data=meg_downsampled)
 
     print('Fixations')
     fix_metadata, fix_events, fix_events_id, fix_metadata_sup = \
-        functions_analysis.define_events(subject=subject, epoch_id=emap_fix_id, screen=screen, mss=mss, dur=None,
+        functions_analysis.define_events(subject=subject, epoch_id=fix_id, screen=screen, mss=mss, dur=None,
                                          tgt=tgt, dir=dir, meg_data=meg_downsampled)
 
     # Get time windows from epoch_id name
@@ -172,8 +171,7 @@ def ocular_components_ploch(subject, meg_downsampled, ica, threshold=1.1, save_d
 
             # Save figure
             save.fig(fig=fig, path=fig_path, fname=f'component_{n_comp}')
-
-        plt.close('all')  # Free up memory
+            plt.close(fig)
         print()
 
         # Reenable figures
@@ -189,7 +187,7 @@ def ocular_components_ploch(subject, meg_downsampled, ica, threshold=1.1, save_d
     # Compute artifactual components
     ocular_components = np.where(variance_ratio > threshold)[0]
 
-    print('The ocular components to exclude based on the variance ration between saccades and fixations with a '
+    print('The ocular components to exclude based on the variance ratio between saccades and fixations with a '
           f'threshold of {threshold} are: {ocular_components}')
 
-    return ocular_components
+    return ocular_components, sac_variance, fix_variance

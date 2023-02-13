@@ -72,11 +72,11 @@ for subject_code in exp_info.subjects_ids:
         epochs_fig_path = plot_path + f'Epochs_ICA/' + run_path
         evoked_fig_path = plot_path + f'Evoked_ICA/' + run_path
     else:
-        epochs_save_path = save_path + f'Epochs_NO_ICA/' + run_path + subject.subject_id + '/'
-        evoked_save_path = save_path + f'Evoked_NO_ICA/' + run_path + subject.subject_id + '/'
+        epochs_save_path = save_path + f'Epochs_RAW/' + run_path + subject.subject_id + '/'
+        evoked_save_path = save_path + f'Evoked_RAW/' + run_path + subject.subject_id + '/'
         # Save figures
-        epochs_fig_path = plot_path + f'Epochs_NO_ICA/' + run_path
-        evoked_fig_path = plot_path + f'Evoked_NO_ICA/' + run_path
+        epochs_fig_path = plot_path + f'Epochs_RAW/' + run_path
+        evoked_fig_path = plot_path + f'Evoked_RAW/' + run_path
 
     # Data filenames
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
