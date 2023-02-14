@@ -8,7 +8,6 @@ from paths import paths
 import setup
 import load
 import functions_analysis
-import numpy as np
 
 plt.figure()
 plt.close('all')
@@ -18,7 +17,7 @@ ica_path = paths().ica_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
-display = False
+display = True
 
 for subject_code in exp_info.subjects_ids:
 
@@ -56,7 +55,8 @@ for subject_code in exp_info.subjects_ids:
             ica = load.var(file_path=save_path_ica + ica_fname)
             print('ICA object loaded')
         else:
-            raise ValueError('No loaded data. Running ICA on new data')
+            print('No loaded data. Running ICA on new data')
+            raise ValueError
     except:
         # Define ICA
         print('Running ICA...')
