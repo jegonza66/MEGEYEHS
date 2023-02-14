@@ -152,7 +152,7 @@ def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', th
     if save_distributions:
         # Create directory
         plot_path = paths().plots_path()
-        fig_path = plot_path + f'ICA/{subject.subject_id}/Ploch/'
+        fig_path = plot_path + f'ICA/{subject.subject_id}/Variance_distributions/'
         os.makedirs(fig_path, exist_ok=True)
 
         # Disable displaying figures
