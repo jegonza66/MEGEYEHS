@@ -33,7 +33,25 @@ def epochs(subject, epochs, picks, order=None, overlay=None, combine='mean', sig
 
 
 def evoked(evoked_meg, evoked_misc, picks, plot_gaze=False, fig=None,
-           axes=None, plot_xlim=None, display_figs=False, save_fig=True, fig_path=None, fname=None):
+           axes=None, plot_xlim='tight', plot_ylim=None, display_figs=False, save_fig=True, fig_path=None, fname=None):
+    '''
+    Plot evoked response with mne.Evoked.plot() method. Option to plot gaze data on subplot.
+
+    :param evoked_meg: Evoked with picked mag channels
+    :param evoked_misc: Evoked with picked misc channels (if plot_gaze = True)
+    :param picks: Meg channels to plot
+    :param plot_gaze: Bool
+    :param fig: Optional. Figure instance
+    :param axes: Optional. Axes instance (if figure provided)
+    :param plot_xlim: tuple. x limits for evoked and gaze plot
+    :param plot_ylim: dict. Possible keys: meg, mag, eeg, misc...
+    :param display_figs: bool. Whether to show figures or not
+    :param save_fig: bool. Whether to save figures. Must provide save_path and figure name.
+    :param fig_path: string. Optional. Path to save figure if save_fig true
+    :param fname: string. Optional. Filename if save_fig is True
+
+    :return: None
+    '''
 
     # Sanity check
     if save_fig and (not fname or not fig_path):
@@ -44,12 +62,11 @@ def evoked(evoked_meg, evoked_misc, picks, plot_gaze=False, fig=None,
             raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
         evoked_meg.plot(picks=picks, gfp=True, axes=axes, time_unit='s', spatial_colors=True, xlim=plot_xlim,
-                        show=display_figs)
+                        ylim=plot_ylim, show=display_figs)
         axes.vlines(x=0, ymin=axes.get_ylim()[0], ymax=axes.get_ylim()[1], color='grey', linestyles='--')
 
         if save_fig:
             save.fig(fig=fig, path=fig_path, fname=fname)
-        plot_gaze = False
 
     elif plot_gaze:
         # Get Gaze x ch
@@ -61,7 +78,8 @@ def evoked(evoked_meg, evoked_misc, picks, plot_gaze=False, fig=None,
         axs[1].set_ylabel('Gaze x')
         axs[1].set_xlabel('Time')
 
-        evoked_meg.plot(picks=picks, gfp=True, axes=axs[0], time_unit='s', spatial_colors=True, xlim=plot_xlim, show=display_figs)
+        evoked_meg.plot(picks=picks, gfp=True, axes=axs[0], time_unit='s', spatial_colors=True, xlim=plot_xlim,
+                        ylim=plot_ylim, show=display_figs)
         axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='grey', linestyles='--')
 
         if save_fig:
@@ -69,7 +87,7 @@ def evoked(evoked_meg, evoked_misc, picks, plot_gaze=False, fig=None,
 
     else:
         fig = evoked_meg.plot(picks=picks, gfp=True, axes=axes, time_unit='s', spatial_colors=True, xlim=plot_xlim,
-                        show=display_figs)
+                              ylim=plot_ylim, show=display_figs)
         axes = fig.get_axes()[0]
         axes.vlines(x=0, ymin=axes.get_ylim()[0], ymax=axes.get_ylim()[1], color='grey', linestyles='--')
 

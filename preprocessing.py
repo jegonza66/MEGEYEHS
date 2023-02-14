@@ -6,7 +6,16 @@ import functions_preproc
 from paths import paths
 
 
-def preprocess(subject_code, exp_info, config, plot=False):
+# Load experiment info
+exp_info = setup.exp_info()
+# Load configuration
+config = load.config(path=paths().config_path(), fname='config.pkl')
+# Run plots
+plot = False
+
+# Run
+for subject_code in exp_info.subjects_ids:
+
     #---------------- Load data ----------------#
     # Define subject
     subject = setup.raw_subject(exp_info=exp_info, config=config, subject_code=subject_code)
@@ -81,14 +90,3 @@ def preprocess(subject_code, exp_info, config, plot=False):
     # Free up memory
     del(raw)
     del(subject)
-
-
-# Run
-# Load experiment info
-exp_info = setup.exp_info()
-# Load configuration
-config = load.config(path=paths().config_path(), fname='config.pkl')
-
-for subject_code in exp_info.subjects_ids[1:]:
-    preprocess(subject_code=subject_code, exp_info=exp_info, config=config, plot=False)
-

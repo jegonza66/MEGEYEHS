@@ -104,11 +104,58 @@ def preproc_subject(exp_info, subject_code):
         f = open(file_path, 'rb')
         preproc_subject = pickle.load(f)
         f.close()
-        return preproc_subject
-
     except:
         print(f'Directory: {os.listdir(pathlib.Path(os.path.join(preproc_path, subject_id)))}')
         raise ValueError(f'Preprocessed data for subject {subject_id} not found in {file_path}')
+
+    return preproc_subject
+
+
+def ica_subject(exp_info, subject_code):
+    """
+    Load ica subject object.
+
+    Attributes
+    --------
+    fixations:
+    saccades:
+    config?:
+
+    Parameters
+    --------
+    exp_info: class
+       Experiment information class
+
+    Returns
+    -------
+    ica_subject: class
+        The ica subject class
+    """
+
+    # Select 1st subject by default
+    if subject_code == None:
+        subject_id = exp_info.subjects_ids[0]
+    # Select subject by index
+    elif type(subject_code) == int:
+        subject_id = exp_info.subjects_ids[subject_code]
+    # Select subject by id
+    elif type(subject_code) == str and (subject_code in exp_info.subjects_ids):
+        subject_id = subject_code
+    else:
+        print('Subject not found.')
+
+    # Preprocessing configuration
+    ica_path = paths().ica_path()
+    file_path = pathlib.Path(os.path.join(ica_path, subject_id, f'Subject_data.pkl'))
+    try:
+        f = open(file_path, 'rb')
+        ica_subject = pickle.load(f)
+        f.close()
+    except:
+        print(f'Directory: {os.listdir(pathlib.Path(os.path.join(ica_path, subject_id)))}')
+        raise ValueError(f'Preprocessed data for subject {subject_id} not found in {file_path}')
+
+    return ica_subject
 
 
 def filtered_data(subject, band_id, preload=False, save_data=False):
