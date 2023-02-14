@@ -45,13 +45,13 @@ for subject_code in exp_info.subjects_ids:
     try:
         # Load evoked data
         # ACTUALIZAR A LA DATA CON ICA
-        evoked_save_path = save_path + f'Evoked/' + run_path + subject.subject_id + '/'
+        evoked_save_path = save_path + f'Evoked/' + run_path
         evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
         evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)
 
     except:
         # Load epoched data
-        epochs_save_path = save_path + f'Epochs/' + run_path + subject.subject_id + '/'
+        epochs_save_path = save_path + f'Epochs/' + run_path
         epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
         epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
 
@@ -61,7 +61,7 @@ for subject_code in exp_info.subjects_ids:
         # Save data
         if save_data:
             # Save evoked data
-            evoked_save_path = save_path + f'Evoked/' + run_path + subject.subject_id + '/'
+            evoked_save_path = save_path + f'Evoked/' + run_path
             os.makedirs(evoked_save_path, exist_ok=True)
             evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
             evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
@@ -102,8 +102,8 @@ grand_avg_misc = grand_avg.copy().pick('misc')
 fig_path = plot_path + f'Evoked/' + run_path
 fname = f'Grand_average_{chs_id}'
 plot_general.evoked(evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
-                    plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
-                    fig_path=fig_path, fname=fname)
+                    plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs,
+                    save_fig=save_fig, fig_path=fig_path, fname=fname)
 
 # Plot Saccades frontal channels
 if 'sac' in epoch_id:

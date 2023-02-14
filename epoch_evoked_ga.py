@@ -1,8 +1,6 @@
 import os
 import matplotlib.pyplot as plt
 import mne
-import pandas as pd
-
 import functions_general
 import functions_analysis
 import load
@@ -61,20 +59,23 @@ run_path = f'/{band_id}/{epoch_id}_{tmin}_{tmax}/'
 evokeds = []
 for subject_code in exp_info.subjects_ids:
 
-    subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-
     # Define save path and file name for loading and saving epoched, evoked, and GA data
     if use_ica_data:
-        # Save data
-        epochs_save_path = save_path + f'Epochs_ICA/' + run_path + subject.subject_id + '/'
-        evoked_save_path = save_path + f'Evoked_ICA/' + run_path + subject.subject_id + '/'
-        # Save figures
+        # Load subject object
+        subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
+        # Save data paths
+        epochs_save_path = save_path + f'Epochs_ICA/' + run_path
+        evoked_save_path = save_path + f'Evoked_ICA/' + run_path
+        # Save figures paths
         epochs_fig_path = plot_path + f'Epochs_ICA/' + run_path
         evoked_fig_path = plot_path + f'Evoked_ICA/' + run_path
     else:
-        epochs_save_path = save_path + f'Epochs_RAW/' + run_path + subject.subject_id + '/'
-        evoked_save_path = save_path + f'Evoked_RAW/' + run_path + subject.subject_id + '/'
-        # Save figures
+        # Load subject object
+        subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
+        # Save data paths
+        epochs_save_path = save_path + f'Epochs_RAW/' + run_path
+        evoked_save_path = save_path + f'Evoked_RAW/' + run_path
+        # Save figures paths
         epochs_fig_path = plot_path + f'Epochs_RAW/' + run_path
         evoked_fig_path = plot_path + f'Evoked_RAW/' + run_path
 

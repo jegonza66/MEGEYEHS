@@ -18,7 +18,7 @@ ica_path = paths().ica_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
-display = True
+display = False
 
 for subject_code in exp_info.subjects_ids:
 
@@ -74,32 +74,6 @@ for subject_code in exp_info.subjects_ids:
     ocular_components, sac_variance, fix_variance = \
         functions_analysis.ocular_components_ploch(subject=subject, meg_downsampled=meg_downsampled,
                                                    ica=ica)
-
-    # # Max variance
-    # ocular_components_v, sac_variance_v, fix_variance = \
-    #     functions_analysis.ocular_components_ploch(subject=subject, meg_downsampled=meg_downsampled,
-    #                                                sac_id='u_sac_emap', ica=ica)
-    # ocular_components_h, sac_variance_h, _ = \
-    #     functions_analysis.ocular_components_ploch(subject=subject, meg_downsampled=meg_downsampled,
-    #                                                sac_id='r_sac_emap', ica=ica)
-    #
-    # # Compute mean component variances
-    # max_sac_variance_v = np.max(sac_variance_v, axis=0)
-    # max_sac_variance_h = np.max(sac_variance_h, axis=0)
-    # max_fix_variance = np.max(fix_variance, axis=0)
-    #
-    # max_sac_variances = np.vstack((max_sac_variance_v, max_sac_variance_h))
-    # max_sac_variance = np.max(max_sac_variances, axis=0)
-    #
-    # # Compute variance ratio
-    # variance_ratio = max_sac_variance / max_fix_variance
-    #
-    # # Compute artifactual components
-    # threshold = 1.1
-    # ocular_components_max_var = np.where(variance_ratio > threshold)[0]
-    #
-    # print('The ocular components to exclude based on the variance ration between saccades and fixations with a '
-    #       f'threshold of {threshold} are: {ocular_components_max_var}')
 
     # Visual inspection for further artefactual components identification
     if display:
@@ -167,3 +141,30 @@ for subject_code in exp_info.subjects_ids:
         meg_data.plot(order=chan_idxs, duration=5)
         meg_ica.plot(order=chan_idxs, duration=5)
 
+
+## Ploch's algorithm on Max variance
+
+# ocular_components_v, sac_variance_v, fix_variance = \
+#     functions_analysis.ocular_components_ploch(subject=subject, meg_downsampled=meg_downsampled,
+#                                                sac_id='u_sac_emap', ica=ica)
+# ocular_components_h, sac_variance_h, _ = \
+#     functions_analysis.ocular_components_ploch(subject=subject, meg_downsampled=meg_downsampled,
+#                                                sac_id='r_sac_emap', ica=ica)
+#
+# # Compute mean component variances
+# max_sac_variance_v = np.max(sac_variance_v, axis=0)
+# max_sac_variance_h = np.max(sac_variance_h, axis=0)
+# max_fix_variance = np.max(fix_variance, axis=0)
+#
+# max_sac_variances = np.vstack((max_sac_variance_v, max_sac_variance_h))
+# max_sac_variance = np.max(max_sac_variances, axis=0)
+#
+# # Compute variance ratio
+# variance_ratio = max_sac_variance / max_fix_variance
+#
+# # Compute artifactual components
+# threshold = 1.1
+# ocular_components_max_var = np.where(variance_ratio > threshold)[0]
+#
+# print('The ocular components to exclude based on the variance ration between saccades and fixations with a '
+#       f'threshold of {threshold} are: {ocular_components_max_var}')
