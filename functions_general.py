@@ -367,10 +367,6 @@ def get_time_lims(epoch_id, map=None):
             tmin = -0.1
             tmax = 0.2
             plot_xlim = (tmin, tmax)
-        elif '_sac' in epoch_id:
-            tmin = -0.1
-            tmax = 0.1
-            plot_xlim = (-0.05, tmax)
         elif 'sac' in epoch_id:
             tmin = -0.05
             tmax = 0.1

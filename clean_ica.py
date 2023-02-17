@@ -8,6 +8,7 @@ from paths import paths
 import setup
 import load
 import functions_analysis
+import functions_general
 
 plt.figure()
 plt.close('all')
@@ -19,7 +20,7 @@ exp_info = setup.exp_info()
 
 display = True
 
-for subject_code in exp_info.subjects_ids:
+for subject_code in exp_info.subjects_ids[0:]:
 
     # Load data
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
@@ -48,6 +49,7 @@ for subject_code in exp_info.subjects_ids:
     # ICA
     save_path_ica = ica_path + subject.subject_id + '/'
     ica_fname = 'ICA.pkl'
+    ica_components = 64
 
     try:
         if loaded_data:
@@ -60,8 +62,7 @@ for subject_code in exp_info.subjects_ids:
     except:
         # Define ICA
         print('Running ICA...')
-        ica_components = 64
-        ica = ICA(method='fastica', random_state=97, n_components=ica_components)
+        ica = ICA(method='infomax', random_state=97, n_components=ica_components)
 
         # Apply ICA
         ica.fit(meg_downsampled)
@@ -76,33 +77,9 @@ for subject_code in exp_info.subjects_ids:
                                                    ica=ica)
 
     # Visual inspection for further artefactual components identification
-    if display:
-        # Plot sources and components
-        ica.plot_sources(meg_downsampled, title='ICA')
-        ica.plot_components()
-
-    # Select bad components
-    answer = None
-    while answer != 'y':
-        answer = input('Enter the component numbers to exclude separated by dashes\n'
-                       'For example, to exclude 0th 1st and 5th components enter: 0-1-5')
-
-        components = answer.split('-')
-
-        try:
-            components = [int(comp) for comp in components]
-            answer = input(f'The components to exclude are: {components}\n'
-                           f'Is that correct? (y/n)')
-        except:
-            print(f'Error to convert components to integer values.\n'
-                  f'components: {components}\n'
-                  f'Please re-enter the components to exclude')
-            answer = None
-
-    # Append ocular components from Ploch's algorithm to the components to exclude
-    for ocular_component in ocular_components:
-        if ocular_component not in components:
-            components.append(ocular_component)
+    # Plot sources and components
+    ica.plot_sources(meg_downsampled, title='ICA')
+    ica.plot_components()
 
     # Save components figures
     # Create directory
@@ -110,16 +87,73 @@ for subject_code in exp_info.subjects_ids:
     os.makedirs(fig_path, exist_ok=True)
 
     # Plot properties of excluded components
-    ica.plot_properties(meg_downsampled, picks=components, psd_args=dict(fmax=hfreq), show=False)
+    all_comps = [i for i in range(ica_components)]
+    ica.plot_properties(meg_downsampled, picks=all_comps, psd_args=dict(fmax=hfreq), show=False)
 
     # Get figures
     figs = [plt.figure(n) for n in plt.get_fignums()]
     for i, fig in enumerate(figs):
         save.fig(fig=fig, path=fig_path, fname=f'figure_{i}')
+    plt.close('all')
+
+    ex_components = [0,1]
+
+    # Get time windows from epoch_id name
+
+    epoch_id = 'l_sac'
+    tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
+
+    # Specific run path for loading evoked data
+    run_path = f'/None/{epoch_id}_{tmin}_{tmax}/'
+
+    # load evoked data path
+    evoked_save_path = paths().save_path() + f'Evoked_RAW/' + run_path
+
+    # Data filenames
+    evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
+
+    # Load evoked data
+    evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
+
+    # plot before and after
+    ica.plot_overlay(inst=evoked, exclude=ex_components)
+
+    # Select bad components
+    answer = None
+    while answer != 'y':
+        answer = input('Enter the component numbers to exclude separated by dashes\n'
+                       'For example, to exclude 0th 1st and 5th components enter: 0-1-5')
+
+        ex_components = answer.split('-')
+
+        try:
+            ex_components = [int(comp) for comp in ex_components]
+            answer = input(f'The components to exclude are: {ex_components}\n'
+                           f'Is that correct? (y/n)')
+        except:
+            print(f'Error to convert components to integer values.\n'
+                  f'components: {ex_components}\n'
+                  f'Please re-enter the components to exclude')
+            answer = None
+
+    # Append ocular components from Ploch's algorithm to the components to exclude
+    for ocular_component in ocular_components:
+        if ocular_component not in ex_components:
+            ex_components.append(ocular_component)
+
+    # Plot properties of excluded components
+    ica.plot_properties(meg_downsampled, picks=ex_components, psd_args=dict(fmax=hfreq), show=False)
+
+    # Get figures
+    figs = [plt.figure(n) for n in plt.get_fignums()]
+    # Redefine save path
+    fig_path += 'Excluded/'
+    for i, fig in enumerate(figs):
+        save.fig(fig=fig, path=fig_path, fname=f'figure_{i}')
 
     # Exclude bad components from data
-    ica.exclude = components
-    subject.ex_components = components
+    ica.exclude = ex_components
+    subject.ex_components = ex_components
     meg_ica = meg_data.copy()
     meg_ica.load_data()
     ica.apply(meg_ica)

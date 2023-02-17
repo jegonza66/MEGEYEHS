@@ -6,7 +6,9 @@ import functions_analysis
 import load
 import plot_general
 import setup
+import save
 from paths import paths
+from mne.preprocessing import ICA
 
 
 #----- Paths -----#
@@ -16,13 +18,16 @@ exp_info = setup.exp_info()
 
 
 #----- Save data and display figures -----#
-save_data = True
-save_fig = True
-display_figs = False
+save_data = False
+save_fig = False
+display_figs = True
 if display_figs:
     plt.ion()
 else:
     plt.ioff()
+
+plot_epochs = True
+plot_gaze = True
 
 
 #----- Parameters -----#
@@ -36,8 +41,6 @@ epoch_id = 'l_sac'
 dur = None  # seconds
 # Plot channels
 chs_id = 'mag'
-plot_epochs = True
-plot_gaze = True
 
 
 # Screen
@@ -56,32 +59,22 @@ run_path = f'/{band_id}/{epoch_id}_{tmin}_{tmax}/'
 
 #----- Run -----#
 evokeds = []
-for subject_code in exp_info.subjects_ids:
+for subject_code in exp_info.subjects_ids[4:]:
 
     # Define save path and file name for loading and saving epoched, evoked, and GA data
-    if use_ica_data:
-        # Load subject object
-        subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
-        # Save data paths
-        epochs_save_path = save_path + f'Epochs_ICA/' + run_path
-        evoked_save_path = save_path + f'Evoked_ICA/' + run_path
-        # Save figures paths
-        epochs_fig_path = plot_path + f'Epochs_ICA/' + run_path
-        evoked_fig_path = plot_path + f'Evoked_ICA/' + run_path
-    else:
-        # Load subject object
-        subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-        # Save data paths
-        epochs_save_path = save_path + f'Epochs_RAW/' + run_path
-        evoked_save_path = save_path + f'Evoked_RAW/' + run_path
-        # Save figures paths
-        epochs_fig_path = plot_path + f'Epochs_RAW/' + run_path
-        evoked_fig_path = plot_path + f'Evoked_RAW/' + run_path
+
+    # Load subject object
+    subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
+    # Save data paths
+    epochs_save_path = save_path + f'Epochs_RAW/' + run_path
+    evoked_save_path = save_path + f'Evoked_RAW/' + run_path
+    # Save figures paths
+    epochs_fig_path = plot_path + f'Epochs_RAW/' + run_path
+    evoked_fig_path = plot_path + f'Evoked_RAW/' + run_path
 
     # Data filenames
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
     evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
-    grand_avg_data_fname = f'Grand_average_ave.fif'
 
     try:
         # Load epoched data
@@ -90,12 +83,7 @@ for subject_code in exp_info.subjects_ids:
         picks = functions_general.pick_chs(chs_id=chs_id, info=epochs.info)
     except:
         # Compute
-        if band_id:
-            meg_data = load.filtered_data(subject=subject, band_id=band_id, save_data=False)
-        elif use_ica_data:
-            meg_data = load.ica_data(subject=subject)
-        else:
-            meg_data = subject.load_preproc_meg()
+        meg_data = subject.load_preproc_meg()
 
         # Pick MEG channels to plot
         picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
@@ -145,53 +133,53 @@ for subject_code in exp_info.subjects_ids:
         plot_general.epochs(subject=subject, epochs=epochs, picks=picks, order=order, overlay=overlay, combine=combine, sigma=sigma,
                             group_by=group_by, display_figs=display_figs, save_fig=save_fig, fig_path=epochs_fig_path, fname=fname)
 
-    #----- Evoked -----#
-    # Define evoked and append for GA
-    evoked = epochs.average(picks=['mag', 'misc'])
-    evokeds.append(evoked)
+    # Evoked for plotting before and after
+    evoked = epochs.average(picks=['mag'])
 
-    # Separete MEG and misc channels
-    evoked_meg = evoked.copy().pick('mag')
-    evoked_misc = evoked.copy().pick('misc')
+    # Fit ICA to epochs and plot overlay
+    ica_components = 64
+    lfreq = 1
+    hfreq = 40
+    epochs.filter(lfreq, hfreq)
 
-    # Plot evoked
-    fname = 'Evoked_' + subject.subject_id + f'_{chs_id}'
-    plot_general.evoked(evoked_meg=evoked_meg, evoked_misc=evoked_misc, picks=picks,
-                        plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
-                        fig_path=evoked_fig_path, fname=fname)
+    # Define ICA
+    ica = ICA(method='infomax', random_state=97, n_components=ica_components)
 
-    if save_data:
-        # Save evoked data
-        os.makedirs(evoked_save_path, exist_ok=True)
-        evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
+    # Apply ICA
+    ica.fit(epochs)
 
-# Compute grand average
-grand_avg = mne.grand_average(evokeds, interpolate_bads=False)
+    # Plot components and signals
+    ica.plot_sources(epochs, title='ICA')
+    ica.plot_components()
 
-# Save grand average
-if save_data:
-    os.makedirs(evoked_save_path, exist_ok=True)
-    grand_avg.save(evoked_save_path + grand_avg_data_fname, overwrite=True)
+    # Select bad components
+    ex_components = [1,2,9,17,18,33,39,43,61,62,63]
 
-# Separate MEG and misc channels
-grand_avg_meg = grand_avg.copy().pick('mag')
-grand_avg_misc = grand_avg.copy().pick('misc')
+    # plot before and after
+    ica.plot_overlay(evoked, exclude=ex_components)
 
-# Plot evoked
-fname = f'Grand_average_{chs_id}'
+    # Save components figures
+    # Create directory
+    fig_path = plot_path + f'ICA_on_Epochs/{subject.subject_id}/'
+    os.makedirs(fig_path, exist_ok=True)
 
-plot_general.evoked(evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
-                    plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
-                    fig_path=evoked_fig_path, fname=fname)
+    # Plot properties of excluded components
+    all_comps = [i for i in range(ica_components)]
+    ica.plot_properties(epochs, picks=all_comps, psd_args=dict(fmax=hfreq), show=False)
 
-# Plot Saccades frontal channels
-if 'sac' in epoch_id:
-    fname = f'Grand_average_front_ch'
+    # Get figures
+    figs = [plt.figure(n) for n in plt.get_fignums()]
+    for i, fig in enumerate(figs):
+        save.fig(fig=fig, path=fig_path, fname=f'figure_{i}')
+    plt.close('all')
 
-    # Pick MEG channels to plot
-    chs_id = 'sac_chs'
-    picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg_meg.info)
+    # Plot properties of excluded components
+    ica.plot_properties(epochs, picks=ex_components, psd_args=dict(fmax=hfreq), show=False)
 
-    plot_general.evoked(evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
-                        plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
-                        fig_path=evoked_fig_path, fname=fname)
+    # Get figures
+    figs = [plt.figure(n) for n in plt.get_fignums()]
+    # Redefine save path
+    fig_path += 'Excluded/'
+    for i, fig in enumerate(figs):
+        save.fig(fig=fig, path=fig_path, fname=f'figure_{i}')
+

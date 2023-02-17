@@ -12,7 +12,7 @@ preproc_path = paths().preproc_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
-for subject_code in exp_info.subjects_ids[6:]:
+for subject_code in exp_info.subjects_ids:
 
     # Load data
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
@@ -20,7 +20,7 @@ for subject_code in exp_info.subjects_ids[6:]:
 
     # --------- Visual annotation ---------#
     meg_data_visual = meg_data.copy()
-    fig = meg_data_visual.pick_types(meg=True).plot(n_channels=100)
+    fig = meg_data_visual.pick_types(meg=True).plot(duration=25, n_channels=271, scalings=dict(mag=0.6e-12))
     fig.fake_keypress('a')
 
     #--------- Muscle artifacts ---------#
@@ -37,7 +37,7 @@ for subject_code in exp_info.subjects_ids[6:]:
     meg_data.set_annotations(meg_data.annotations + annotations_muscle + annotations_bad)
 
     # Check muscle annottations
-    meg_data.pick_types(meg=True).plot(n_channels=100)
+    # meg_data.pick_types(meg=True).plot(n_channels=100)
 
     # Define save path to overwrite preprocessed data with new annotations and muscle nans
     preproc_save_path = preproc_path + subject.subject_id + '/'

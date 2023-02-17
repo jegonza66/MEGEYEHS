@@ -11,25 +11,27 @@ save_path = paths().save_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
-
 #----- Save data and display figures -----#
 save_data = False
-save_fig = True
-display_figs = False
+save_fig = False
+display_figs = True
 if display_figs:
     plt.ion()
 else:
     plt.ioff()
 
-plot_gaze = False
-
+#-----  Select frequency band -----#
+# ICA vs raw data
+use_ica_data = False
+band_id = None
+# Id
+epoch_id = 'l_sac'
+# Duration
+dur = None  # seconds
 # Pick MEG chs (Select channels or set picks = 'mag')
 chs_id = 'mag'
-
-#-----  Select frequency band -----#
-band_id = None
-
-epoch_id = 'sac'
+# Plot eye movements
+plot_gaze = False
 
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
@@ -40,19 +42,36 @@ run_path = f'/{band_id}/{epoch_id}_{tmin}_{tmax}/'
 evokeds = []
 for subject_code in exp_info.subjects_ids:
 
-    subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
+    if use_ica_data:
+        # Load subject object
+        subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
+        # Save data paths
+        epochs_save_path = save_path + f'Epochs_ICA/' + run_path
+        evoked_save_path = save_path + f'Evoked_ICA/' + run_path
+        # Save figures paths
+        epochs_fig_path = plot_path + f'Epochs_ICA/' + run_path
+        evoked_fig_path = plot_path + f'Evoked_ICA/' + run_path
+    else:
+        # Load subject object
+        subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
+        # Save data paths
+        epochs_save_path = save_path + f'Epochs_RAW/' + run_path
+        evoked_save_path = save_path + f'Evoked_RAW/' + run_path
+        # Save figures paths
+        epochs_fig_path = plot_path + f'Epochs_RAW/' + run_path
+        evoked_fig_path = plot_path + f'Evoked_RAW/' + run_path
+
+    # Data filenames
+    epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+    evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
+    grand_avg_data_fname = f'Grand_average_ave.fif'
 
     try:
         # Load evoked data
-        # ACTUALIZAR A LA DATA CON ICA
-        evoked_save_path = save_path + f'Evoked/' + run_path
-        evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
-        evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)
+        evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
 
     except:
         # Load epoched data
-        epochs_save_path = save_path + f'Epochs/' + run_path
-        epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
         epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
 
         # Get evoked by averaging epochs
