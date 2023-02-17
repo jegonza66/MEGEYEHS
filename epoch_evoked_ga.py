@@ -100,9 +100,9 @@ for subject_code in exp_info.subjects_ids:
         # Pick MEG channels to plot
         picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
 
-        # Exclude bad channels
-        bads = subject.bad_channels
-        meg_data.info['bads'].extend(bads)
+        # # Exclude bad channels
+        # bads = subject.bad_channels
+        # meg_data.info['bads'].extend(bads)
 
         metadata, events, events_id, metadata_sup = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
                                                                                      screen=screen, mss=mss, dur=dur,
