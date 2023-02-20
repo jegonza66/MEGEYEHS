@@ -2,7 +2,6 @@ import mne
 import numpy as np
 import functions_general
 import matplotlib.pyplot as plt
-import functions_analysis
 from paths import paths
 import os
 import time
@@ -58,7 +57,7 @@ def define_events(subject, epoch_id, screen, mss, dur, tgt, dir, meg_data, evt_f
         if 'fix' not in epoch_id:
             epoch_keys = [key for key in epoch_keys if 'fix' not in key]
         if screen:
-            epoch_keys = [epoch_key for epoch_key in epoch_keys if f'_{screen}' in epoch_key]
+            epoch_keys = [epoch_key for epoch_key in epoch_keys if f'{screen}' in epoch_key]
         if mss:
             trials_mss = subject.bh_data.loc[subject.bh_data['Nstim'] == mss].index + 1  # add 1 due to python 0th indexing
             epoch_keys = [epoch_key for epoch_key in epoch_keys if int(epoch_key.split('t')[-1]) in trials_mss]
@@ -76,7 +75,8 @@ def define_events(subject, epoch_id, screen, mss, dur, tgt, dir, meg_data, evt_f
     return metadata, events, events_id, metadata_sup
 
 
-def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', threshold=1.1, save_distributions=True):
+def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', fix_id='fix_emap' , threshold=1.1,
+                            plot_distributions=True):
     '''
     Ploch's algorithm for saccadic artifacts detection by variance comparison
 
@@ -87,9 +87,6 @@ def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', th
     :return: ocular_components
     '''
 
-
-    # Fix ID
-    fix_id = 'fix_emap'
     # Screen
     screen = functions_general.get_screen(epoch_id=sac_id)
     # MSS
@@ -104,19 +101,19 @@ def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', th
     # Define events
     print('Saccades')
     sac_metadata, sac_events, sac_events_id, sac_metadata_sup = \
-        functions_analysis.define_events(subject=subject, epoch_id=sac_id, screen=screen, mss=mss, dur=None,
+        define_events(subject=subject, epoch_id=sac_id, screen=screen, mss=mss, dur=None,
                                          tgt=tgt, dir=dir, meg_data=meg_downsampled)
 
     print('Fixations')
     fix_metadata, fix_events, fix_events_id, fix_metadata_sup = \
-        functions_analysis.define_events(subject=subject, epoch_id=fix_id, screen=screen, mss=mss, dur=None,
+        define_events(subject=subject, epoch_id=fix_id, screen=screen, mss=mss, dur=None,
                                          tgt=tgt, dir=dir, meg_data=meg_downsampled)
 
     # Get time windows from epoch_id name
     sac_tmin = -0.005  # Add previous 5 ms
-    sac_tmax = sac_metadata_sup['duration'].min() + 0.01  # Min sac duration + 10 ms
+    sac_tmax = sac_metadata_sup['duration'].mean()
     fix_tmin = 0
-    fix_tmax = fix_metadata_sup['duration'].min()  # Min sac duration + 10 ms
+    fix_tmax = fix_metadata_sup['duration'].min()
 
     # Epoch data
     sac_epochs = mne.Epochs(raw=meg_downsampled, events=sac_events, event_id=sac_events_id, tmin=sac_tmin,
@@ -148,8 +145,8 @@ def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', th
     sac_variance = np.var(sac_ica_data, axis=2)
     fix_variance = np.var(fix_ica_data, axis=2)
 
-    # Plot componets distributions
-    if save_distributions:
+    # Plot components distributions
+    if plot_distributions:
         # Create directory
         plot_path = paths().plots_path()
         fig_path = plot_path + f'ICA/{subject.subject_id}/Variance_distributions/'
@@ -190,4 +187,4 @@ def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', th
     print('The ocular components to exclude based on the variance ratio between saccades and fixations with a '
           f'threshold of {threshold} are: {ocular_components}')
 
-    return ocular_components, sac_variance, fix_variance
+    return ocular_components, sac_epochs, fix_epochs

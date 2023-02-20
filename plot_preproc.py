@@ -1,9 +1,9 @@
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 plt.figure()
 plt.close()
 import numpy as np
 import matplotlib.image as mpimg
-import matplotlib as mpl
 import os
 import seaborn as sn
 import pandas as pd
@@ -908,3 +908,27 @@ def performance_BH(subject, display=False, save=True):
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id
         os.makedirs(save_path, exist_ok=True)
         plt.savefig(save_path + f'/{subject.subject_id} Performance.png')
+
+
+def line_noise_psd(subject, raw, filtered, display_fig=False, save_fig=True, fig_path=None, fig_name='RAW_PSD'):
+
+    # Display image True or False
+    if display_fig:
+        plt.ion()
+    else:
+        plt.ioff()
+
+    fig, axs = plt.subplots(nrows=2)
+    plt.suptitle('Power line noise filtering')
+
+    # Plot noise
+    raw.plot_psd(picks='mag', ax=axs[0])
+
+    # Plot filtered
+    filtered.plot_psd(picks='mag', ax=axs[1])
+
+    if save_fig:
+        # Save
+        if not fig_path:
+            fig_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
+        save.fig(fig=fig, path=fig_path, fname=fig_name)

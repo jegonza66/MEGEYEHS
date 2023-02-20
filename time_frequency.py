@@ -23,18 +23,20 @@ save_fig = False
 display_figs = True
 
 #-----  Select MEG channels -----#
-chs_id = 'parietal'
+chs_id = 'frontal'
 
 # MSS
-mss = 1
+mss = None
 mss_duration = {1: 2, 2: 3.5, 4: 5}
 cross1_dur = 0.75
 cross2_dur = 1
 # Id
 save_id = f'mss{mss}_cross1_ms_cross2'
-epoch_id = 'cross2_'
+save_id = f'l_sac'
+epoch_id = 'l_sac'
 # Duration
 dur = cross1_dur + mss_duration[mss] + cross2_dur  # seconds
+dur = None
 # Direction
 dir = None
 # Screen
@@ -44,12 +46,13 @@ tgt = functions_general.get_item(epoch_id=epoch_id)
 
 # Get time windows from epoch_id name
 map_times = dict(cross={'tmin': 0, 'tmax': dur, 'plot_xlim': (dur-1, dur-0.2)})
-tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
+tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
 
 # Power computation parameters
 baseline = (tmin, tmin+cross1_dur)
+baseline = (None, 0)
 bline_mode = 'logratio'
-l_freq = 4
+l_freq = 20
 h_freq = 100
 
 # Specific run path for saving data and plots
@@ -72,11 +75,13 @@ for subject_code in exp_info.subjects_ids:
     except:
         # No previous data. Compute
         meg_data = load.ica_data(subject=subject)
+        # OJO ACA
+        meg_data = subject.load_preproc_meg() # OJO ACA
         picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
 
-        # Exclude bad channels
-        bads = subject.bad_channels
-        meg_data.info['bads'].extend(bads)
+        # # Exclude bad channels
+        # bads = subject.bad_channels
+        # meg_data.info['bads'].extend(bads)
 
         metadata, events, events_id, metadata_sup = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
                                                                                      screen=screen, mss=mss, dur=dur, tgt=tgt,
@@ -84,18 +89,18 @@ for subject_code in exp_info.subjects_ids:
 
         # Reject based on channel amplitude
         reject = dict(mag=subject.config.general.reject_amp)
-        reject = dict(mag=2.5e-12)
-        reject = dict(mag=1)
+        # reject = dict(mag=2.5e-12)
+        # reject = dict(mag=1)
 
         # Epoch data
-        epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=tmin, tmax=tmax, reject=reject,
+        epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=-0.2, tmax=0.2, reject=reject,
                             baseline=baseline, event_repeated='drop', metadata=metadata, picks='mag', preload=True)
         # Drop bad epochs
         epochs.drop_bad()
 
         # Compute power over frequencies
         freqs = np.logspace(*np.log10([l_freq, h_freq]), num=40)
-        n_cycles = freqs / 2.  # different number of cycle per frequency
+        n_cycles = freqs / 4.  # different number of cycle per frequency
         power = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
                                               return_itc=False, decim=3, n_jobs=None)
 

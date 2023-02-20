@@ -16,7 +16,7 @@ plot = False
 # Run
 for subject_code in exp_info.subjects_ids:
 
-    #---------------- Load data ----------------#
+    # ---------------- Load data ----------------#
     # Define subject
     subject = setup.raw_subject(exp_info=exp_info, config=config, subject_code=subject_code)
 
@@ -84,9 +84,37 @@ for subject_code in exp_info.subjects_ids:
     #---------------- Add scaled data to meg data ----------------#
     functions_preproc.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=exp_info.et_channel_names)
 
+    # ---------------- Filter line noise ----------------#
+    freqs = (50, 100, 110, 150, 200, 250, 300)
+    filtered_data = functions_preproc.filter_line_noise(subject=subject, raw=raw, freqs=freqs)
+
+    # Extra Add clean annotations to meg data
+    import mne
+
+    preproc_data_path = paths().preproc_path()
+    preproc_save_path = preproc_data_path + subject.subject_id + '/'
+    file_path = preproc_save_path + 'clean_annotations.csv'
+    clean_annotations = mne.read_annotations(fname=file_path)
+    filtered_data.set_annotations(clean_annotations)
+
+    # Add bad channels
+    filtered_data.info['bads'] = subject.bad_channels
+
+    # Plot new PSD from annotated data
+    fig = filtered_data.plot_psd(picks='mag')
+    fig_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
+    fig_name = 'Annot_PSD'
+    save.fig(fig=fig, path=fig_path, fname=fig_name)
+
     #---------------- Save preprocesed data ----------------#
-    save.preprocessed_data(raw=raw, et_data_scaled=et_channels_meg, subject=subject, config=config)
+    save.preprocessed_data(raw=filtered_data, et_data_scaled=et_channels_meg, subject=subject, config=config)
 
     # Free up memory
     del(raw)
+    del(filtered_data)
     del(subject)
+
+
+
+# add_bads = ['16191001', '16200001', '16201001', '09991040']
+

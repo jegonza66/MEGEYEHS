@@ -1701,6 +1701,22 @@ def add_et_channels(raw, et_channels_meg, et_channel_names):
     return raw
 
 
+def filter_line_noise(subject, raw, freqs=(50, 100, 110, 150, 200, 250, 300), display_fig=False, save_fig=True,
+                      fig_path=None, fig_name='RAW_PSD'):
+
+    # Pick filter channels
+    meg_picks = mne.pick_types(raw.info, meg=True)
+
+    # Filter
+    filtered_data = raw.copy().notch_filter(freqs=freqs, picks=meg_picks)
+
+    # Plot
+    plot_preproc.line_noise_psd(subject=subject, raw=raw, filtered=filtered_data, display_fig=display_fig,
+                                save_fig=save_fig, fig_path=fig_path, fig_name=fig_name)
+
+    return filtered_data
+
+
 
 ## OLD out of use
 

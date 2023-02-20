@@ -1,5 +1,6 @@
 import numpy as np
 from mne.preprocessing import annotate_muscle_zscore
+import save
 import matplotlib.pyplot as plt
 plt.figure()
 plt.close('all')
@@ -12,9 +13,9 @@ preproc_path = paths().preproc_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
-for subject_code in exp_info.subjects_ids:
+for subject_code in exp_info.subjects_ids[11:]:
 
-    # Load data
+    # --------- Load data ---------#
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
     meg_data = subject.load_preproc_meg()
 
@@ -36,13 +37,14 @@ for subject_code in exp_info.subjects_ids:
     annotations_bad.delete(np.where(annotations_bad.description != 'bad')[0])
     meg_data.set_annotations(meg_data.annotations + annotations_muscle + annotations_bad)
 
-    # Check muscle annottations
-    # meg_data.pick_types(meg=True).plot(n_channels=100)
+    # Plot new PSD from annotated data
+    fig = meg_data.plot_psd(picks='mag', show=True)
+    fig_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
+    fig_name = 'Annot_PSD'
+    save.fig(fig=fig, path=fig_path, fname=fig_name)
 
-    # Define save path to overwrite preprocessed data with new annotations and muscle nans
+    # Save MEG with new annotations and muscle nans
     preproc_save_path = preproc_path + subject.subject_id + '/'
-
-    # Save MEG
     preproc_meg_data_fname = f'Subject_{subject.subject_id}_meg.fif'
     meg_data.save(preproc_save_path + preproc_meg_data_fname, overwrite=True)
 

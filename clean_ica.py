@@ -18,9 +18,8 @@ ica_path = paths().ica_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
-display = True
 
-for subject_code in exp_info.subjects_ids[0:]:
+for subject_code in exp_info.subjects_ids:
 
     # Load data
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
@@ -34,6 +33,7 @@ for subject_code in exp_info.subjects_ids[0:]:
     loaded_data = False
 
     try:
+        raise ValueError
         # Load
         meg_downsampled = mne.io.read_raw_fif(downsampled_path, preload=False)
         loaded_data = True
@@ -71,14 +71,32 @@ for subject_code in exp_info.subjects_ids[0:]:
         os.makedirs(save_path_ica, exist_ok=True)
         save.var(var=ica, path=save_path_ica, fname=ica_fname)
 
+    # Load epochs and evoked data from saccades to plot components and
+    # check saccadic artifacts by plot_overlay
+    # ID
+    epoch_id = 'l_sac'
+    # Get time windows from epoch_id name
+    tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
+    # Specific run path for loading evoked data
+    run_path = f'/None/{epoch_id}_{tmin}_{tmax}/'
+    # load evoked data path
+    epochs_save_path = paths().save_path() + f'Epochs_RAW/' + run_path
+    evoked_save_path = paths().save_path() + f'Evoked_RAW/' + run_path
+    # Data filenames
+    epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+    evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
+    # Load evoked data
+    sac_epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+    sac_evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
+
     # Ploch's algorithm for saccadic artifacts detection by variance comparison
-    ocular_components, sac_variance, fix_variance = \
+    ocular_components, sac_epochs_ds, fix_epochs_ds = \
         functions_analysis.ocular_components_ploch(subject=subject, meg_downsampled=meg_downsampled,
                                                    ica=ica)
 
     # Visual inspection for further artefactual components identification
     # Plot sources and components
-    ica.plot_sources(meg_downsampled, title='ICA')
+    # ica.plot_sources(meg_downsampled, title='ICA')
     ica.plot_components()
 
     # Save components figures
@@ -86,39 +104,59 @@ for subject_code in exp_info.subjects_ids[0:]:
     fig_path = plot_path + f'ICA/{subject.subject_id}/'
     os.makedirs(fig_path, exist_ok=True)
 
-    # Plot properties of excluded components
+    # Get figures and save
+    figs = [plt.figure(n) for n in plt.get_fignums()]
+    for i, fig in enumerate(figs):
+        save.fig(fig=fig, path=fig_path, fname=f'Components_{i}')
+    plt.close('all')
+
+    # Plot properties on all data and save
     all_comps = [i for i in range(ica_components)]
     ica.plot_properties(meg_downsampled, picks=all_comps, psd_args=dict(fmax=hfreq), show=False)
 
-    # Get figures
+    # Get figures and save
     figs = [plt.figure(n) for n in plt.get_fignums()]
-    for i, fig in enumerate(figs):
-        save.fig(fig=fig, path=fig_path, fname=f'figure_{i}')
+    # Make fake figure to pass for plotting spureous plots
+    fake_fig, fake_axs = plt.subplots(nrows=3)
+    for ic, fig in enumerate(figs):
+        # Get figure epochs and ERP axes
+        image_ax, erp_ax = fig.get_axes()[1], fig.get_axes()[2]
+        # Define axes list to pass and plot properties
+        ax_list = [fake_axs[0], image_ax, erp_ax, fake_axs[1], fake_axs[2]]
+        # Plot properties
+        ica.plot_properties(sac_epochs, picks=[ic], axes=ax_list, psd_args=dict(fmax=hfreq), show=False)
+        save.fig(fig=fig, path=fig_path, fname=f'IC_{ic}_Properties')
     plt.close('all')
 
-    ex_components = [0,1]
+    #----------------------------- Extra plot ploch ocular components to save
+    if len(ocular_components):
+        # Plot properties of excluded components
+        ica.plot_properties(meg_downsampled, picks=ocular_components, psd_args=dict(fmax=hfreq), show=False)
 
-    # Get time windows from epoch_id name
+        # Get figures
+        figs = [plt.figure(n) for n in plt.get_fignums()]
+        # Redefine save path
+        fig_path_ex = fig_path + 'Excluded/'
+        os.makedirs(fig_path, exist_ok=True)
+        # Make fake figure to pass for plotting spureous plots
+        fake_fig, fake_axs = plt.subplots(nrows=3)
+        for ic, fig in zip(ocular_components, figs):
+            # Get figure epochs and ERP axes
+            image_ax, erp_ax = fig.get_axes()[1], fig.get_axes()[2]
+            # Define axes list to pass and plot properties
+            ax_list = [fake_axs[0], image_ax, erp_ax, fake_axs[1], fake_axs[2]]
+            # Plot properties
+            ica.plot_properties(sac_epochs, picks=[ic], axes=ax_list, psd_args=dict(fmax=hfreq), show=False)
+            save.fig(fig=fig, path=fig_path_ex, fname=f'IC_{ic}_Properties')
+        plt.close('all')
 
-    epoch_id = 'l_sac'
-    tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
+        # plot before and after
+        before_after = ica.plot_overlay(inst=sac_evoked, exclude=ocular_components)
+        save.fig(fig=before_after, path=fig_path_ex, fname=f'Raw_ICA')
+        plt.close('all')
+        #-------------------------------------- End Extra
 
-    # Specific run path for loading evoked data
-    run_path = f'/None/{epoch_id}_{tmin}_{tmax}/'
-
-    # load evoked data path
-    evoked_save_path = paths().save_path() + f'Evoked_RAW/' + run_path
-
-    # Data filenames
-    evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
-
-    # Load evoked data
-    evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
-
-    # plot before and after
-    ica.plot_overlay(inst=evoked, exclude=ex_components)
-
-    # Select bad components
+    # Select bad components by input
     answer = None
     while answer != 'y':
         answer = input('Enter the component numbers to exclude separated by dashes\n'
@@ -136,10 +174,18 @@ for subject_code in exp_info.subjects_ids[0:]:
                   f'Please re-enter the components to exclude')
             answer = None
 
+    # Select bad components by variable
+    ex_components = [0,1,3,5,8,14,16,21,36,39,47,53,55,57,58,62,63]
+
     # Append ocular components from Ploch's algorithm to the components to exclude
     for ocular_component in ocular_components:
         if ocular_component not in ex_components:
             ex_components.append(ocular_component)
+
+    # plot before and after
+    before_after = ica.plot_overlay(inst=sac_evoked, exclude=ex_components)
+    save.fig(fig=before_after, path=fig_path, fname=f'Raw_ICA')
+    plt.close('all')
 
     # Plot properties of excluded components
     ica.plot_properties(meg_downsampled, picks=ex_components, psd_args=dict(fmax=hfreq), show=False)
@@ -147,9 +193,20 @@ for subject_code in exp_info.subjects_ids[0:]:
     # Get figures
     figs = [plt.figure(n) for n in plt.get_fignums()]
     # Redefine save path
-    fig_path += 'Excluded/'
-    for i, fig in enumerate(figs):
-        save.fig(fig=fig, path=fig_path, fname=f'figure_{i}')
+    fig_path_ex = fig_path + 'Excluded/'
+    os.makedirs(fig_path, exist_ok=True)
+    # Make fake figure to pass for plotting spureous plots
+    fake_fig, fake_axs = plt.subplots(nrows=3)
+
+    for ic, fig in zip(ocular_components, figs):
+        # Get figure epochs and ERP axes
+        image_ax, erp_ax = fig.get_axes()[1], fig.get_axes()[2]
+        # Define axes list to pass and plot properties
+        ax_list = [fake_axs[0], image_ax, erp_ax, fake_axs[1], fake_axs[2]]
+        # Plot properties
+        ica.plot_properties(sac_epochs, picks=[ic], axes=ax_list, psd_args=dict(fmax=hfreq), show=False)
+        save.fig(fig=fig, path=fig_path_ex, fname=f'IC_{ic}_Properties')
+    plt.close('all')
 
     # Exclude bad components from data
     ica.exclude = ex_components
@@ -166,14 +223,6 @@ for subject_code in exp_info.subjects_ids[0:]:
 
     # Save subject
     save.var(var=subject, path=save_path_ica, fname='Subject_data.pkl')
-
-    if display:
-        # Plot to check
-        chs = ['MLF14', 'MLF13', 'MLF12', 'MLF11', 'MRF11', 'MRF12', 'MRF13', 'MRF14', 'MZF01']
-        chan_idxs = [meg_data.ch_names.index(ch) for ch in chs]
-
-        meg_data.plot(order=chan_idxs, duration=5)
-        meg_ica.plot(order=chan_idxs, duration=5)
 
 
 ## Ploch's algorithm on Max variance
