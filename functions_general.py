@@ -354,15 +354,16 @@ def get_time_lims(epoch_id, map=None):
         time start and end to plot.
 
     '''
+    done = False
     if map:
         for key in map.keys():
             if key in epoch_id:
                 tmin = map[key]['tmin']
                 tmax = map[key]['tmax']
                 plot_xlim = map[key]['plot_xlim']
-            else:
-                raise ValueError('No key matched the epoch id.')
-    else:
+                done = True
+    if not done:
+        print('No key matched the epoch id. Using default values')
         if 'fix' in epoch_id:
             tmin = -0.1
             tmax = 0.2

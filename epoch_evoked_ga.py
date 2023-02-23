@@ -27,7 +27,7 @@ else:
 
 #----- Parameters -----#
 # ICA vs raw data
-use_ica_data = False
+use_ica_data = True
 # Frequency band
 band_id = None
 # Id
@@ -100,10 +100,6 @@ for subject_code in exp_info.subjects_ids:
         # Pick MEG channels to plot
         picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
 
-        # # Exclude bad channels
-        # bads = subject.bad_channels
-        # meg_data.info['bads'].extend(bads)
-
         metadata, events, events_id, metadata_sup = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
                                                                                      screen=screen, mss=mss, dur=dur,
                                                                                      tgt=tgt, dir=dir, meg_data=meg_data)
@@ -165,6 +161,7 @@ for subject_code in exp_info.subjects_ids:
         os.makedirs(evoked_save_path, exist_ok=True)
         evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
 
+
 # Compute grand average
 grand_avg = mne.grand_average(evokeds, interpolate_bads=False)
 
@@ -179,7 +176,7 @@ grand_avg_misc = grand_avg.copy().pick('misc')
 
 # Plot evoked
 fname = f'Grand_average_{chs_id}'
-
+# ylim = dict({'mag': (-150, 200)})
 plot_general.evoked(evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
                     plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
                     fig_path=evoked_fig_path, fname=fname)
