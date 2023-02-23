@@ -33,7 +33,6 @@ for subject_code in exp_info.subjects_ids:
     loaded_data = False
 
     try:
-        raise ValueError
         # Load
         meg_downsampled = mne.io.read_raw_fif(downsampled_path, preload=False)
         loaded_data = True
@@ -57,7 +56,7 @@ for subject_code in exp_info.subjects_ids:
             ica = load.var(file_path=save_path_ica + ica_fname)
             print('ICA object loaded')
         else:
-            print('No loaded data. Running ICA on new data')
+            print('No loaded ICA. Running ICA on new data')
             raise ValueError
     except:
         # Define ICA
@@ -71,8 +70,7 @@ for subject_code in exp_info.subjects_ids:
         os.makedirs(save_path_ica, exist_ok=True)
         save.var(var=ica, path=save_path_ica, fname=ica_fname)
 
-    # Load epochs and evoked data from saccades to plot components and
-    # check saccadic artifacts by plot_overlay
+    # Load epochs and evoked data from saccades to plot components and check saccadic artifacts by plot_overlay
     # ID
     epoch_id = 'l_sac'
     # Get time windows from epoch_id name
@@ -92,16 +90,17 @@ for subject_code in exp_info.subjects_ids:
     # Ploch's algorithm for saccadic artifacts detection by variance comparison
     ocular_components, sac_epochs_ds, fix_epochs_ds = \
         functions_analysis.ocular_components_ploch(subject=subject, meg_downsampled=meg_downsampled,
-                                                   ica=ica)
+                                                   ica=ica, plot_distributions=False)
 
-    # Visual inspection for further artefactual components identification
-    # Plot sources and components
-    # ica.plot_sources(meg_downsampled, title='ICA')
-    ica.plot_components()
+    # Plot and save components and properties
+    plt.ioff()
+    ica.plot_components(show=False)
 
     # Save components figures
-    # Create directory
     fig_path = plot_path + f'ICA/{subject.subject_id}/'
+    os.makedirs(fig_path, exist_ok=True)
+    # Excluded components save path
+    fig_path_ex = fig_path + 'Excluded/'
     os.makedirs(fig_path, exist_ok=True)
 
     # Get figures and save
@@ -121,92 +120,70 @@ for subject_code in exp_info.subjects_ids:
     for ic, fig in enumerate(figs):
         # Get figure epochs and ERP axes
         image_ax, erp_ax = fig.get_axes()[1], fig.get_axes()[2]
+        image_ax.clear()
+        erp_ax.clear()
         # Define axes list to pass and plot properties
         ax_list = [fake_axs[0], image_ax, erp_ax, fake_axs[1], fake_axs[2]]
         # Plot properties
         ica.plot_properties(sac_epochs, picks=[ic], axes=ax_list, psd_args=dict(fmax=hfreq), show=False)
         save.fig(fig=fig, path=fig_path, fname=f'IC_{ic}_Properties')
-    plt.close('all')
+        plt.close(fig)
 
-    #----------------------------- Extra plot ploch ocular components to save
-    if len(ocular_components):
-        # Plot properties of excluded components
-        ica.plot_properties(meg_downsampled, picks=ocular_components, psd_args=dict(fmax=hfreq), show=False)
-
-        # Get figures
-        figs = [plt.figure(n) for n in plt.get_fignums()]
-        # Redefine save path
-        fig_path_ex = fig_path + 'Excluded/'
-        os.makedirs(fig_path, exist_ok=True)
-        # Make fake figure to pass for plotting spureous plots
-        fake_fig, fake_axs = plt.subplots(nrows=3)
-        for ic, fig in zip(ocular_components, figs):
-            # Get figure epochs and ERP axes
-            image_ax, erp_ax = fig.get_axes()[1], fig.get_axes()[2]
-            # Define axes list to pass and plot properties
-            ax_list = [fake_axs[0], image_ax, erp_ax, fake_axs[1], fake_axs[2]]
-            # Plot properties
-            ica.plot_properties(sac_epochs, picks=[ic], axes=ax_list, psd_args=dict(fmax=hfreq), show=False)
-            save.fig(fig=fig, path=fig_path_ex, fname=f'IC_{ic}_Properties')
-        plt.close('all')
-
-        # plot before and after
-        before_after = ica.plot_overlay(inst=sac_evoked, exclude=ocular_components)
-        save.fig(fig=before_after, path=fig_path_ex, fname=f'Raw_ICA')
-        plt.close('all')
-        #-------------------------------------- End Extra
-
-    # Select bad components by input
-    answer = None
-    while answer != 'y':
-        answer = input('Enter the component numbers to exclude separated by dashes\n'
-                       'For example, to exclude 0th 1st and 5th components enter: 0-1-5')
-
-        ex_components = answer.split('-')
-
-        try:
-            ex_components = [int(comp) for comp in ex_components]
-            answer = input(f'The components to exclude are: {ex_components}\n'
-                           f'Is that correct? (y/n)')
-        except:
-            print(f'Error to convert components to integer values.\n'
-                  f'components: {ex_components}\n'
-                  f'Please re-enter the components to exclude')
-            answer = None
+    # Visual inspection of sources for further artefactual components identification
+    ica.plot_sources(meg_downsampled, title='ICA', block=True)
 
     # Select bad components by variable
-    ex_components = [0,1,3,5,8,14,16,21,36,39,47,53,55,57,58,62,63]
+    ex_components = []
+
+    # Select bad components by input
+    if not len(ex_components):
+        answer = None
+        while answer != 'y':
+            answer = input('Enter the component numbers to exclude separated by dashes\n'
+                           'For example, to exclude 0th 1st and 5th components enter: 0-1-5')
+
+            ex_components = answer.split('-')
+
+            try:
+                ex_components = [int(comp) for comp in ex_components]
+                answer = input(f'The components to exclude are: {ex_components}\n'
+                               f'Is that correct? (y/n)')
+            except:
+                print(f'Error to convert components to integer values.\n'
+                      f'components: {ex_components}\n'
+                      f'Please re-enter the components to exclude')
+                answer = None
 
     # Append ocular components from Ploch's algorithm to the components to exclude
     for ocular_component in ocular_components:
         if ocular_component not in ex_components:
             ex_components.append(ocular_component)
 
-    # plot before and after
-    before_after = ica.plot_overlay(inst=sac_evoked, exclude=ex_components)
-    save.fig(fig=before_after, path=fig_path, fname=f'Raw_ICA')
+    # Plot evoked before and after
+    before_after = ica.plot_overlay(inst=sac_evoked, exclude=ex_components, show=True)
+    save.fig(fig=before_after, path=fig_path_ex, fname=f'Raw_ICA')
     plt.close('all')
 
     # Plot properties of excluded components
+    plt.ioff()
     ica.plot_properties(meg_downsampled, picks=ex_components, psd_args=dict(fmax=hfreq), show=False)
 
     # Get figures
     figs = [plt.figure(n) for n in plt.get_fignums()]
-    # Redefine save path
-    fig_path_ex = fig_path + 'Excluded/'
-    os.makedirs(fig_path, exist_ok=True)
     # Make fake figure to pass for plotting spureous plots
     fake_fig, fake_axs = plt.subplots(nrows=3)
 
-    for ic, fig in zip(ocular_components, figs):
+    for ic, fig in zip(ex_components, figs):
         # Get figure epochs and ERP axes
         image_ax, erp_ax = fig.get_axes()[1], fig.get_axes()[2]
+        image_ax.clear()
+        erp_ax.clear()
         # Define axes list to pass and plot properties
         ax_list = [fake_axs[0], image_ax, erp_ax, fake_axs[1], fake_axs[2]]
         # Plot properties
         ica.plot_properties(sac_epochs, picks=[ic], axes=ax_list, psd_args=dict(fmax=hfreq), show=False)
         save.fig(fig=fig, path=fig_path_ex, fname=f'IC_{ic}_Properties')
-    plt.close('all')
+        plt.close(fig)
 
     # Exclude bad components from data
     ica.exclude = ex_components

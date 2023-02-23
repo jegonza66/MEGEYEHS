@@ -4,12 +4,11 @@ import load
 import mne
 import numpy as np
 import os
-
-import matplotlib.pyplot as plt
 import plot_general
 import save
 import setup
 from paths import paths
+import matplotlib.pyplot as plt
 
 #----- Path -----#
 save_path = paths().save_path()
@@ -18,24 +17,32 @@ exp_info = setup.exp_info()
 
 
 #----- Save data and display figures -----#
-save_data = False
-save_fig = False
-display_figs = True
+save_data = True
+save_fig = True
+display_figs = False
+if display_figs:
+    plt.ion()
+else:
+    plt.ioff()
 
-#-----  Select MEG channels -----#
-chs_id = 'frontal'
+#-----  Parameters -----#
 
+# Select channels
+chs_id = 'mag'
+# ICA / RAW
+use_ica_data = True
 # MSS
 mss = None
 mss_duration = {1: 2, 2: 3.5, 4: 5}
 cross1_dur = 0.75
 cross2_dur = 1
 # Id
-save_id = f'mss{mss}_cross1_ms_cross2'
+# save_id = f'mss{mss}_cross1_ms_cross2'
 save_id = f'l_sac'
+# epoch_id = 'cross1_'
 epoch_id = 'l_sac'
 # Duration
-dur = cross1_dur + mss_duration[mss] + cross2_dur  # seconds
+# dur = cross1_dur + mss_duration[mss] + cross2_dur  # seconds
 dur = None
 # Direction
 dir = None
@@ -45,15 +52,15 @@ screen = None
 tgt = functions_general.get_item(epoch_id=epoch_id)
 
 # Get time windows from epoch_id name
-map_times = dict(cross={'tmin': 0, 'tmax': dur, 'plot_xlim': (dur-1, dur-0.2)})
+# map_times = dict(cross={'tmin': 0, 'tmax': dur, 'plot_xlim': (dur-1, dur-0.2)})
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
 
 # Power computation parameters
-baseline = (tmin, tmin+cross1_dur)
-baseline = (None, 0)
+# baseline = (tmin, tmin+cross1_dur)
+baseline = (tmin, 0)
 bline_mode = 'logratio'
-l_freq = 20
-h_freq = 100
+l_freq = 1
+h_freq = 20
 
 # Specific run path for saving data and plots
 run_path = f'/{save_id}_{tmin}_{tmax}/'
@@ -63,29 +70,48 @@ averages = []
 
 for subject_code in exp_info.subjects_ids:
 
-    # Load subject, meg data and pick channels
-    subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
+    # Define save path and file name for loading and saving epoched, evoked, and GA data
+    if use_ica_data:
+        # Load subject object
+        subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
+        # Load meg data
+        meg_data = load.ica_data(subject=subject)
+
+        # Save data paths
+        trf_save_path = save_path + f'Time_Frequency_ICA/' + run_path
+        os.makedirs(trf_save_path, exist_ok=True)
+        # Save figures paths
+        trf_fig_path = plot_path + f'Time_Frequency_ICA/' + run_path + f'{chs_id}/'
+        os.makedirs(trf_fig_path, exist_ok=True)
+    else:
+        # Load subject object
+        subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
+        # Load meg data
+        meg_data = subject.load_preproc_meg()
+
+        # Save data paths
+        trf_save_path = save_path + f'Time_Frequency_RAW/' + run_path
+        os.makedirs(trf_save_path, exist_ok=True)
+        # Save figures paths
+        trf_fig_path = plot_path + f'Time_Frequency_RAW/' + run_path + f'{chs_id}/'
+        os.makedirs(trf_fig_path, exist_ok=True)
+
+    # Data filenames
+    trf_data_fname = f'Subject_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
+    grand_avg_data_fname = f'Grand_Average_{l_freq}_{h_freq}_tfr.h5'
 
     try:
         # Load previous data
-        tf_save_path = save_path + f'Time_Frequency/' + run_path + subject.subject_id + '/'
-        tf_data_fname = f'Subject_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
-        power = mne.time_frequency.read_tfrs(tf_save_path + tf_data_fname, condition=0)
+        power = mne.time_frequency.read_tfrs(trf_save_path + trf_data_fname, condition=0)
         picks = functions_general.pick_chs(chs_id=chs_id, info=power.info)
     except:
         # No previous data. Compute
-        meg_data = load.ica_data(subject=subject)
-        # OJO ACA
-        meg_data = subject.load_preproc_meg() # OJO ACA
         picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
 
-        # # Exclude bad channels
-        # bads = subject.bad_channels
-        # meg_data.info['bads'].extend(bads)
-
+        # Define events
         metadata, events, events_id, metadata_sup = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
-                                                                                     screen=screen, mss=mss, dur=dur, tgt=tgt,
-                                                                                     dir=dir, meg_data=meg_data)
+                                                                                     screen=screen, mss=mss, dur=dur,
+                                                                                     tgt=tgt, dir=dir, meg_data=meg_data)
 
         # Reject based on channel amplitude
         reject = dict(mag=subject.config.general.reject_amp)
@@ -105,22 +131,26 @@ for subject_code in exp_info.subjects_ids:
                                               return_itc=False, decim=3, n_jobs=None)
 
         if save_data:
-            # Save evoked data
-            tf_save_path = save_path + f'Time_Frequency/' + run_path + subject.subject_id + '/'
-            os.makedirs(tf_save_path, exist_ok=True)
-            tf_data_fname = f'Subject_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
-            power.save(tf_save_path + tf_data_fname, overwrite=True)
+            # Save trf data
+            power.save(trf_save_path + trf_data_fname, overwrite=True)
 
+    # Append data for GA
     averages.append(power)
 
     # Define figure
     fig, axes_topo, ax_tf = plot_general.fig_time_frequency(fontsize=14)
 
     # Plot time-frequency
-    power.plot(picks=picks, baseline=baseline, mode=bline_mode, tmin=tmin, tmax=plot_xlim[1], combine='mean', cmap='jet',
-               axes=ax_tf, show=display_figs)
-    ax_tf.vlines(x=cross1_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
-    ax_tf.vlines(x=cross1_dur + mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
+    power.plot(picks=picks, baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
+               combine='mean', cmap='jet', axes=ax_tf, show=display_figs)
+
+    # Plot time markers as vertical lines
+    if 'cross' in epoch_id and mss:
+        ax_tf.vlines(x=cross1_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
+        ax_tf.vlines(x=cross1_dur + mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
+                     linestyles='--', colors='black')
+    else:
+        ax_tf.vlines(x=0, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
 
     # Topomaps parameters
     topomap_kw = dict(ch_type='mag', tmin=plot_xlim[0], tmax=plot_xlim[1], baseline=baseline,
@@ -130,57 +160,61 @@ for subject_code in exp_info.subjects_ids:
 
     # Plot topomaps
     for ax, (title, fmin_fmax) in zip(axes_topo, plot_dict.items()):
-        power.plot_topomap(**fmin_fmax, axes=ax, **topomap_kw)
+        try:
+            power.plot_topomap(**fmin_fmax, axes=ax, **topomap_kw)
+        except:
+            ax.text(0.5, 0.5, 'No data', horizontalalignment='center', verticalalignment='center')
+            ax.set_xticks([]), ax.set_yticks([])
         ax.set_title(title)
     fig.suptitle(subject.subject_id + f'_{chs_id}_{bline_mode}')
     fig.tight_layout()
 
     if save_fig:
-        fig_path = plot_path + f'Time_Frequency/' + run_path + f'{subject.subject_id}/'
-        fname = 'Time_Freq_' + subject.subject_id + f'_{chs_id}_{bline_mode}'
-        save.fig(fig=fig, path=fig_path, fname=fname)
+        fname = 'Time_Freq_' + subject.subject_id + f'_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
 # Grand Average
 try:
     # Load previous data
-    tf_save_path = save_path + f'Time_Frequency/' + run_path
-    tf_data_fname = f'Grand_Average_{l_freq}_{h_freq}_tfr.h5'
-    grand_avg = mne.time_frequency.read_tfrs(tf_save_path + tf_data_fname, condition=0)
+    grand_avg = mne.time_frequency.read_tfrs(trf_save_path + grand_avg_data_fname, condition=0)
 except:
     # Compute grand average
     grand_avg = mne.grand_average(averages)
 
     if save_data:
-        # Save evoked data
-        tf_save_path = save_path + f'Time_Frequency/' + run_path
-        os.makedirs(tf_save_path, exist_ok=True)
-        tf_data_fname = f'Grand_average_{l_freq}_{h_freq}tfr.h5'
-        grand_avg.save(tf_save_path + tf_data_fname, overwrite=True)
+        # Save trf data
+        grand_avg.save(trf_save_path + grand_avg_data_fname, overwrite=True)
 
 # Define figure
 fig, axes_topo, ax_tf = plot_general.fig_time_frequency(fontsize=14)
 
 # Plot time-frequency
-grand_avg.plot(picks=picks, baseline=baseline, mode=bline_mode, tmin=tmin, tmax=plot_xlim[1], combine='mean', cmap='jet',
+grand_avg.plot(picks=picks, baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1], combine='mean', cmap='jet',
                axes=ax_tf, show=display_figs)
-ax_tf.vlines(x=cross1_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
-ax_tf.vlines(x=cross1_dur + mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
-
+# Plot time markers as vertical lines
+if 'cross' in epoch_id and mss:
+    ax_tf.vlines(x=cross1_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
+    ax_tf.vlines(x=cross1_dur + mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
+else:
+    ax_tf.vlines(x=0, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
 
 # Topomaps parameters
 topomap_kw = dict(ch_type='mag', tmin=plot_xlim[0], tmax=plot_xlim[1], baseline=baseline,
-                  mode=bline_mode, show=False)
+                  mode=bline_mode, show=display_figs)
 plot_dict = dict(Delta=dict(fmin=1, fmax=4), Theta=dict(fmin=4, fmax=8), Alpha=dict(fmin=8, fmax=12),
                  Beta=dict(fmin=12, fmax=30), Gamma=dict(fmin=30, fmax=45), HGamma=dict(fmin=45, fmax=100))
 
 # Plot topomaps
 for ax, (title, fmin_fmax) in zip(axes_topo, plot_dict.items()):
-    grand_avg.plot_topomap(**fmin_fmax, axes=ax, **topomap_kw)
+    try:
+        grand_avg.plot_topomap(**fmin_fmax, axes=ax, **topomap_kw)
+    except:
+        ax.text(0.5, 0.5, 'No data', horizontalalignment='center', verticalalignment='center')
+        ax.set_xticks([]), ax.set_yticks([])
     ax.set_title(title)
 fig.suptitle(f'Grand_average_{chs_id}_{bline_mode}')
 fig.tight_layout()
 
 if save_fig:
-    fig_path = plot_path + f'Time_Frequency/' + run_path
-    fname = 'Time_Freq_' + f'Grand_average_{chs_id}_{bline_mode}'
-    save.fig(fig=fig, path=fig_path, fname=fname)
+    fname = 'Time_Freq_' + f'Grand_average_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    save.fig(fig=fig, path=trf_fig_path, fname=fname)
