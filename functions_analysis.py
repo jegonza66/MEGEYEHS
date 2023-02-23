@@ -8,7 +8,7 @@ import time
 import save
 
 
-def define_events(subject, epoch_id, screen, mss, dur, tgt, dir, meg_data, evt_from_df=False, evt_from_annot=True):
+def define_events(subject, epoch_id, screen, mss, dur, tgt, dir, meg_data, evt_from_df=False):
 
     print('Defining events')
 
@@ -46,7 +46,7 @@ def define_events(subject, epoch_id, screen, mss, dur, tgt, dir, meg_data, evt_f
 
         events_id = dict(zip(metadata.id, metadata.index))
 
-    if evt_from_annot:
+    else:
         # Get events from annotations
         all_events, all_event_id = mne.events_from_annotations(meg_data, verbose=False)
 

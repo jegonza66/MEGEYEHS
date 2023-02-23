@@ -363,7 +363,7 @@ def get_time_lims(epoch_id, map=None):
                 plot_xlim = map[key]['plot_xlim']
                 done = True
     if not done:
-        print('No key matched the epoch id. Using default values')
+        print('Using default time values')
         if 'fix' in epoch_id:
             tmin = -0.1
             tmax = 0.2
