@@ -1,7 +1,4 @@
 import os
-import matplotlib.pyplot as plt
-plt.figure()
-plt.close('all')
 import mne
 import numpy as np
 from paths import paths
@@ -13,6 +10,7 @@ import pandas as pd
 # --------- Setup ---------#
 # Select subject to run
 subject_code = 0
+use_ica_data = True
 
 # Load experiment info
 exp_info = setup.exp_info()
@@ -27,9 +25,13 @@ dig_path = paths().opt_path()
 
 
 # --------- Coregistration ---------#
-# Load subject and meg clean data
-subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-meg_data = load.ica_data(subject=subject)
+if use_ica_data:
+    # Load subject and meg clean data
+    subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
+    meg_data = load.ica_data(subject=subject)
+else:
+    subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
+    meg_data = subject.load_preproc_meg()
 
 # Load digitalization file
 dig_path_subject = dig_path + subject.subject_id
@@ -89,14 +91,29 @@ mne.write_bem_solution(fname_bem, bem, overwrite=True)
 # Load data
 noise = setup.noise(exp_info=exp_info, id='BACK_NOISE')
 raw_noise = noise.load_preproc_data()
-
 # Set bads to match participant's
 raw_noise.info['bads'] = meg_data.info['bads']
+
+if use_ica_data:
+    # ICA
+    save_path_ica = paths().ica_path() + subject.subject_id + '/'
+    ica_fname = 'ICA.pkl'
+    ica_components = 64
+
+    # Load ICA
+    ica = load.var(file_path=save_path_ica + ica_fname)
+    print('ICA object loaded')
+
+    # Get excluded components from subject and apply ICA to background noise
+    ica.exclude = subject.ex_components
+    # Load raw noise data to apply ICA
+    raw_noise.load_data()
+    ica.apply(raw_noise)
 
 # Pick meg channels for source modeling
 raw_noise.pick('meg')
 
-reject = dict(mag=2.5e-12)
+reject = dict(mag=subject.config.general.reject_amp)
 # Compute covariance to withdraw from meg data
 cov = mne.compute_raw_covariance(raw_noise, reject=reject)
 
@@ -124,7 +141,10 @@ if not volume:
 
     # Inverse operator
     inv = mne.minimum_norm.make_inverse_operator(meg_data.info, fwd, cov)
-    fname_inv = sources_path_subject + f'/{subject.subject_id}_surface-inv.fif'
+    if use_ica_data:
+        fname_inv = sources_path_subject + f'/{subject.subject_id}_surface-inv_ica.fif'
+    else:
+        fname_inv = sources_path_subject + f'/{subject.subject_id}_surface-inv.fif'
     mne.minimum_norm.write_inverse_operator(fname_inv, inv, overwrite=True)
 
 else:
@@ -144,6 +164,8 @@ else:
 
     # Inverse operator
     inv_vol = mne.minimum_norm.make_inverse_operator(meg_data.info, fwd_vol, cov)
-    fname_inv = sources_path_subject + f'/{subject.subject_id}_volume-inv.fif'
+    if use_ica_data:
+        fname_inv = sources_path_subject + f'/{subject.subject_id}_volume-inv_ica.fif'
+    else:
+        fname_inv = sources_path_subject + f'/{subject.subject_id}_volume-inv.fif'
     mne.minimum_norm.write_inverse_operator(fname_inv, inv_vol, overwrite=True)
-

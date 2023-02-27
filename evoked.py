@@ -80,9 +80,6 @@ for subject_code in exp_info.subjects_ids:
         # Save data
         if save_data:
             # Save evoked data
-            evoked_save_path = save_path + f'Evoked/' + run_path
-            os.makedirs(evoked_save_path, exist_ok=True)
-            evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
             evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
 
     # Apend to evokeds list to pass to grand average
@@ -96,37 +93,30 @@ for subject_code in exp_info.subjects_ids:
     picks = functions_general.pick_chs(chs_id=chs_id, info=evoked_meg.info)
 
     # Save plot
-    fig_path = plot_path + f'Evoked/' + run_path
     fname = 'Evoked_' + subject.subject_id + f'_{chs_id}'
-
     plot_general.evoked(evoked_meg=evoked_meg, evoked_misc=evoked_misc,
                         picks=picks, plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs,
-                        save_fig=save_fig, fig_path=fig_path, fname=fname)
+                        save_fig=save_fig, fig_path=evoked_fig_path, fname=fname)
 
 # Compute grand average
 grand_avg = mne.grand_average(evokeds, interpolate_bads=False)
 
 # Save grand average
 if save_data:
-    ga_save_path = save_path + f'Evoked/' + run_path
-    os.makedirs(ga_save_path, exist_ok=True)
-    grand_avg_data_fname = f'Grand_average_ave.fif'
-    grand_avg.save(ga_save_path + grand_avg_data_fname, overwrite=True)
+    grand_avg.save(evoked_save_path + grand_avg_data_fname, overwrite=True)
 
 # Separate MEG and misc channels
 grand_avg_meg = grand_avg.copy().pick('mag')
 grand_avg_misc = grand_avg.copy().pick('misc')
 
 # Plot evoked
-fig_path = plot_path + f'Evoked/' + run_path
 fname = f'Grand_average_{chs_id}'
 plot_general.evoked(evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
                     plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs,
-                    save_fig=save_fig, fig_path=fig_path, fname=fname)
+                    save_fig=save_fig, fig_path=evoked_fig_path, fname=fname)
 
 # Plot Saccades frontal channels
 if 'sac' in epoch_id:
-    fig_path = plot_path + f'Evoked/' + run_path
     fname = f'Grand_average_front_ch'
 
     # Pick MEG channels to plot
@@ -134,4 +124,4 @@ if 'sac' in epoch_id:
     picks = functions_general.pick_chs(chs_id=chs_id, info=evoked_meg.info)
     plot_general.evoked(evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
                         plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
-                        fig_path=fig_path, fname=fname)
+                        fig_path=evoked_fig_path, fname=fname)
