@@ -1,8 +1,33 @@
 import matplotlib.pyplot as plt
 import numpy as np
-
+import mne
 import functions_general
 import load
+from paths import paths
+import setup
+
+
+## Plot channels
+save_path = paths().save_path()
+ica_path = paths().ica_path()
+plot_path = paths().plots_path()
+exp_info = setup.exp_info()
+
+# Subject
+subject_code = exp_info.subjects_ids[0]
+
+# Load subject object
+subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
+raw_data = subject.load_preproc_meg()
+info = mne.pick_info(raw_data.info, mne.pick_types(raw_data.info, meg=True, ref_meg=False))
+
+empty_data = np.zeros(info['nchan'])
+
+channels_mask = np.array([True if 'P' in ch_name else False for ch_name in info.ch_names])
+
+mask_params = dict(marker='o', markerfacecolor='orange', markeredgecolor='k', linewidth=0, markersize=6)
+
+mne.viz.plot_topomap(data=empty_data, pos=info, mask=channels_mask, mask_params=mask_params)
 
 
 ## First fixation delay distribution

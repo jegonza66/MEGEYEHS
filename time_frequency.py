@@ -11,14 +11,12 @@ from paths import paths
 import matplotlib.pyplot as plt
 
 #----- Path -----#
-save_path = paths().save_path()
-plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
 #----- Save data and display figures -----#
-save_data = False
-save_fig = False
-display_figs = True
+save_data = True
+save_fig = True
+display_figs = False
 if display_figs:
     plt.ion()
 else:
@@ -26,19 +24,19 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'frontal'
+chs_id = 'mag'
 # ICA / RAW
 use_ica_data = True
 # MSS
-mss = None
+mss = 1
 # Id
-# save_id = f'mss{mss}_cross1_ms_cross2'
-save_id = 'l_sac'
-# epoch_id = 'ms_'
-epoch_id = 'l_sac'
+save_id = f'mss{mss}_cross1_ms_cross2'
+# save_id = 'l_sac'
+epoch_id = 'ms_'
+# epoch_id = 'l_sac'
 # Power frequency range
 l_freq = 1
-h_freq = 20
+h_freq = 100
 # Baseline method
 bline_mode = 'logratio'
 #----------#
@@ -47,12 +45,17 @@ bline_mode = 'logratio'
 mss_duration = {1: 2, 2: 3.5, 4: 5, None: 0}
 cross1_dur = 0.75
 cross2_dur = 1
+vs_dur = 4
+plot_edge = 0.1
+
 if 'cross1' in epoch_id and mss:
-    dur = cross1_dur + mss_duration[mss] + cross2_dur  # seconds
+    dur = cross1_dur + mss_duration[mss] + cross2_dur + vs_dur # seconds
+elif 'ms' in epoch_id:
+    dur = mss_duration[mss] + cross2_dur + vs_dur
 elif 'cross2' in epoch_id:
-    dur = cross2_dur + 5  # seconds
+    dur = cross2_dur + vs_dur  # seconds
 else:
-    dur = None
+    dur = 0
 
 # Direction
 dir = None
@@ -62,9 +65,9 @@ screen = None
 tgt = functions_general.get_item(epoch_id=epoch_id)
 
 # Get time windows from epoch_id name
-map_times = dict(cross1={'tmin': 0, 'tmax': dur, 'plot_xlim': (0, dur)},
-                 ms={'tmin': -cross1_dur, 'tmax': mss_duration[mss] + cross2_dur, 'plot_xlim': (-cross1_dur, mss_duration[mss] + cross2_dur)},
-                 cross2={'tmin': 0, 'tmax': dur, 'plot_xlim': (0, dur)},
+map_times = dict(cross1={'tmin': 0, 'tmax': dur, 'plot_xlim': (plot_edge, dur - plot_edge)},
+                 ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
+                 cross2={'tmin': 0, 'tmax': dur, 'plot_xlim': (plot_edge, dur - plot_edge)},
                  sac={'tmin': -0.2, 'tmax': 0.2, 'plot_xlim': (-0.05, 0.1)})
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
 
@@ -73,13 +76,35 @@ if 'cross1' in epoch_id or 'ms' in epoch_id and mss:
     baseline = (tmin, tmin+cross1_dur)
 elif 'cross2' in epoch_id:
     baseline = (tmin, tmin+cross2_dur)
+elif 'sac' in epoch_id or 'fix' in epoch_id:
+    baseline = (plot_xlim[0], 0)
 else:
-    baseline = (None, 0)
+    baseline = (plot_xlim[0], 0)
 
 # Specific run path for saving data and plots
-run_path = f'/{save_id}_{tmin}_{tmax}/'
+save_path = f'/{save_id}_{tmin}_{tmax}/'
+plot_path = f'/{save_id}_{plot_xlim[0]}_{plot_xlim[1]}/'
+if use_ica_data:
+    # Save data paths
+    trf_save_path = paths().save_path() + f'Time_Frequency_ICA/' + save_path
+    os.makedirs(trf_save_path, exist_ok=True)
+    epochs_save_path = paths().save_path() + f'Epochs_ICA/None/' + save_path
+    os.makedirs(epochs_save_path, exist_ok=True)
+    # Save figures paths
+    trf_fig_path = paths().plots_path() + f'Time_Frequency_ICA/' + plot_path + f'{chs_id}/'
+    os.makedirs(trf_fig_path, exist_ok=True)
+else:
+    # Save data paths
+    trf_save_path = paths().save_path() + f'Time_Frequency_RAW/' + save_path
+    os.makedirs(trf_save_path, exist_ok=True)
+    epochs_save_path = paths().save_path() + f'Epochs_RAW/None/' + save_path
+    os.makedirs(epochs_save_path, exist_ok=True)
+    # Save figures paths
+    trf_fig_path = paths().plots_path() + f'Time_Frequency_RAW/' + plot_path + f'{chs_id}/'
+    os.makedirs(trf_fig_path, exist_ok=True)
 
 # Grand average data variable
+grand_avg_data_fname = f'Grand_Average_{l_freq}_{h_freq}_tfr.h5'
 averages = []
 
 for subject_code in exp_info.subjects_ids:
@@ -91,55 +116,33 @@ for subject_code in exp_info.subjects_ids:
         # Load meg data
         meg_data = load.ica_data(subject=subject)
 
-        # Save data paths
-        trf_save_path = save_path + f'Time_Frequency_ICA/' + run_path
-        os.makedirs(trf_save_path, exist_ok=True)
-        epochs_save_path = save_path + f'Epochs_ICA/' + run_path
-        os.makedirs(epochs_save_path, exist_ok=True)
-        # Save figures paths
-        trf_fig_path = plot_path + f'Time_Frequency_ICA/' + run_path + f'{chs_id}/'
-        os.makedirs(trf_fig_path, exist_ok=True)
     else:
         # Load subject object
         subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
         # Load meg data
         meg_data = subject.load_preproc_meg()
 
-        # Save data paths
-        trf_save_path = save_path + f'Time_Frequency_RAW/' + run_path
-        os.makedirs(trf_save_path, exist_ok=True)
-        epochs_save_path = save_path + f'Epochs_RAW/' + run_path
-        os.makedirs(epochs_save_path, exist_ok=True)
-        # Save figures paths
-        trf_fig_path = plot_path + f'Time_Frequency_RAW/' + run_path + f'{chs_id}/'
-        os.makedirs(trf_fig_path, exist_ok=True)
-
     # Data filenames
     trf_data_fname = f'Subject_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
-    grand_avg_data_fname = f'Grand_Average_{l_freq}_{h_freq}_tfr.h5'
 
     try:
         # Load previous data
         power = mne.time_frequency.read_tfrs(trf_save_path + trf_data_fname, condition=0)
-        picks = functions_general.pick_chs(chs_id=chs_id, info=power.info)
     except:
-
         try:
             # Load epoched data
             epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
-            # Pick MEG channels to plot
-            picks = functions_general.pick_chs(chs_id=chs_id, info=epochs.info)
         except:
-
             # Define events
             metadata, events, events_id, metadata_sup = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
-                                                                                         screen=screen, mss=mss, meg_data=meg_data,
-                                                                                         dur=None, tgt=None, dir=None)
+                                                                                         screen=screen, mss=mss, meg_data=meg_data)
             # Reject based on channel amplitude
-            reject = dict(mag=subject.config.general.reject_amp)
-            # reject = dict(mag=2.5e-12)
-            # reject = dict(mag=1)
+            if 'sac' in epoch_id or 'fix' in epoch_id:
+                reject = dict(mag=subject.config.general.reject_amp)
+                # reject = dict(mag=2.5e-12)
+            else:
+                reject = None
 
             # Epoch data
             epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=tmin, tmax=tmax, reject=reject,
@@ -158,12 +161,9 @@ for subject_code in exp_info.subjects_ids:
                 os.makedirs(epochs_save_path, exist_ok=True)
                 epochs.save(epochs_save_path + epochs_data_fname, overwrite=True)
 
-        # No previous data. Compute
-        picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
-
         # Compute power over frequencies
         freqs = np.logspace(*np.log10([l_freq, h_freq]), num=40)
-        n_cycles = freqs / 4.  # different number of cycle per frequency
+        n_cycles = freqs / 2.  # different number of cycle per frequency
         power = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
                                               return_itc=False, decim=3, n_jobs=None)
 
@@ -174,11 +174,14 @@ for subject_code in exp_info.subjects_ids:
     # Append data for GA
     averages.append(power)
 
+    # Pick plot channels
+    picks = functions_general.pick_chs(chs_id=chs_id, info=power.info)
+
     # Define figure
     fig, axes_topo, ax_tf = plot_general.fig_time_frequency(fontsize=14)
 
     # Plot time-frequency
-    power.plot(picks=picks, baseline=None, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
+    power.plot(picks=picks, baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
                combine='mean', cmap='jet', axes=ax_tf, show=display_figs)
 
     # Plot time markers as vertical lines
@@ -219,7 +222,9 @@ for subject_code in exp_info.subjects_ids:
 # Grand Average
 try:
     # Load previous data
-    grand_avg = mne.time_frequency.read_tfrs(trf_save_path + grand_avg_data_fname, condition=0)
+    grand_avg = mne.time_frequency.read_tfrs(trf_save_path + grand_avg_data_fname)[0]
+    # Pick plot channels
+    picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg.info)
 except:
     # Compute grand average
     grand_avg = mne.grand_average(averages)
@@ -238,9 +243,13 @@ grand_avg.plot(picks=picks, baseline=baseline, mode=bline_mode, tmin=plot_xlim[0
 if 'cross1' in epoch_id and mss:
     ax_tf.vlines(x=cross1_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
     ax_tf.vlines(x=cross1_dur + mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
+    ax_tf.vlines(x=cross1_dur + mss_duration[mss] + cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--',
+                 colors='black')
 elif 'ms' in epoch_id and mss:
     ax_tf.vlines(x=0, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
     ax_tf.vlines(x=mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
+                 linestyles='--', colors='black')
+    ax_tf.vlines(x=mss_duration[mss] + cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
                  linestyles='--', colors='black')
 elif 'cross2' in epoch_id:
     ax_tf.vlines(x=cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')

@@ -32,7 +32,7 @@ else:
 subject_code = exp_info.subjects_ids[5]
 # Id
 epoch_ids = ['l_sac', 'r_sac', 'u_sac', 'd_sac']
-epoch_names = {'l_sac': 'Downward', 'r_sac': 'Rightward', 'u_sac': 'Upward', 'd_sac': 'Downward'}
+epoch_names = {'l_sac': 'Leftward', 'r_sac': 'Rightward', 'u_sac': 'Upward', 'd_sac': 'Downward'}
 
 
 # Load subject object

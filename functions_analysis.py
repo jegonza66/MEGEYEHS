@@ -8,7 +8,7 @@ import time
 import save
 
 
-def define_events(subject, epoch_id, screen, mss, dur, tgt, dir, meg_data, evt_from_df=False):
+def define_events(subject, meg_data, epoch_id, mss=None,  screen=None, dur=None, tgt=None, dir=None, evt_from_df=False):
 
     print('Defining events')
 
