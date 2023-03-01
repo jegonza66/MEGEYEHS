@@ -54,7 +54,7 @@ dir = functions_general.get_dir(epoch_id=epoch_id)
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
 # Specific run path for saving data and plots
-run_path = f'/{band_id}/{epoch_id}_{tmin}_{tmax}/'
+run_path = f'/Band_{band_id}/{epoch_id}_{tmin}_{tmax}/'
 
 
 #----- Run -----#

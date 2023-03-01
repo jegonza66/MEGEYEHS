@@ -41,7 +41,7 @@ for epoch_id, chs_id, ax_evoked, ax_topo, topo_times, ylim in zip(epoch_ids, chs
     tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
 
     # Specific run path for saving data and plots
-    run_path = f'/{band_id}/{epoch_id}_{tmin}_{tmax}/'
+    run_path = f'/Band_{band_id}/{epoch_id}_{tmin}_{tmax}/'
 
     #----- Load Grand Average data -----#
     ga_save_path = save_path + f'Evoked/' + run_path
@@ -66,14 +66,14 @@ for epoch_id, chs_id, ax_evoked, ax_topo, topo_times, ylim in zip(epoch_ids, chs
 
 #----- Load Grand Average data -----#
 epoch_id = 'it_fix_vs'
-run_path = f'/{band_id}/{epoch_id}_{tmin}_{tmax}/'
+run_path = f'/Band_{band_id}/{epoch_id}_{tmin}_{tmax}/'
 ga_save_path = save_path + f'Evoked/' + run_path
 grand_avg_data_fname = f'Grand_average_ave.fif'
 grand_avg_vs = mne.read_evokeds(ga_save_path + grand_avg_data_fname, condition=0)
 grand_avg_vs_meg = grand_avg_vs.copy().pick('meg')
 
 epoch_id = 'fix_ms'
-run_path = f'/{band_id}/{epoch_id}_{tmin}_{tmax}/'
+run_path = f'/Band_{band_id}/{epoch_id}_{tmin}_{tmax}/'
 ga_save_path = save_path + f'Evoked/' + run_path
 grand_avg_data_fname = f'Grand_average_ave.fif'
 grand_avg_ms = mne.read_evokeds(ga_save_path + grand_avg_data_fname, condition=0)
@@ -93,7 +93,7 @@ picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg_vs_meg.info)
 
 # Plot
 save_fig = True
-fig_path = plot_path + f'Evoked/' + f'{band_id}/'
+fig_path = plot_path + f'Evoked/' + f'Band_{band_id}/'
 fname = f'Grand_Average_VS_MS_{chs_id}'
 
 plot_general.evoked_topo(evoked_meg=evoked_diff, picks=picks, fig=fig,
@@ -129,7 +129,7 @@ epoch_id = 'l_sac'
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
 
 # Specific run path for saving data and plots
-run_path = f'/{band_id}/{epoch_id}_{tmin}_{tmax}/'
+run_path = f'/Band_{band_id}/{epoch_id}_{tmin}_{tmax}/'
 
 #----- Load Grand Average data -----#
 ga_save_path = save_path + f'Evoked/' + run_path

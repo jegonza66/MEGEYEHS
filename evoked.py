@@ -37,7 +37,7 @@ plot_gaze = False
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
 
 # Specific run path for saving data and plots
-run_path = f'/{band_id}/{epoch_id}_{tmin}_{tmax}/'
+run_path = f'/Band_{band_id}/{epoch_id}_{tmin}_{tmax}/'
 
 evokeds = []
 for subject_code in exp_info.subjects_ids:

@@ -6,6 +6,8 @@ from paths import paths
 import os
 import time
 import save
+import load
+import setup
 
 
 def define_events(subject, meg_data, epoch_id, mss=None,  screen=None, dur=None, tgt=None, dir=None, evt_from_df=False):
@@ -188,3 +190,45 @@ def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', fi
           f'threshold of {threshold} are: {ocular_components}')
 
     return ocular_components, sac_epochs, fix_epochs
+
+
+def noise_cov(exp_info, subject, bads, use_ica_data, rank=None):
+    '''
+    Compute background noise covariance matrix for source estimation.
+    :param exp_info:
+    :param subject:
+    :param meg_data:
+    :param use_ica_data:
+    :return: noise_cov
+    '''
+    # Load data
+    noise = setup.noise(exp_info=exp_info, id='BACK_NOISE')
+    raw_noise = noise.load_preproc_data()
+    # Set bads to match participant's
+    raw_noise.info['bads'] = bads
+
+    if use_ica_data:
+        # ICA
+        save_path_ica = paths().ica_path() + subject.subject_id + '/'
+        ica_fname = 'ICA.pkl'
+        ica_components = 64
+
+        # Load ICA
+        ica = load.var(file_path=save_path_ica + ica_fname)
+        print('ICA object loaded')
+
+        # Get excluded components from subject and apply ICA to background noise
+        ica.exclude = subject.ex_components
+        # Load raw noise data to apply ICA
+        raw_noise.load_data()
+        ica.apply(raw_noise)
+
+    # Pick meg channels for source modeling
+    raw_noise.pick('meg')
+
+    reject = dict(mag=subject.config.general.reject_amp)
+
+    # Compute covariance to withdraw from meg data
+    noise_cov = mne.compute_raw_covariance(raw_noise, reject=reject, rank=rank)
+
+    return noise_cov
