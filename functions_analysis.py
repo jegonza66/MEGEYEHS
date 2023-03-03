@@ -10,7 +10,7 @@ import load
 import setup
 
 
-def define_events(subject, meg_data, epoch_id, mss=None,  screen=None, dur=None, tgt=None, dir=None, evt_from_df=False):
+def define_events(subject, meg_data, epoch_id, mss=None, trials=None, screen=None, dur=None, tgt=None, dir=None, evt_from_df=False):
 
     print('Defining events')
 
@@ -58,8 +58,10 @@ def define_events(subject, meg_data, epoch_id, mss=None,  screen=None, dur=None,
             epoch_keys = [key for key in epoch_keys if 'sac' not in key]
         if 'fix' not in epoch_id:
             epoch_keys = [key for key in epoch_keys if 'fix' not in key]
-        if screen:
-            epoch_keys = [epoch_key for epoch_key in epoch_keys if f'{screen}' in epoch_key]
+        # if screen:
+        #     epoch_keys = [epoch_key for epoch_key in epoch_keys if f'{screen}' in epoch_key]
+        if trials != None:
+            epoch_keys = [epoch_key for epoch_key in epoch_keys if int(epoch_key.split('t')[-1]) in trials]
         if mss:
             trials_mss = subject.bh_data.loc[subject.bh_data['Nstim'] == mss].index + 1  # add 1 due to python 0th indexing
             epoch_keys = [epoch_key for epoch_key in epoch_keys if int(epoch_key.split('t')[-1]) in trials_mss]
