@@ -10,10 +10,11 @@ import setup
 
 
 # --------- Define Parameters ---------#
+save_fig = False
 # Subject
 subject_code = 0
 # Select epochs
-epoch_id = 'fix_ms'
+epoch_id = 'l_sac'
 # ICA
 use_ica_data = False
 # Souce model
@@ -22,7 +23,8 @@ use_beamformer = True
 # Volume vs Surface estimation
 surf_vol = 'volume'
 pick_ori = None  # 'vector' For dipoles
-
+# Plot time
+initial_time = 0.06
 # Frequency band
 band_id = None
 # Duration
@@ -151,11 +153,12 @@ if use_beamformer:
 
     stc = apply_lcmv(evoked, filters)
 
-    fig = stc.plot(fwd['src'], subject=subject.subject_id, subjects_dir=subjects_dir)  # , clim=dict(kind='value', lims=(48,55,89)))
+    fig = stc.plot(fwd['src'], subject=subject.subject_id, subjects_dir=subjects_dir, initial_time=initial_time)  # , clim=dict(kind='value', lims=(48,55,89)))
 
     fig.tight_layout()
-    fname = f'{subject.subject_id}'
-    save.fig(fig=fig, path=fig_path, fname=fname)
+    if save_fig:
+        fname = f'{subject.subject_id}_sustained'
+        save.fig(fig=fig, path=fig_path, fname=fname)
 
 
 if not use_beamformer:
@@ -165,7 +168,6 @@ if not use_beamformer:
     # Inverse solution parameters (standard from mne)
     snr = 3.0
     lambda2 = 1.0 / snr ** 2
-    initial_time = 0.
     # Compute inverse solution to get sources time series
     stc = mne.minimum_norm.apply_inverse(evoked=evoked, inverse_operator=inv, lambda2=lambda2, method='dSPM',
                                          pick_ori=pick_ori)
@@ -183,10 +185,14 @@ if not use_beamformer:
                              initial_time=initial_time, time_unit='s')
 
     elif surf_vol == 'volume':
-        fig = stc.plot(inv['src'], subject=subject.subject_id, subjects_dir=subjects_dir)#, clim=dict(kind='value', lims=(48,55,89)))
+        fig = stc.plot(inv['src'], subject=subject.subject_id, subjects_dir=subjects_dir, initial_time=initial_time)#, clim=dict(kind='value', lims=(48,55,95)))
         fig.tight_layout()
-        fname = f'{subject.subject_id}'
-        save.fig(fig=fig, path=fig_path, fname=fname)
+        if save_fig:
+            fname = f'{subject.subject_id}'
+            save.fig(fig=fig, path=fig_path, fname=fname)
+
+        stc.plot_3d(src=inv['src'], subject=subject.subject_id, subjects_dir=subjects_dir, hemi='both', surface='white',
+                    initial_time=initial_time, time_unit='s', smoothing_steps=7)
 
 
 

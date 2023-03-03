@@ -248,7 +248,7 @@ def pick_chs(chs_id, info):
     :return: picks: list
         List of chosen channel names.
     '''
-    picks = info.ch_names
+    all_chs = info.ch_names
 
     if chs_id == 'mag':
         picks = 'mag'
@@ -261,24 +261,29 @@ def pick_chs(chs_id, info):
 
     else:
         ids = chs_id.split('_')
+        all_chs = info.ch_names
+        picks = []
         for id in ids:
             if id == 'parietal':
-                picks = [ch_name for ch_name in picks if 'M' in ch_name and 'P' in ch_name]
-            if id == 'parietal+':
-                picks = [ch_name for ch_name in picks if 'M' in ch_name and 'P' in ch_name]
-                picks = picks + ['MLT25', 'MLT26', 'MLT27', 'MLO24', 'MLO23', 'MLO22', 'MLO21', 'MLT15', 'MLT16',
+                picks += [ch_name for ch_name in all_chs if 'M' in ch_name and 'P' in ch_name]
+            elif id == 'parietal+':
+                picks += [ch_name for ch_name in all_chs if 'M' in ch_name and 'P' in ch_name]
+                picks += ['MLT25', 'MLT26', 'MLT27', 'MLO24', 'MLO23', 'MLO22', 'MLO21', 'MLT15', 'MLT16',
                                  'MLO14', 'MLO13', 'MLO12', 'MLO11',
                                  'MZO01',
                                  'MRT25', 'MRT26', 'MRT27', 'MRO24', 'MRO23', 'MRO22', 'MRO21', 'MRT15', 'MRT16',
                                  'MRO14', 'MRO13', 'MRO12', 'MRO11']
             elif id == 'occipital':
-                picks = [ch_name for ch_name in picks if 'M' in ch_name and 'O' in ch_name]
+                picks += [ch_name for ch_name in all_chs if 'M' in ch_name and 'O' in ch_name]
             elif id == 'frontal':
-                picks = [ch_name for ch_name in picks if 'M' in ch_name and 'F' in ch_name]
+                picks += [ch_name for ch_name in all_chs if 'M' in ch_name and 'F' in ch_name]
+
+            # Subset from picked chanels
             elif id == 'L':
                 picks = [ch_name for ch_name in picks if 'M' in ch_name and 'L' in ch_name]
             elif id == 'R':
                 picks = [ch_name for ch_name in picks if 'M' in ch_name and 'R' in ch_name]
+
     return picks
 
 
@@ -421,3 +426,21 @@ def get_mss(epoch_id):
         mss = None
 
     return mss
+
+
+def get_condition_trials(subject, mss=None, corr_ans=None, tgt_pres=None):
+    bh_data = subject.bh_data
+    if corr_ans:
+        bh_data = bh_data.loc[subject.corr_ans == 1]
+    elif corr_ans == False:
+        bh_data = bh_data.loc[subject.corr_ans == 0]
+    if mss:
+        bh_data = bh_data.loc[bh_data['Nstim'] == mss]
+    if tgt_pres:
+        bh_data = bh_data.loc[bh_data['Tpres'] == 1]
+    elif tgt_pres == False:
+        bh_data = bh_data.loc[bh_data['Tpres'] == 0]
+
+    trials = list(bh_data.index + 1)  # +1 for 0th index
+
+    return trials, bh_data

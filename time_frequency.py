@@ -24,13 +24,15 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'mag'
+chs_id = 'parietal'
 # ICA / RAW
 use_ica_data = True
+corr_ans = True
+tgt_pres = False
 # MSS
-mss = 1
+mss = 4
 # Id
-save_id = f'mss{mss}_cross1_ms_cross2'
+save_id = f'mss{mss}_cross1_ms_cross2_Corr_{corr_ans}_tgt_{tgt_pres}'
 # save_id = 'l_sac'
 epoch_id = 'ms_'
 # epoch_id = 'l_sac'
@@ -56,13 +58,6 @@ elif 'cross2' in epoch_id:
     dur = cross2_dur + vs_dur  # seconds
 else:
     dur = 0
-
-# Direction
-dir = None
-# Screen
-screen = None
-# Item
-tgt = functions_general.get_item(epoch_id=epoch_id)
 
 # Get time windows from epoch_id name
 map_times = dict(cross1={'tmin': 0, 'tmax': dur, 'plot_xlim': (plot_edge, dur - plot_edge)},
@@ -135,8 +130,11 @@ for subject_code in exp_info.subjects_ids:
             epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
         except:
             # Define events
+            # Trials
+            cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss,
+                                                                              corr_ans=corr_ans, tgt_pres=tgt_pres)
             metadata, events, events_id, metadata_sup = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
-                                                                                         screen=screen, mss=mss, meg_data=meg_data)
+                                                                                         trials=cond_trials, meg_data=meg_data)
             # Reject based on channel amplitude
             if 'sac' in epoch_id or 'fix' in epoch_id:
                 reject = dict(mag=subject.config.general.reject_amp)
@@ -189,9 +187,14 @@ for subject_code in exp_info.subjects_ids:
         ax_tf.vlines(x=cross1_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
         ax_tf.vlines(x=cross1_dur + mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
                      linestyles='--', colors='black')
+        ax_tf.vlines(x=cross1_dur + mss_duration[mss] + cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
+                     linestyles='--',
+                     colors='black')
     elif 'ms' in epoch_id and mss:
         ax_tf.vlines(x=0, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
         ax_tf.vlines(x=mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
+                     linestyles='--', colors='black')
+        ax_tf.vlines(x=mss_duration[mss] + cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
                      linestyles='--', colors='black')
     elif 'cross2' in epoch_id:
         ax_tf.vlines(x=cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
