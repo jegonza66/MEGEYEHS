@@ -24,18 +24,18 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'parietal'
+chs_id = 'occipital'
 # ICA / RAW
 use_ica_data = True
-corr_ans = True
-tgt_pres = False
+corr_ans = None
+tgt_pres = None
 # MSS
-mss = 4
+mss = None
 # Id
-save_id = f'mss{mss}_cross1_ms_cross2_Corr_{corr_ans}_tgt_{tgt_pres}'
-# save_id = 'l_sac'
-epoch_id = 'ms_'
-# epoch_id = 'l_sac'
+# save_id = f'mss{mss}_cross1_ms_cross2_Corr_{corr_ans}_tgt_{tgt_pres}'
+save_id = f'fix_vs_Corr_{corr_ans}_tgt_{tgt_pres}'
+# epoch_id = 'ms_'
+epoch_id = 'fix_vs'
 # Power frequency range
 l_freq = 1
 h_freq = 100
@@ -63,7 +63,8 @@ else:
 map_times = dict(cross1={'tmin': 0, 'tmax': dur, 'plot_xlim': (plot_edge, dur - plot_edge)},
                  ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
                  cross2={'tmin': 0, 'tmax': dur, 'plot_xlim': (plot_edge, dur - plot_edge)},
-                 sac={'tmin': -0.2, 'tmax': 0.2, 'plot_xlim': (-0.05, 0.1)})
+                 sac={'tmin': -0.2, 'tmax': 0.2, 'plot_xlim': (-0.05, 0.1)},
+                 fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)})
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
 
 # Baseline duration
@@ -73,6 +74,8 @@ elif 'cross2' in epoch_id:
     baseline = (tmin, tmin+cross2_dur)
 elif 'sac' in epoch_id or 'fix' in epoch_id:
     baseline = (plot_xlim[0], 0)
+elif 'fix' in epoch_id or 'fix' in epoch_id:
+    baseline = (tmin, -0.05)
 else:
     baseline = (plot_xlim[0], 0)
 
@@ -83,7 +86,7 @@ if use_ica_data:
     # Save data paths
     trf_save_path = paths().save_path() + f'Time_Frequency_ICA/' + save_path
     os.makedirs(trf_save_path, exist_ok=True)
-    epochs_save_path = paths().save_path() + f'Epochs_ICA/None/' + save_path
+    epochs_save_path = paths().save_path() + f'Epochs_ICA/Band_None/' + save_path
     os.makedirs(epochs_save_path, exist_ok=True)
     # Save figures paths
     trf_fig_path = paths().plots_path() + f'Time_Frequency_ICA/' + plot_path + f'{chs_id}/'
@@ -92,7 +95,7 @@ else:
     # Save data paths
     trf_save_path = paths().save_path() + f'Time_Frequency_RAW/' + save_path
     os.makedirs(trf_save_path, exist_ok=True)
-    epochs_save_path = paths().save_path() + f'Epochs_RAW/None/' + save_path
+    epochs_save_path = paths().save_path() + f'Epochs_RAW/Band_None/' + save_path
     os.makedirs(epochs_save_path, exist_ok=True)
     # Save figures paths
     trf_fig_path = paths().plots_path() + f'Time_Frequency_RAW/' + plot_path + f'{chs_id}/'
@@ -161,7 +164,7 @@ for subject_code in exp_info.subjects_ids:
 
         # Compute power over frequencies
         freqs = np.logspace(*np.log10([l_freq, h_freq]), num=40)
-        n_cycles = freqs / 2.  # different number of cycle per frequency
+        n_cycles = freqs / 4.  # different number of cycle per frequency
         power = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
                                               return_itc=False, decim=3, n_jobs=None)
 
