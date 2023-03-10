@@ -24,18 +24,18 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'occipital'
+chs_id = 'parietal'
 # ICA / RAW
 use_ica_data = True
-corr_ans = None
+corr_ans = True
 tgt_pres = None
 # MSS
-mss = None
+mss = 4
 # Id
 # save_id = f'mss{mss}_cross1_ms_cross2_Corr_{corr_ans}_tgt_{tgt_pres}'
-save_id = f'fix_vs_Corr_{corr_ans}_tgt_{tgt_pres}'
+save_id = f'sac_ms_Corr_{corr_ans}_tgt_{tgt_pres}'
 # epoch_id = 'ms_'
-epoch_id = 'fix_vs'
+epoch_id = 'sac_ms'
 # Power frequency range
 l_freq = 1
 h_freq = 100
@@ -68,14 +68,14 @@ map_times = dict(cross1={'tmin': 0, 'tmax': dur, 'plot_xlim': (plot_edge, dur - 
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
 
 # Baseline duration
-if 'cross1' in epoch_id or 'ms' in epoch_id and mss:
-    baseline = (tmin, tmin+cross1_dur)
-elif 'cross2' in epoch_id:
-    baseline = (tmin, tmin+cross2_dur)
-elif 'sac' in epoch_id or 'fix' in epoch_id:
+if 'sac' in epoch_id:
     baseline = (plot_xlim[0], 0)
 elif 'fix' in epoch_id or 'fix' in epoch_id:
     baseline = (tmin, -0.05)
+elif 'cross1' in epoch_id or 'ms' in epoch_id and mss:
+    baseline = (tmin, tmin+cross1_dur)
+elif 'cross2' in epoch_id:
+    baseline = (tmin, tmin+cross2_dur)
 else:
     baseline = (plot_xlim[0], 0)
 
@@ -102,8 +102,10 @@ else:
     os.makedirs(trf_fig_path, exist_ok=True)
 
 # Grand average data variable
-grand_avg_data_fname = f'Grand_Average_{l_freq}_{h_freq}_tfr.h5'
-averages = []
+grand_avg_power_fname = f'Grand_Average_power_{l_freq}_{h_freq}_tfr.h5'
+grand_avg_itc_fname = f'Grand_Average_itc_{l_freq}_{h_freq}_tfr.h5'
+averages_power = []
+averages_itc = []
 
 for subject_code in exp_info.subjects_ids:
 
@@ -121,12 +123,14 @@ for subject_code in exp_info.subjects_ids:
         meg_data = subject.load_preproc_meg()
 
     # Data filenames
-    trf_data_fname = f'Subject_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
+    power_data_fname = f'Power_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
+    itc_data_fname = f'ITC_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
 
     try:
         # Load previous data
-        power = mne.time_frequency.read_tfrs(trf_save_path + trf_data_fname, condition=0)
+        power = mne.time_frequency.read_tfrs(trf_save_path + power_data_fname, condition=0)
+        itc = mne.time_frequency.read_tfrs(trf_save_path + itc_data_fname, condition=0)
     except:
         try:
             # Load epoched data
@@ -163,122 +167,88 @@ for subject_code in exp_info.subjects_ids:
                 epochs.save(epochs_save_path + epochs_data_fname, overwrite=True)
 
         # Compute power over frequencies
-        freqs = np.logspace(*np.log10([l_freq, h_freq]), num=40)
+        # freqs = np.logspace(*np.log10([l_freq, h_freq]), num=40)
+        freqs = np.linspace(l_freq, h_freq, num=h_freq)
         n_cycles = freqs / 4.  # different number of cycle per frequency
-        power = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
-                                              return_itc=False, decim=3, n_jobs=None)
+        power, itc = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
+                                                   return_itc=True, decim=3, n_jobs=None)
 
         if save_data:
             # Save trf data
-            power.save(trf_save_path + trf_data_fname, overwrite=True)
+            power.save(trf_save_path + power_data_fname, overwrite=True)
+            itc.save(trf_save_path + itc_data_fname, overwrite=True)
 
     # Append data for GA
-    averages.append(power)
+    averages_power.append(power)
+    averages_itc.append(itc)
 
-    # Pick plot channels
-    picks = functions_general.pick_chs(chs_id=chs_id, info=power.info)
+    # Plot power time-frequency
+    fname = f'{subject.subject_id}/Power_tf_' + subject.subject_id + f'_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    plot_general.trf(subject=subject, trf=power, chs_id=chs_id, baseline=baseline, bline_mode=bline_mode,
+                           plot_xlim=plot_xlim, epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur,
+                           mss_duration=mss_duration, cross2_dur=cross2_dur, display_figs=display_figs,
+                           save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
 
-    # Define figure
-    fig, axes_topo, ax_tf = plot_general.fig_time_frequency(fontsize=14)
+    # Plot ITC time-frequency
+    fname = f'{subject.subject_id}/ITC_tf_' + subject.subject_id + f'_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    plot_general.trf(subject=subject, trf=itc, chs_id=chs_id, baseline=baseline, bline_mode=bline_mode,
+                           plot_xlim=plot_xlim, epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur,
+                           mss_duration=mss_duration, cross2_dur=cross2_dur, display_figs=display_figs,
+                           save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
 
-    # Plot time-frequency
-    power.plot(picks=picks, baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
-               combine='mean', cmap='jet', axes=ax_tf, show=display_figs)
-
-    # Plot time markers as vertical lines
-    if 'cross1' in epoch_id and mss:
-        ax_tf.vlines(x=cross1_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
-        ax_tf.vlines(x=cross1_dur + mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
-                     linestyles='--', colors='black')
-        ax_tf.vlines(x=cross1_dur + mss_duration[mss] + cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
-                     linestyles='--',
-                     colors='black')
-    elif 'ms' in epoch_id and mss:
-        ax_tf.vlines(x=0, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
-        ax_tf.vlines(x=mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
-                     linestyles='--', colors='black')
-        ax_tf.vlines(x=mss_duration[mss] + cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
-                     linestyles='--', colors='black')
-    elif 'cross2' in epoch_id:
-        ax_tf.vlines(x=cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
-    else:
-        ax_tf.vlines(x=0, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
-
-    # Topomaps parameters
-    topomap_kw = dict(ch_type='mag', tmin=plot_xlim[0], tmax=plot_xlim[1], baseline=baseline,
-                      mode=bline_mode, show=display_figs)
-    plot_dict = dict(Delta=dict(fmin=1, fmax=4), Theta=dict(fmin=4, fmax=8), Alpha=dict(fmin=8, fmax=12),
-                     Beta=dict(fmin=12, fmax=30), Gamma=dict(fmin=30, fmax=45), HGamma=dict(fmin=45, fmax=100))
-
-    # Plot topomaps
-    for ax, (title, fmin_fmax) in zip(axes_topo, plot_dict.items()):
-        try:
-            power.plot_topomap(**fmin_fmax, axes=ax, **topomap_kw)
-        except:
-            ax.text(0.5, 0.5, 'No data', horizontalalignment='center', verticalalignment='center')
-            ax.set_xticks([]), ax.set_yticks([])
-        ax.set_title(title)
-    fig.suptitle(subject.subject_id + f'_{chs_id}_{bline_mode}')
-    fig.tight_layout()
-
+    # Power topoplot
+    fig = power.plot_topo(baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
+                    cmap='jet', show=display_figs)
     if save_fig:
-        fname = 'Time_Freq_' + subject.subject_id + f'_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        fname = f'{subject.subject_id}/Power_topoch_' + subject.subject_id + f'_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        save.fig(fig=fig, path=trf_fig_path, fname=fname)
+
+    # ITC topoplot
+    fig = itc.plot_topo(tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet', show=display_figs, title='Inter-Trial coherence')
+    if save_fig:
+        fname = f'{subject.subject_id}/ITC_topoch_' + subject.subject_id + f'_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
         save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
 # Grand Average
 try:
-    # Load previous data
-    grand_avg = mne.time_frequency.read_tfrs(trf_save_path + grand_avg_data_fname)[0]
+    # Load previous power data
+    grand_avg_power = mne.time_frequency.read_tfrs(trf_save_path + grand_avg_power_fname)[0]
+    # Load previous itc data
+    grand_avg_itc = mne.time_frequency.read_tfrs(trf_save_path + grand_avg_itc_fname)[0]
     # Pick plot channels
-    picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg.info)
+    picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg_power.info)
 except:
     # Compute grand average
-    grand_avg = mne.grand_average(averages)
+    grand_avg_power = mne.grand_average(averages_power)
+    grand_avg_itc = mne.grand_average(averages_itc)
 
     if save_data:
         # Save trf data
-        grand_avg.save(trf_save_path + grand_avg_data_fname, overwrite=True)
+        grand_avg_power.save(trf_save_path + grand_avg_power_fname, overwrite=True)
+        grand_avg_itc.save(trf_save_path + grand_avg_itc_fname, overwrite=True)
 
-# Define figure
-fig, axes_topo, ax_tf = plot_general.fig_time_frequency(fontsize=14)
 
-# Plot time-frequency
-grand_avg.plot(picks=picks, baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1], combine='mean', cmap='jet',
-               axes=ax_tf, show=display_figs)
-# Plot time markers as vertical lines
-if 'cross1' in epoch_id and mss:
-    ax_tf.vlines(x=cross1_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
-    ax_tf.vlines(x=cross1_dur + mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
-    ax_tf.vlines(x=cross1_dur + mss_duration[mss] + cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--',
-                 colors='black')
-elif 'ms' in epoch_id and mss:
-    ax_tf.vlines(x=0, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
-    ax_tf.vlines(x=mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
-                 linestyles='--', colors='black')
-    ax_tf.vlines(x=mss_duration[mss] + cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
-                 linestyles='--', colors='black')
-elif 'cross2' in epoch_id:
-    ax_tf.vlines(x=cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
-else:
-    ax_tf.vlines(x=0, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
+# Plot ITC time-frequency
+fname = f'GA_Power_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+plot_general.trf(trf=grand_avg_power, chs_id=chs_id, baseline=baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
+                 epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
+                 subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
 
-# Topomaps parameters
-topomap_kw = dict(ch_type='mag', tmin=plot_xlim[0], tmax=plot_xlim[1], baseline=baseline,
-                  mode=bline_mode, show=display_figs)
-plot_dict = dict(Delta=dict(fmin=1, fmax=4), Theta=dict(fmin=4, fmax=8), Alpha=dict(fmin=8, fmax=12),
-                 Beta=dict(fmin=12, fmax=30), Gamma=dict(fmin=30, fmax=45), HGamma=dict(fmin=45, fmax=100))
+# Plot ITC time-frequency
+fname = f'GA_ITC_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+plot_general.trf(trf=grand_avg_itc, chs_id=chs_id, baseline=baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
+                 epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
+                 subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
 
-# Plot topomaps
-for ax, (title, fmin_fmax) in zip(axes_topo, plot_dict.items()):
-    try:
-        grand_avg.plot_topomap(**fmin_fmax, axes=ax, **topomap_kw)
-    except:
-        ax.text(0.5, 0.5, 'No data', horizontalalignment='center', verticalalignment='center')
-        ax.set_xticks([]), ax.set_yticks([])
-    ax.set_title(title)
-fig.suptitle(f'Grand_average_{chs_id}_{bline_mode}')
-fig.tight_layout()
-
+# Power topoplot
+fig = power.plot_topo(baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
+                      cmap='jet', show=display_figs)
 if save_fig:
-    fname = 'Time_Freq_' + f'Grand_average_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    fname = f'GA_Power_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    save.fig(fig=fig, path=trf_fig_path, fname=fname)
+
+# ITC topoplot
+fig = itc.plot_topo(tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet', show=display_figs, title='Inter-Trial coherence')
+if save_fig:
+    fname = f'GA_ITC_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
     save.fig(fig=fig, path=trf_fig_path, fname=fname)

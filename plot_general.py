@@ -1,10 +1,9 @@
 import matplotlib.pyplot as plt
-plt.figure()
-plt.close('all')
 import matplotlib
 import numpy as np
 from paths import paths
 import save
+import functions_general
 
 save_path = paths().save_path()
 plot_path = paths().plots_path()
@@ -221,3 +220,66 @@ def fig_time_frequency(fontsize=None):
     ax1 = fig.add_axes([0.1, 0.1, 0.5, 0.8])
 
     return fig, axes_topo, ax1
+
+
+def trf(trf, chs_id, baseline, bline_mode, plot_xlim, epoch_id, mss, cross1_dur, mss_duration, cross2_dur,
+        subject=None, title=None, display_figs=False, save_fig=False, fig_path=None, fname=None):
+    # Sanity check
+    if save_fig and (not fname or not fig_path):
+        raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
+
+    # Define figure
+    fig, axes_topo, ax_tf = fig_time_frequency(fontsize=14)
+
+    # Pick plot channels
+    picks = functions_general.pick_chs(chs_id=chs_id, info=trf.info)
+
+    # Plot time-frequency
+    trf.plot(picks=picks, baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
+             combine='mean', cmap='jet', axes=ax_tf, show=display_figs)
+
+    # Plot time markers as vertical lines
+    if 'cross1' in epoch_id and mss:
+        ax_tf.vlines(x=cross1_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
+        ax_tf.vlines(x=cross1_dur + mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
+                     linestyles='--', colors='black')
+        ax_tf.vlines(x=cross1_dur + mss_duration[mss] + cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
+                     linestyles='--',
+                     colors='black')
+    elif 'ms' in epoch_id and mss:
+        ax_tf.vlines(x=0, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
+        ax_tf.vlines(x=mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
+                     linestyles='--', colors='black')
+        ax_tf.vlines(x=mss_duration[mss] + cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
+                     linestyles='--', colors='black')
+    elif 'cross2' in epoch_id:
+        ax_tf.vlines(x=cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
+    else:
+        ax_tf.vlines(x=0, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
+
+    # Topomaps parameters
+    topomap_kw = dict(ch_type='mag', tmin=plot_xlim[0], tmax=plot_xlim[1], baseline=baseline,
+                      mode=bline_mode, show=display_figs)
+    plot_dict = dict(Delta=dict(fmin=1, fmax=4), Theta=dict(fmin=4, fmax=8), Alpha=dict(fmin=8, fmax=12),
+                     Beta=dict(fmin=12, fmax=30), Gamma=dict(fmin=30, fmax=45), HGamma=dict(fmin=45, fmax=100))
+
+    # Plot topomaps
+    for ax, (title, fmin_fmax) in zip(axes_topo, plot_dict.items()):
+        try:
+            trf.plot_topomap(**fmin_fmax, axes=ax, **topomap_kw)
+        except:
+            ax.text(0.5, 0.5, 'No data', horizontalalignment='center', verticalalignment='center')
+            ax.set_xticks([]), ax.set_yticks([])
+        ax.set_title(title)
+
+    # Figure title
+    if title:
+        fig.suptitle(title)
+    elif subject:
+        fig.suptitle(subject.subject_id + f'_{chs_id}_{bline_mode}')
+    elif not subject:
+        fig.suptitle(f'Grand_average_{chs_id}_{bline_mode}')
+    fig.tight_layout()
+
+    if save_fig:
+        save.fig(fig=fig, path=fig_path, fname=fname)

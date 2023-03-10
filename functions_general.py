@@ -277,6 +277,8 @@ def pick_chs(chs_id, info):
                 picks += [ch_name for ch_name in all_chs if 'M' in ch_name and 'O' in ch_name]
             elif id == 'frontal':
                 picks += [ch_name for ch_name in all_chs if 'M' in ch_name and 'F' in ch_name]
+            elif id == 'temporal':
+                picks += [ch_name for ch_name in all_chs if 'M' in ch_name and 'T' in ch_name]
 
             # Subset from picked chanels
             elif id == 'L':
