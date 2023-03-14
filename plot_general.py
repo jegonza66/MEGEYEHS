@@ -1,3 +1,5 @@
+import os
+
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
@@ -222,7 +224,7 @@ def fig_time_frequency(fontsize=None):
     return fig, axes_topo, ax1
 
 
-def trf(trf, chs_id, baseline, bline_mode, plot_xlim, epoch_id, mss, cross1_dur, mss_duration, cross2_dur,
+def trf(trf, chs_id, plot_xlim, epoch_id, mss, cross1_dur, mss_duration, cross2_dur, baseline=None, bline_mode=None,
         subject=None, title=None, display_figs=False, save_fig=False, fig_path=None, fname=None):
     # Sanity check
     if save_fig and (not fname or not fig_path):
@@ -264,22 +266,23 @@ def trf(trf, chs_id, baseline, bline_mode, plot_xlim, epoch_id, mss, cross1_dur,
                      Beta=dict(fmin=12, fmax=30), Gamma=dict(fmin=30, fmax=45), HGamma=dict(fmin=45, fmax=100))
 
     # Plot topomaps
-    for ax, (title, fmin_fmax) in zip(axes_topo, plot_dict.items()):
+    for ax, (title_topo, fmin_fmax) in zip(axes_topo, plot_dict.items()):
         try:
             trf.plot_topomap(**fmin_fmax, axes=ax, **topomap_kw)
         except:
             ax.text(0.5, 0.5, 'No data', horizontalalignment='center', verticalalignment='center')
             ax.set_xticks([]), ax.set_yticks([])
-        ax.set_title(title)
+        ax.set_title(title_topo)
 
     # Figure title
     if title:
         fig.suptitle(title)
     elif subject:
-        fig.suptitle(subject.subject_id + f'_{chs_id}_{bline_mode}')
+        fig.suptitle(subject.subject_id + f'{fname.split("_")[0]}_{chs_id}_{bline_mode}')
     elif not subject:
-        fig.suptitle(f'Grand_average_{chs_id}_{bline_mode}')
+        fig.suptitle(f'Grand_average_{fname.split("_")[0]}_{chs_id}_{bline_mode}')
     fig.tight_layout()
 
     if save_fig:
+        os.makedirs(fig_path, exist_ok=True)
         save.fig(fig=fig, path=fig_path, fname=fname)

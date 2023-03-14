@@ -16,7 +16,7 @@ exp_info = setup.exp_info()
 #----- Save data and display figures -----#
 save_data = True
 save_fig = True
-display_figs = False
+display_figs = True
 if display_figs:
     plt.ion()
 else:
@@ -27,13 +27,13 @@ else:
 chs_id = 'parietal'
 # ICA / RAW
 use_ica_data = True
-corr_ans = True
+corr_ans = False
 tgt_pres = None
 # MSS
-mss = 4
+mss = 1
 # Id
 # save_id = f'mss{mss}_cross1_ms_cross2_Corr_{corr_ans}_tgt_{tgt_pres}'
-save_id = f'sac_ms_Corr_{corr_ans}_tgt_{tgt_pres}'
+save_id = f'sac_ms_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
 # epoch_id = 'ms_'
 epoch_id = 'sac_ms'
 # Power frequency range
@@ -63,13 +63,14 @@ else:
 map_times = dict(cross1={'tmin': 0, 'tmax': dur, 'plot_xlim': (plot_edge, dur - plot_edge)},
                  ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
                  cross2={'tmin': 0, 'tmax': dur, 'plot_xlim': (plot_edge, dur - plot_edge)},
-                 sac={'tmin': -0.2, 'tmax': 0.2, 'plot_xlim': (-0.05, 0.1)},
+                 sac={'tmin': -0.2, 'tmax': 0.2, 'plot_xlim': (-0.2, 0.2)},
                  fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)})
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
 
 # Baseline duration
 if 'sac' in epoch_id:
     baseline = (plot_xlim[0], 0)
+    baseline = None
 elif 'fix' in epoch_id or 'fix' in epoch_id:
     baseline = (tmin, -0.05)
 elif 'cross1' in epoch_id or 'ms' in epoch_id and mss:
@@ -126,6 +127,9 @@ for subject_code in exp_info.subjects_ids:
     power_data_fname = f'Power_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
     itc_data_fname = f'ITC_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+    # Subject plots path
+    trf_fig_path_subj = trf_fig_path + f'{subject.subject_id}/'
+    os.makedirs(trf_fig_path_subj, exist_ok=True)
 
     try:
         # Load previous data
@@ -168,7 +172,7 @@ for subject_code in exp_info.subjects_ids:
 
         # Compute power over frequencies
         # freqs = np.logspace(*np.log10([l_freq, h_freq]), num=40)
-        freqs = np.linspace(l_freq, h_freq, num=h_freq)
+        freqs = np.linspace(l_freq, h_freq, num=h_freq-l_freq+1)  # 1 Hz bands
         n_cycles = freqs / 4.  # different number of cycle per frequency
         power, itc = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
                                                    return_itc=True, decim=3, n_jobs=None)
@@ -183,31 +187,31 @@ for subject_code in exp_info.subjects_ids:
     averages_itc.append(itc)
 
     # Plot power time-frequency
-    fname = f'{subject.subject_id}/Power_tf_' + subject.subject_id + f'_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.trf(subject=subject, trf=power, chs_id=chs_id, baseline=baseline, bline_mode=bline_mode,
-                           plot_xlim=plot_xlim, epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur,
-                           mss_duration=mss_duration, cross2_dur=cross2_dur, display_figs=display_figs,
-                           save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
+    fname = f'Power_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    plot_general.trf(subject=subject, trf=power, chs_id=chs_id, plot_xlim=plot_xlim, epoch_id=epoch_id, mss=mss,
+                     cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
+                     baseline=baseline, bline_mode=bline_mode,
+                     display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
 
     # Plot ITC time-frequency
-    fname = f'{subject.subject_id}/ITC_tf_' + subject.subject_id + f'_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.trf(subject=subject, trf=itc, chs_id=chs_id, baseline=baseline, bline_mode=bline_mode,
-                           plot_xlim=plot_xlim, epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur,
-                           mss_duration=mss_duration, cross2_dur=cross2_dur, display_figs=display_figs,
-                           save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
+    fname = f'ITC_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    plot_general.trf(subject=subject, trf=itc, chs_id=chs_id,
+                     plot_xlim=plot_xlim, epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur,
+                     mss_duration=mss_duration, cross2_dur=cross2_dur, baseline=baseline, bline_mode=bline_mode,
+                     display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
 
     # Power topoplot
-    fig = power.plot_topo(baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
-                    cmap='jet', show=display_figs)
+    fig = power.plot_topo(baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet',
+                          show=display_figs)
     if save_fig:
-        fname = f'{subject.subject_id}/Power_topoch_' + subject.subject_id + f'_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-        save.fig(fig=fig, path=trf_fig_path, fname=fname)
+        fname = f'Power_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
 
     # ITC topoplot
     fig = itc.plot_topo(tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet', show=display_figs, title='Inter-Trial coherence')
     if save_fig:
-        fname = f'{subject.subject_id}/ITC_topoch_' + subject.subject_id + f'_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-        save.fig(fig=fig, path=trf_fig_path, fname=fname)
+        fname = f'ITC_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
 
 # Grand Average
 try:
