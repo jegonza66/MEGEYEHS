@@ -39,6 +39,11 @@ epoch_id = 'sac_ms'
 # Power frequency range
 l_freq = 1
 h_freq = 100
+log_bands = False
+if log_bands:
+    bands_name = 'log'
+else:
+    bands_name = 'lin'
 # Baseline method
 bline_mode = 'logratio'
 #----------#
@@ -84,23 +89,18 @@ else:
 save_path = f'/{save_id}_{tmin}_{tmax}/'
 plot_path = f'/{save_id}_{plot_xlim[0]}_{plot_xlim[1]}/'
 if use_ica_data:
-    # Save data paths
-    trf_save_path = paths().save_path() + f'Time_Frequency_ICA/' + save_path
-    os.makedirs(trf_save_path, exist_ok=True)
-    epochs_save_path = paths().save_path() + f'Epochs_ICA/Band_None/' + save_path
-    os.makedirs(epochs_save_path, exist_ok=True)
-    # Save figures paths
-    trf_fig_path = paths().plots_path() + f'Time_Frequency_ICA/' + plot_path + f'{chs_id}/'
-    os.makedirs(trf_fig_path, exist_ok=True)
+    data_type = 'ICA'
 else:
-    # Save data paths
-    trf_save_path = paths().save_path() + f'Time_Frequency_RAW/' + save_path
-    os.makedirs(trf_save_path, exist_ok=True)
-    epochs_save_path = paths().save_path() + f'Epochs_RAW/Band_None/' + save_path
-    os.makedirs(epochs_save_path, exist_ok=True)
-    # Save figures paths
-    trf_fig_path = paths().plots_path() + f'Time_Frequency_RAW/' + plot_path + f'{chs_id}/'
-    os.makedirs(trf_fig_path, exist_ok=True)
+    data_type = 'RAW'
+
+# Save data paths
+trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/' + save_path
+os.makedirs(trf_save_path, exist_ok=True)
+epochs_save_path = paths().save_path() + f'Epochs_{data_type}/Band_None/' + save_path
+os.makedirs(epochs_save_path, exist_ok=True)
+# Save figures paths
+trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + plot_path + f'{chs_id}/'
+os.makedirs(trf_fig_path, exist_ok=True)
 
 # Grand average data variable
 grand_avg_power_fname = f'Grand_Average_power_{l_freq}_{h_freq}_tfr.h5'
@@ -171,6 +171,7 @@ for subject_code in exp_info.subjects_ids:
                 epochs.save(epochs_save_path + epochs_data_fname, overwrite=True)
 
         # Compute power over frequencies
+
         # freqs = np.logspace(*np.log10([l_freq, h_freq]), num=40)
         freqs = np.linspace(l_freq, h_freq, num=h_freq-l_freq+1)  # 1 Hz bands
         n_cycles = freqs / 4.  # different number of cycle per frequency

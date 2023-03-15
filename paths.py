@@ -16,8 +16,8 @@ class paths:
         if self.name == 'laptop-5i5qsv76\\joaco\n':  # Asus Rog
             self.main_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/'
 
-        elif self.name == 'usuario\n':  # Liaa Colores
-            self.main_path = '/mnt/6a6fd40a-e256-4844-8004-0e60d95969e8/MEGEYEHS/'
+        elif self.name == 'desktop-r5hd7ct\\joac\n':  # Liaa Colores
+            self.main_path = 'D:/OneDrive - The University of Nottingham/MEGEYEHS'
 
         elif self.name == 'desktop-59r7a1d\\usuario\n':  # Desktop
             self.main_path = 'C:/Users/Usuario/OneDrive - The University of Nottingham/MEGEYEHS/'

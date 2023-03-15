@@ -39,27 +39,28 @@ tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
 # Specific run path for saving data and plots
 run_path = f'/Band_{band_id}/{epoch_id}_{tmin}_{tmax}/'
 
+# Data type
+if use_ica_data:
+    data_type = 'ICA'
+else:
+    data_type = 'RAW'
+
 evokeds = []
 for subject_code in exp_info.subjects_ids:
 
     if use_ica_data:
         # Load subject object
         subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
-        # Save data paths
-        epochs_save_path = save_path + f'Epochs_ICA/' + run_path
-        evoked_save_path = save_path + f'Evoked_ICA/' + run_path
-        # Save figures paths
-        epochs_fig_path = plot_path + f'Epochs_ICA/' + run_path
-        evoked_fig_path = plot_path + f'Evoked_ICA/' + run_path
     else:
         # Load subject object
         subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-        # Save data paths
-        epochs_save_path = save_path + f'Epochs_RAW/' + run_path
-        evoked_save_path = save_path + f'Evoked_RAW/' + run_path
-        # Save figures paths
-        epochs_fig_path = plot_path + f'Epochs_RAW/' + run_path
-        evoked_fig_path = plot_path + f'Evoked_RAW/' + run_path
+
+    # Save data paths
+    epochs_save_path = save_path + f'Epochs_{data_type}/' + run_path
+    evoked_save_path = save_path + f'Evoked_{data_type}/' + run_path
+    # Save figures paths
+    epochs_fig_path = plot_path + f'Epochs_{data_type}/' + run_path
+    evoked_fig_path = plot_path + f'Evoked_{data_type}/' + run_path
 
     # Data filenames
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
