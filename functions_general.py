@@ -315,13 +315,16 @@ def get_freq_band(band_id):
                 h_freq = 8
             elif band == 'Alpha':
                 l_freq = 8
-                h_freq = 13
+                h_freq = 12
             elif band == 'Beta':
-                l_freq = 13
-                h_freq = 25
+                l_freq = 12
+                h_freq = 30
             elif band == 'Gamma':
-                l_freq = 25
-                h_freq = 80
+                l_freq = 30
+                h_freq = 45
+            elif band == 'HGamma':
+                l_freq = 45
+                h_freq = 100
             elif band == 'Broad':
                 l_freq = 0.5
                 h_freq = 100

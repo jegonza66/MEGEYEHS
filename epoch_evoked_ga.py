@@ -32,28 +32,23 @@ use_ica_data = True
 band_id = None
 # Id
 epoch_id = 'l_sac'
-# Duration
-dur = None  # seconds
 # Plot channels
 chs_id = 'mag'
 # PLots
 plot_epochs = True
 plot_gaze = True
-# Baseline
-baseline = (None, 0)
-
-
-# Screen
-screen = functions_general.get_screen(epoch_id=epoch_id)
+corr_ans = None
+tgt_pres = None
 # MSS
-mss = functions_general.get_mss(epoch_id=epoch_id)
-# Item
-tgt = functions_general.get_item(epoch_id=epoch_id)
-# Saccades direction
-dir = functions_general.get_dir(epoch_id=epoch_id)
+mss = None
+
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
+# Baseline
+baseline = (tmin, 0)
+
 # Specific run path for saving data and plots
+save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
 run_path = f'/Band_{band_id}/{epoch_id}_{tmin}_{tmax}_bline{baseline}/'
 
 # Data type
@@ -101,12 +96,13 @@ for subject_code in exp_info.subjects_ids:
         else:
             meg_data = subject.load_preproc_meg()
 
-        # Pick MEG channels to plot
-        picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
+        # Trials
+        cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss,
+                                                                          corr_ans=corr_ans, tgt_pres=tgt_pres)
 
         metadata, events, events_id, metadata_sup = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
-                                                                                     screen=screen, mss=mss, dur=dur,
-                                                                                     tgt=tgt, dir=dir, meg_data=meg_data)
+                                                                                     trials=cond_trials,
+                                                                                     meg_data=meg_data)
 
         # Reject based on channel amplitude
         reject = dict(mag=subject.config.general.reject_amp)
@@ -127,6 +123,8 @@ for subject_code in exp_info.subjects_ids:
             os.makedirs(epochs_save_path, exist_ok=True)
             epochs.save(epochs_save_path + epochs_data_fname, overwrite=True)
 
+    # Pick MEG channels to plot
+    picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
     if plot_epochs:
         # Parameters for plotting
         overlay = epochs.metadata['duration']

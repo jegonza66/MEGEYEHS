@@ -14,24 +14,28 @@ save_fig = False
 # Subject
 subject_code = 0
 # Select epochs
-epoch_id = 'l_sac'
+epoch_id = 'fix_vs'
 # ICA
 use_ica_data = False
 # Souce model
 use_beamformer = True
+# Trials
+corr_ans = None
+tgt_pres = None
+mss = None
 
 # Volume vs Surface estimation
 surf_vol = 'volume'
-pick_ori = None  # 'vector' For dipoles
+pick_ori = None  # 'vector' For dipoles, 'max_power' for
 # Plot time
-initial_time = 0.06
+initial_time = 0.1
 # Frequency band
 band_id = None
-# Duration
-dur = None  # seconds
+
 visualize_alignment = False
 # Get time windows from epoch_id name
-map_times = dict(sac={'tmin': -0.05, 'tmax': 0.07, 'plot_xlim': (-0.05, 0.07)})
+map_times = dict(sac={'tmin': -0.05, 'tmax': 0.07, 'plot_xlim': (-0.05, 0.07)},
+                 fix={'tmin': -0.05, 'tmax': 0.2, 'plot_xlim': (-0.05, 0.2)})
 # -------------------------------------#
 
 
@@ -50,16 +54,20 @@ if use_beamformer:
 else:
     model_name = 'MNE'
 
+# Get times
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
+
+# Baseline duration
+if 'sac' in epoch_id:
+    baseline = (tmin, 0)
+    # baseline = None
+elif 'fix' in epoch_id or 'fix' in epoch_id:
+    baseline = (tmin, -0.05)
 
 
 # --------- Paths ---------#
-# Define Subjects_dir as Freesurfer output folder
-mri_path = paths().mri_path()
-subjects_dir = os.path.join(mri_path, 'FreeSurfer_out')
-os.environ["SUBJECTS_DIR"] = subjects_dir
+run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_{tmin}_{tmax}_bline{baseline}/'
 
-run_path = f'/Band_{band_id}/{epoch_id}_{tmin}_{tmax}/'
 # Source plots paths
 fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_{pick_ori}/'
 os.makedirs(fig_path, exist_ok=True)
@@ -67,7 +75,6 @@ os.makedirs(fig_path, exist_ok=True)
 # Data paths
 epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path
 evoked_save_path = paths().save_path() + f'Evoked_{data_type}/' + run_path
-os.makedirs(evoked_save_path, exist_ok=True)
 
 # Data filenames
 epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
@@ -78,6 +85,11 @@ sources_path = paths().sources_path()
 sources_path_subject = sources_path + subject.subject_id
 fname_fwd = sources_path_subject + f'/{subject.subject_id}_volume-fwd.fif'
 fname_inv = sources_path_subject + f'/{subject.subject_id}_{surf_vol}-inv_{data_type}.fif'
+
+# Define Subjects_dir as Freesurfer output folder
+mri_path = paths().mri_path()
+subjects_dir = os.path.join(mri_path, 'FreeSurfer_out')
+os.environ["SUBJECTS_DIR"] = subjects_dir
 
 
 if visualize_alignment:
@@ -109,32 +121,33 @@ except:
     else:
         meg_data = subject.load_preproc_meg()
 
-    # --------- Epoch data ---------#
-    # Screen
-    screen = functions_general.get_screen(epoch_id=epoch_id)
-    # MSS
-    mss = functions_general.get_mss(epoch_id=epoch_id)
-    # Item
-    tgt = functions_general.get_item(epoch_id=epoch_id)
-    # Saccades direction
-    dir = functions_general.get_dir(epoch_id=epoch_id)
+    try:
+        epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+    except:
+        # Trials
+        cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss,
+                                                                          corr_ans=corr_ans, tgt_pres=tgt_pres)
 
-    # Get events based on conditions
-    metadata, events, events_id, metadata_sup = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
-                                                                                 screen=screen, mss=mss, dur=dur,
-                                                                                 tgt=tgt, dir=dir, meg_data=meg_data)
-    # Reject based on channel amplitude
-    reject = dict(mag=subject.config.general.reject_amp)
-    # reject = dict(mag=2.5e-12)
+        metadata, events, events_id, metadata_sup = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
+                                                                                     trials=cond_trials,
+                                                                                     meg_data=meg_data)
+        # Reject based on channel amplitude
+        reject = dict(mag=subject.config.general.reject_amp)
+        # reject = dict(mag=2.5e-12)
 
-    # Epoch data
-    epochs = mne.Epochs(meg_data, events, event_id=events_id, reject=reject, tmin=tmin, tmax=tmax,
-                        event_repeated='drop', metadata=metadata, preload=True)
+        # Epoch data
+        epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=tmin, tmax=tmax, reject=reject,
+                            event_repeated='drop', metadata=metadata, preload=True)
+
+        epochs.reset_drop_log_selection()
+        os.makedirs(epochs_save_path, exist_ok=True)
+        epochs.save(epochs_save_path + epochs_data_fname, overwrite=True)
 
     # Define evoked from epochs
     evoked = epochs.average()
 
     # Save evoked data
+    os.makedirs(evoked_save_path, exist_ok=True)
     evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
 
 # Pick meg channels for source modeling
@@ -159,6 +172,10 @@ if use_beamformer:
     if save_fig:
         fname = f'{subject.subject_id}_sustained'
         save.fig(fig=fig, path=fig_path, fname=fname)
+
+    # 3D Plot
+    stc.plot_3d(src=fwd['src'], subject=subject.subject_id, subjects_dir=subjects_dir, hemi='both', surface='white',
+                initial_time=initial_time, time_unit='s', smoothing_steps=7)
 
 
 if not use_beamformer:

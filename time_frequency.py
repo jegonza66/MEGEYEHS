@@ -16,7 +16,7 @@ exp_info = setup.exp_info()
 #----- Save data and display figures -----#
 save_data = True
 save_fig = True
-display_figs = True
+display_figs = False
 if display_figs:
     plt.ion()
 else:
@@ -24,26 +24,20 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'parietal'
+chs_id = 'occipital'
 # ICA / RAW
 use_ica_data = True
-corr_ans = False
+corr_ans = None
 tgt_pres = None
-# MSS
-mss = 1
-# Id
-# save_id = f'mss{mss}_cross1_ms_cross2_Corr_{corr_ans}_tgt_{tgt_pres}'
-save_id = f'sac_ms_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
+mss = None
 # epoch_id = 'ms_'
-epoch_id = 'sac_ms'
+epoch_id = 'fix_vs'
+save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
 # Power frequency range
 l_freq = 1
 h_freq = 100
-log_bands = False
-if log_bands:
-    freqs_type = 'log'
-else:
-    freqs_type = 'lin'
+log_bands = True
+
 # Baseline method
 bline_mode = 'logratio'
 #----------#
@@ -55,6 +49,7 @@ cross2_dur = 1
 vs_dur = 4
 plot_edge = 0.1
 
+# Duration
 if 'cross1' in epoch_id and mss:
     dur = cross1_dur + mss_duration[mss] + cross2_dur + vs_dur # seconds
 elif 'ms' in epoch_id:
@@ -74,20 +69,29 @@ tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=m
 
 # Baseline duration
 if 'sac' in epoch_id:
-    baseline = (plot_xlim[0], 0)
-    baseline = None
+    baseline = (tmin, 0)
+    # baseline = None
 elif 'fix' in epoch_id or 'fix' in epoch_id:
-    baseline = (None, -0.05)
+    baseline = (tmin, -0.05)
 elif 'cross1' in epoch_id or 'ms' in epoch_id and mss:
-    baseline = (None, tmin+cross1_dur)
+    baseline = (tmin, tmin+cross1_dur)
 elif 'cross2' in epoch_id:
-    baseline = (None, tmin+cross1_dur)
+    baseline = (tmin, tmin+cross1_dur)
 else:
-    baseline = (plot_xlim[0], 0)
+    baseline = (tmin, 0)
+
+# Plot baseline
+plot_baseline = (plot_xlim[0], 0)
+
+# freqs type
+if log_bands:
+    freqs_type = 'log'
+else:
+    freqs_type = 'lin'
 
 # Specific run path for saving data and plots
 save_path = f'/{save_id}_{tmin}_{tmax}_bline{baseline}/'
-plot_path = f'/{save_id}_{plot_xlim[0]}_{plot_xlim[1]}/'
+plot_path = f'/{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}/'
 if use_ica_data:
     data_type = 'ICA'
 else:
@@ -95,12 +99,9 @@ else:
 
 # Save data paths
 trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + save_path
-os.makedirs(trf_save_path, exist_ok=True)
 epochs_save_path = paths().save_path() + f'Epochs_{data_type}/Band_None/' + save_path
-os.makedirs(epochs_save_path, exist_ok=True)
 # Save figures paths
 trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + plot_path + f'{chs_id}/'
-os.makedirs(trf_fig_path, exist_ok=True)
 
 # Grand average data variable
 grand_avg_power_fname = f'Grand_Average_power_{l_freq}_{h_freq}_tfr.h5'
@@ -129,7 +130,6 @@ for subject_code in exp_info.subjects_ids:
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
     # Subject plots path
     trf_fig_path_subj = trf_fig_path + f'{subject.subject_id}/'
-    os.makedirs(trf_fig_path_subj, exist_ok=True)
 
     try:
         # Load previous data
@@ -171,15 +171,18 @@ for subject_code in exp_info.subjects_ids:
                 epochs.save(epochs_save_path + epochs_data_fname, overwrite=True)
 
         # Compute power over frequencies
-
-        # freqs = np.logspace(*np.log10([l_freq, h_freq]), num=40)
-        freqs = np.linspace(l_freq, h_freq, num=h_freq-l_freq+1)  # 1 Hz bands
+        print('Computing power and ITC')
+        if freqs_type == 'log':
+            freqs = np.logspace(*np.log10([l_freq, h_freq]), num=40)
+        elif freqs_type == 'lin':
+            freqs = np.linspace(l_freq, h_freq, num=h_freq-l_freq+1)  # 1 Hz bands
         n_cycles = freqs / 4.  # different number of cycle per frequency
         power, itc = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
-                                                   return_itc=True, decim=3, n_jobs=None)
+                                                   return_itc=True, decim=3, n_jobs=None, verbose=True)
 
         if save_data:
             # Save trf data
+            os.makedirs(trf_save_path, exist_ok=True)
             power.save(trf_save_path + power_data_fname, overwrite=True)
             itc.save(trf_save_path + itc_data_fname, overwrite=True)
 
@@ -191,25 +194,25 @@ for subject_code in exp_info.subjects_ids:
     fname = f'Power_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
     plot_general.trf(subject=subject, trf=power, chs_id=chs_id, plot_xlim=plot_xlim, epoch_id=epoch_id, mss=mss,
                      cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
-                     baseline=baseline, bline_mode=bline_mode,
+                     baseline=plot_baseline, bline_mode=bline_mode,
                      display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
 
     # Plot ITC time-frequency
     fname = f'ITC_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.trf(subject=subject, trf=itc, chs_id=chs_id,
-                     plot_xlim=plot_xlim, epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur,
-                     mss_duration=mss_duration, cross2_dur=cross2_dur, baseline=baseline, bline_mode=bline_mode,
+    plot_general.trf(subject=subject, trf=itc, chs_id=chs_id, plot_xlim=plot_xlim, epoch_id=epoch_id, mss=mss,
+                     cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
+                     baseline=plot_baseline, bline_mode=bline_mode,
                      display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
 
     # Power topoplot
-    fig = power.plot_topo(baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet',
-                          show=display_figs)
+    fig = power.plot_topo(baseline=plot_baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet',
+                          show=display_figs, title='Power')
     if save_fig:
         fname = f'Power_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
         save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
 
     # ITC topoplot
-    fig = itc.plot_topo(tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet', show=display_figs, title='Inter-Trial coherence')
+    fig = itc.plot_topo(baseline=plot_baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet', show=display_figs, title='Inter-Trial coherence')
     if save_fig:
         fname = f'ITC_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
         save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
@@ -235,13 +238,13 @@ except:
 
 # Plot ITC time-frequency
 fname = f'GA_Power_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-plot_general.trf(trf=grand_avg_power, chs_id=chs_id, baseline=baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
+plot_general.trf(trf=grand_avg_power, chs_id=chs_id, baseline=plot_baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
                  epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                  subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
 
 # Plot ITC time-frequency
 fname = f'GA_ITC_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-plot_general.trf(trf=grand_avg_itc, chs_id=chs_id, baseline=baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
+plot_general.trf(trf=grand_avg_itc, chs_id=chs_id, baseline=plot_baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
                  epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                  subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
 
@@ -253,7 +256,7 @@ if save_fig:
     save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
 # ITC topoplot
-fig = itc.plot_topo(tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet', show=display_figs, title='Inter-Trial coherence')
+fig = itc.plot_topo(baseline=plot_baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet', show=display_figs, title='Inter-Trial coherence')
 if save_fig:
     fname = f'GA_ITC_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
     save.fig(fig=fig, path=trf_fig_path, fname=fname)

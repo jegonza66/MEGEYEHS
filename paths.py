@@ -17,7 +17,7 @@ class paths:
             self.main_path = 'C:/Users/joaco/OneDrive - The University of Nottingham/MEGEYEHS/'
 
         elif self.name == 'desktop-r5hd7ct\\joac\n':  # Liaa Colores
-            self.main_path = 'D:/OneDrive - The University of Nottingham/MEGEYEHS'
+            self.main_path = 'D:/OneDrive - The University of Nottingham/MEGEYEHS/'
 
         elif self.name == 'desktop-59r7a1d\\usuario\n':  # Desktop
             self.main_path = 'C:/Users/Usuario/OneDrive - The University of Nottingham/MEGEYEHS/'

@@ -225,7 +225,7 @@ def fig_time_frequency(fontsize=None):
 
 
 def trf(trf, chs_id, plot_xlim, epoch_id, mss, cross1_dur, mss_duration, cross2_dur, baseline=None, bline_mode=None,
-        subject=None, title=None, display_figs=False, save_fig=False, fig_path=None, fname=None):
+        subject=None, title=None, topo_times=None, display_figs=False, save_fig=False, fig_path=None, fname=None):
     # Sanity check
     if save_fig and (not fname or not fig_path):
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
@@ -260,7 +260,9 @@ def trf(trf, chs_id, plot_xlim, epoch_id, mss, cross1_dur, mss_duration, cross2_
         ax_tf.vlines(x=0, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
 
     # Topomaps parameters
-    topomap_kw = dict(ch_type='mag', tmin=plot_xlim[0], tmax=plot_xlim[1], baseline=baseline,
+    if not topo_times:
+        topo_times = plot_xlim
+    topomap_kw = dict(ch_type='mag', tmin=topo_times[0], tmax=topo_times[1], baseline=baseline,
                       mode=bline_mode, show=display_figs)
     plot_dict = dict(Delta=dict(fmin=1, fmax=4), Theta=dict(fmin=4, fmax=8), Alpha=dict(fmin=8, fmax=12),
                      Beta=dict(fmin=12, fmax=30), Gamma=dict(fmin=30, fmax=45), HGamma=dict(fmin=45, fmax=100))
@@ -278,11 +280,12 @@ def trf(trf, chs_id, plot_xlim, epoch_id, mss, cross1_dur, mss_duration, cross2_
     if title:
         fig.suptitle(title)
     elif subject:
-        fig.suptitle(subject.subject_id + f'{fname.split("_")[0]}_{chs_id}_{bline_mode}')
+        fig.suptitle(subject.subject_id + f'_{fname.split("_")[0]}_{chs_id}_{bline_mode}_topotimes_{topo_times}')
     elif not subject:
         fig.suptitle(f'Grand_average_{fname.split("_")[0]}_{chs_id}_{bline_mode}')
     fig.tight_layout()
 
     if save_fig:
+        fname += f'_topotimes_{topo_times}'
         os.makedirs(fig_path, exist_ok=True)
         save.fig(fig=fig, path=fig_path, fname=fname)
