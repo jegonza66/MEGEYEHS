@@ -36,8 +36,11 @@ epoch_id = 'l_sac'
 dur = None  # seconds
 # Plot channels
 chs_id = 'mag'
+# PLots
 plot_epochs = True
 plot_gaze = True
+# Baseline
+baseline = (None, 0)
 
 
 # Screen
@@ -51,7 +54,7 @@ dir = functions_general.get_dir(epoch_id=epoch_id)
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
 # Specific run path for saving data and plots
-run_path = f'/Band_{band_id}/{epoch_id}_{tmin}_{tmax}/'
+run_path = f'/Band_{band_id}/{epoch_id}_{tmin}_{tmax}_bline{baseline}/'
 
 # Data type
 if use_ica_data:

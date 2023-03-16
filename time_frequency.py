@@ -41,9 +41,9 @@ l_freq = 1
 h_freq = 100
 log_bands = False
 if log_bands:
-    bands_name = 'log'
+    freqs_type = 'log'
 else:
-    bands_name = 'lin'
+    freqs_type = 'lin'
 # Baseline method
 bline_mode = 'logratio'
 #----------#
@@ -67,7 +67,7 @@ else:
 # Get time windows from epoch_id name
 map_times = dict(cross1={'tmin': 0, 'tmax': dur, 'plot_xlim': (plot_edge, dur - plot_edge)},
                  ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
-                 cross2={'tmin': 0, 'tmax': dur, 'plot_xlim': (plot_edge, dur - plot_edge)},
+                 cross2={'tmin': -cross1_dur - mss_duration[mss], 'tmax': dur, 'plot_xlim': (plot_edge, dur - plot_edge)},
                  sac={'tmin': -0.2, 'tmax': 0.2, 'plot_xlim': (-0.2, 0.2)},
                  fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)})
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
@@ -77,16 +77,16 @@ if 'sac' in epoch_id:
     baseline = (plot_xlim[0], 0)
     baseline = None
 elif 'fix' in epoch_id or 'fix' in epoch_id:
-    baseline = (tmin, -0.05)
+    baseline = (None, -0.05)
 elif 'cross1' in epoch_id or 'ms' in epoch_id and mss:
-    baseline = (tmin, tmin+cross1_dur)
+    baseline = (None, tmin+cross1_dur)
 elif 'cross2' in epoch_id:
-    baseline = (tmin, tmin+cross2_dur)
+    baseline = (None, tmin+cross1_dur)
 else:
     baseline = (plot_xlim[0], 0)
 
 # Specific run path for saving data and plots
-save_path = f'/{save_id}_{tmin}_{tmax}/'
+save_path = f'/{save_id}_{tmin}_{tmax}_bline{baseline}/'
 plot_path = f'/{save_id}_{plot_xlim[0]}_{plot_xlim[1]}/'
 if use_ica_data:
     data_type = 'ICA'
@@ -94,12 +94,12 @@ else:
     data_type = 'RAW'
 
 # Save data paths
-trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/' + save_path
+trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + save_path
 os.makedirs(trf_save_path, exist_ok=True)
 epochs_save_path = paths().save_path() + f'Epochs_{data_type}/Band_None/' + save_path
 os.makedirs(epochs_save_path, exist_ok=True)
 # Save figures paths
-trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + plot_path + f'{chs_id}/'
+trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + plot_path + f'{chs_id}/'
 os.makedirs(trf_fig_path, exist_ok=True)
 
 # Grand average data variable
