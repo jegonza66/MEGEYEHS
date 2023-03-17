@@ -39,7 +39,6 @@ plot_epochs = True
 plot_gaze = True
 corr_ans = None
 tgt_pres = None
-# MSS
 mss = None
 
 # Get time windows from epoch_id name
@@ -49,7 +48,7 @@ baseline = (tmin, 0)
 
 # Specific run path for saving data and plots
 save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
-run_path = f'/Band_{band_id}/{epoch_id}_{tmin}_{tmax}_bline{baseline}/'
+run_path = f'/Band_{band_id}/{save_id}_{tmin}_{tmax}_bline{baseline}/'
 
 # Data type
 if use_ica_data:
@@ -96,32 +95,11 @@ for subject_code in exp_info.subjects_ids:
         else:
             meg_data = subject.load_preproc_meg()
 
-        # Trials
-        cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss,
-                                                                          corr_ans=corr_ans, tgt_pres=tgt_pres)
-
-        metadata, events, events_id, metadata_sup = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
-                                                                                     trials=cond_trials,
-                                                                                     meg_data=meg_data)
-
-        # Reject based on channel amplitude
-        reject = dict(mag=subject.config.general.reject_amp)
-
         # Epoch data
-        epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=tmin, tmax=tmax, reject=reject,
-                            event_repeated='drop', metadata=metadata, preload=True)
-        # Drop bad epochs
-        epochs.drop_bad()
-
-        if metadata_sup is not None:
-            metadata_sup = metadata_sup.loc[(metadata_sup['id'].isin(epochs.metadata['event_name']))].reset_index(drop=True)
-            epochs.metadata = metadata_sup
-
-        if save_data:
-            # Save epoched data
-            epochs.reset_drop_log_selection()
-            os.makedirs(epochs_save_path, exist_ok=True)
-            epochs.save(epochs_save_path + epochs_data_fname, overwrite=True)
+        epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
+                                                       epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, tmax=tmax,
+                                                       save_data=save_data, epochs_save_path=epochs_save_path,
+                                                       epochs_data_fname=epochs_data_fname)
 
     # Pick MEG channels to plot
     picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)

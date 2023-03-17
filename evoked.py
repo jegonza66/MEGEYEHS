@@ -6,15 +6,16 @@ import setup
 from paths import paths
 import plot_general
 import functions_general
+import functions_analysis
 
 save_path = paths().save_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
 #----- Save data and display figures -----#
-save_data = False
-save_fig = False
-display_figs = True
+save_data = True
+save_fig = True
+display_figs = False
 if display_figs:
     plt.ion()
 else:
@@ -22,30 +23,40 @@ else:
 
 #-----  Select frequency band -----#
 # ICA vs raw data
-use_ica_data = False
+use_ica_data = True
 band_id = None
 # Id
-epoch_id = 'l_sac'
-# Duration
-dur = None  # seconds
+epoch_id = 'blue'
 # Pick MEG chs (Select channels or set picks = 'mag')
 chs_id = 'mag'
 # Plot eye movements
 plot_gaze = False
-# Baseline
-baseline = (None, 0)
+corr_ans = None
+tgt_pres = None
+mss = None
 
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
-
-# Specific run path for saving data and plots
-run_path = f'/Band_{band_id}/{epoch_id}_{tmin}_{tmax}_bline{baseline}/'
+# Baseline
+baseline = (tmin, -0.1)
 
 # Data type
 if use_ica_data:
     data_type = 'ICA'
 else:
     data_type = 'RAW'
+
+# Specific run path for saving data and plots
+save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
+run_path = f'/Band_{band_id}/{save_id}_{tmin}_{tmax}_bline{baseline}/'
+
+# Save data paths
+epochs_save_path = save_path + f'Epochs_{data_type}/' + run_path
+evoked_save_path = save_path + f'Evoked_{data_type}/' + run_path
+# Save figures paths
+epochs_fig_path = plot_path + f'Epochs_{data_type}/' + run_path
+evoked_fig_path = plot_path + f'Evoked_{data_type}/' + run_path
+
 
 evokeds = []
 for subject_code in exp_info.subjects_ids:
@@ -57,13 +68,6 @@ for subject_code in exp_info.subjects_ids:
         # Load subject object
         subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
 
-    # Save data paths
-    epochs_save_path = save_path + f'Epochs_{data_type}/' + run_path
-    evoked_save_path = save_path + f'Evoked_{data_type}/' + run_path
-    # Save figures paths
-    epochs_fig_path = plot_path + f'Epochs_{data_type}/' + run_path
-    evoked_fig_path = plot_path + f'Evoked_{data_type}/' + run_path
-
     # Data filenames
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
     evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
@@ -74,16 +78,51 @@ for subject_code in exp_info.subjects_ids:
         evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
 
     except:
-        # Load epoched data
-        epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+        try:
+            # Load epoched data
+            epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
 
-        # Get evoked by averaging epochs
-        evoked = epochs.average(picks=['mag', 'misc'])
+            # Get evoked by averaging epochs
+            evoked = epochs.average(picks=['mag', 'misc'])
 
-        # Save data
-        if save_data:
-            # Save evoked data
-            evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
+            # Save data
+            if save_data:
+                # Save evoked data
+                evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
+        except:
+
+            # Define save path and file name for loading and saving epoched, evoked, and GA data
+            if use_ica_data:
+                # Load subject object
+                subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
+                if band_id:
+                    meg_data = load.filtered_data(subject=subject, band_id=band_id, save_data=False)
+                else:
+                    meg_data = load.ica_data(subject=subject)
+            else:
+                # Load subject object
+                subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
+                if band_id:
+                    meg_data = load.filtered_data(subject=subject, band_id=band_id, save_data=False)
+                else:
+                    meg_data = subject.load_preproc_meg()
+
+            # Epoch data
+            epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans,
+                                                           tgt_pres=tgt_pres,
+                                                           epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, tmax=tmax,
+                                                           save_data=save_data, epochs_save_path=epochs_save_path,
+                                                           epochs_data_fname=epochs_data_fname)
+
+            # ----- Evoked -----#
+            # Define evoked and append for GA
+            evoked = epochs.average(picks=['mag', 'misc'])
+            evokeds.append(evoked)
+
+    if save_data:
+        # Save evoked data
+        os.makedirs(evoked_save_path, exist_ok=True)
+        evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
 
     # Apend to evokeds list to pass to grand average
     evokeds.append(evoked)

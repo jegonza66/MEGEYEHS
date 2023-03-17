@@ -15,8 +15,8 @@ exp_info = setup.exp_info()
 
 #----- Save data and display figures -----#
 save_data = True
-save_fig = True
-display_figs = False
+save_fig = False
+display_figs = True
 if display_figs:
     plt.ion()
 else:
@@ -31,8 +31,7 @@ corr_ans = None
 tgt_pres = None
 mss = None
 # epoch_id = 'ms_'
-epoch_id = 'fix_vs'
-save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
+epoch_id = 'fix_ms'
 # Power frequency range
 l_freq = 1
 h_freq = 100
@@ -90,6 +89,7 @@ else:
     freqs_type = 'lin'
 
 # Specific run path for saving data and plots
+save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
 save_path = f'/{save_id}_{tmin}_{tmax}_bline{baseline}/'
 plot_path = f'/{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}/'
 if use_ica_data:
@@ -140,51 +140,17 @@ for subject_code in exp_info.subjects_ids:
             # Load epoched data
             epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
         except:
-            # Define events
-            # Trials
-            cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss,
-                                                                              corr_ans=corr_ans, tgt_pres=tgt_pres)
-            metadata, events, events_id, metadata_sup = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
-                                                                                         trials=cond_trials, meg_data=meg_data)
-            # Reject based on channel amplitude
-            if 'sac' in epoch_id or 'fix' in epoch_id:
-                reject = dict(mag=subject.config.general.reject_amp)
-                # reject = dict(mag=2.5e-12)
-            else:
-                reject = None
-
             # Epoch data
-            epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=tmin, tmax=tmax, reject=reject,
-                                baseline=baseline, event_repeated='drop', metadata=metadata, picks='mag', preload=True)
-            # Drop bad epochs
-            epochs.drop_bad()
+            epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans,
+                                                           tgt_pres=tgt_pres,
+                                                           epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, tmax=tmax,
+                                                           save_data=save_data, epochs_save_path=epochs_save_path,
+                                                           epochs_data_fname=epochs_data_fname)
 
-            if metadata_sup is not None:
-                metadata_sup = metadata_sup.loc[(metadata_sup['id'].isin(epochs.metadata['event_name']))].reset_index(
-                    drop=True)
-                epochs.metadata = metadata_sup
-
-            if save_data:
-                # Save epoched data
-                epochs.reset_drop_log_selection()
-                os.makedirs(epochs_save_path, exist_ok=True)
-                epochs.save(epochs_save_path + epochs_data_fname, overwrite=True)
-
-        # Compute power over frequencies
-        print('Computing power and ITC')
-        if freqs_type == 'log':
-            freqs = np.logspace(*np.log10([l_freq, h_freq]), num=40)
-        elif freqs_type == 'lin':
-            freqs = np.linspace(l_freq, h_freq, num=h_freq-l_freq+1)  # 1 Hz bands
-        n_cycles = freqs / 4.  # different number of cycle per frequency
-        power, itc = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
-                                                   return_itc=True, decim=3, n_jobs=None, verbose=True)
-
-        if save_data:
-            # Save trf data
-            os.makedirs(trf_save_path, exist_ok=True)
-            power.save(trf_save_path + power_data_fname, overwrite=True)
-            itc.save(trf_save_path + itc_data_fname, overwrite=True)
+        # Compute power and PLI over frequencies
+        power, itc = functions_analysis.time_frequency(epochs=epochs, l_freq=l_freq, h_freq=h_freq, freqs_type=freqs_type,
+                                                       n_cycles_div=4., save_data=save_data, trf_save_path=trf_save_path,
+                                                       power_data_fname=power_data_fname, itc_data_fname=itc_data_fname)
 
     # Append data for GA
     averages_power.append(power)
@@ -237,13 +203,13 @@ except:
 
 
 # Plot ITC time-frequency
-fname = f'GA_Power_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+fname = f'Power_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
 plot_general.trf(trf=grand_avg_power, chs_id=chs_id, baseline=plot_baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
                  epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                  subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
 
 # Plot ITC time-frequency
-fname = f'GA_ITC_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+fname = f'ITC_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
 plot_general.trf(trf=grand_avg_itc, chs_id=chs_id, baseline=plot_baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
                  epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                  subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname)

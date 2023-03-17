@@ -124,24 +124,12 @@ except:
     try:
         epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
     except:
-        # Trials
-        cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss,
-                                                                          corr_ans=corr_ans, tgt_pres=tgt_pres)
-
-        metadata, events, events_id, metadata_sup = functions_analysis.define_events(subject=subject, epoch_id=epoch_id,
-                                                                                     trials=cond_trials,
-                                                                                     meg_data=meg_data)
-        # Reject based on channel amplitude
-        reject = dict(mag=subject.config.general.reject_amp)
-        # reject = dict(mag=2.5e-12)
 
         # Epoch data
-        epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=tmin, tmax=tmax, reject=reject,
-                            event_repeated='drop', metadata=metadata, preload=True)
-
-        epochs.reset_drop_log_selection()
-        os.makedirs(epochs_save_path, exist_ok=True)
-        epochs.save(epochs_save_path + epochs_data_fname, overwrite=True)
+        epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
+                                                       epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, tmax=tmax,
+                                                       save_data=True, epochs_save_path=epochs_save_path,
+                                                       epochs_data_fname=epochs_data_fname)
 
     # Define evoked from epochs
     evoked = epochs.average()

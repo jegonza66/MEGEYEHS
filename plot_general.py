@@ -282,7 +282,7 @@ def trf(trf, chs_id, plot_xlim, epoch_id, mss, cross1_dur, mss_duration, cross2_
     elif subject:
         fig.suptitle(subject.subject_id + f'_{fname.split("_")[0]}_{chs_id}_{bline_mode}_topotimes_{topo_times}')
     elif not subject:
-        fig.suptitle(f'Grand_average_{fname.split("_")[0]}_{chs_id}_{bline_mode}')
+        fig.suptitle(f'Grand_average_{fname.split("_")[0]}_{chs_id}_{bline_mode}_topotimes_{topo_times}')
     fig.tight_layout()
 
     if save_fig:

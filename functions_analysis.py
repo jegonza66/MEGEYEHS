@@ -61,7 +61,10 @@ def define_events(subject, meg_data, epoch_id, mss=None, trials=None, screen=Non
         # if screen:
         #     epoch_keys = [epoch_key for epoch_key in epoch_keys if f'{screen}' in epoch_key]
         if trials != None:
-            epoch_keys = [epoch_key for epoch_key in epoch_keys if int(epoch_key.split('_t')[-1].split('_')[0]) in trials]
+            try:
+                epoch_keys = [epoch_key for epoch_key in epoch_keys if int(epoch_key.split('_t')[-1].split('_')[0]) in trials]
+            except:
+                print('Trial selection skiped. Epoch_id does not contain trial number.')
         # if mss:
         #     trials_mss = subject.bh_data.loc[subject.bh_data['Nstim'] == mss].index + 1  # add 1 due to python 0th indexing
         #     epoch_keys = [epoch_key for epoch_key in epoch_keys if int(epoch_key.split('t')[-1]) in trials_mss]
@@ -77,6 +80,68 @@ def define_events(subject, meg_data, epoch_id, mss=None, trials=None, screen=Non
             metadata_sup = subject.saccades
 
     return metadata, events, events_id, metadata_sup
+
+
+def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax, reject=None,
+               save_data=False, epochs_save_path=None, epochs_data_fname=None):
+    # Sanity check to save data
+    if save_data and (not epochs_save_path or not epochs_data_fname):
+        raise ValueError('Please provide path and filename to save data. Else, set save_data to false.')
+
+    # Trials
+    cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss,
+                                                                      corr_ans=corr_ans, tgt_pres=tgt_pres)
+    # Define events
+    metadata, events, events_id, metadata_sup = define_events(subject=subject, epoch_id=epoch_id,
+                                                                                 trials=cond_trials,
+                                                                                 meg_data=meg_data)
+    # Reject based on channel amplitude
+    if not reject:
+        reject = dict(mag=subject.config.general.reject_amp)
+
+    # Epoch data
+    epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=tmin, tmax=tmax, reject=reject,
+                        event_repeated='drop', metadata=metadata, preload=True)
+    # Drop bad epochs
+    epochs.drop_bad()
+
+    if metadata_sup is not None:
+        metadata_sup = metadata_sup.loc[(metadata_sup['id'].isin(epochs.metadata['event_name']))].reset_index(drop=True)
+        epochs.metadata = metadata_sup
+
+    if save_data:
+        # Save epoched data
+        epochs.reset_drop_log_selection()
+        os.makedirs(epochs_save_path, exist_ok=True)
+        epochs.save(epochs_save_path + epochs_data_fname, overwrite=True)
+
+    return epochs, events
+
+
+def time_frequency(epochs, l_freq, h_freq, freqs_type, n_cycles_div=4., save_data=False, trf_save_path=None,
+                   power_data_fname=None, itc_data_fname=None):
+
+    # Sanity check to save data
+    if save_data and (not trf_save_path or not power_data_fname or not itc_data_fname):
+        raise ValueError('Please provide path and filename to save data. Else, set save_data to false.')
+
+    # Compute power over frequencies
+    print('Computing power and ITC')
+    if freqs_type == 'log':
+        freqs = np.logspace(*np.log10([l_freq, h_freq]), num=40)
+    elif freqs_type == 'lin':
+        freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)  # 1 Hz bands
+    n_cycles = freqs / n_cycles_div  # different number of cycle per frequency
+    power, itc = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
+                                               return_itc=True, decim=3, n_jobs=None, verbose=True)
+
+    if save_data:
+        # Save trf data
+        os.makedirs(trf_save_path, exist_ok=True)
+        power.save(trf_save_path + power_data_fname, overwrite=True)
+        itc.save(trf_save_path + itc_data_fname, overwrite=True)
+
+    return power, itc
 
 
 def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', fix_id='fix_emap' , threshold=1.1,

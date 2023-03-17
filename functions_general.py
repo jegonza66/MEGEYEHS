@@ -248,7 +248,6 @@ def pick_chs(chs_id, info):
     :return: picks: list
         List of chosen channel names.
     '''
-    all_chs = info.ch_names
 
     if chs_id == 'mag':
         picks = 'mag'
@@ -279,6 +278,8 @@ def pick_chs(chs_id, info):
                 picks += [ch_name for ch_name in all_chs if 'M' in ch_name and 'F' in ch_name]
             elif id == 'temporal':
                 picks += [ch_name for ch_name in all_chs if 'M' in ch_name and 'T' in ch_name]
+            elif id == 'central':
+                picks += [ch_name for ch_name in all_chs if 'M' in ch_name and 'C' in ch_name]
 
             # Subset from picked chanels
             elif id == 'L':
