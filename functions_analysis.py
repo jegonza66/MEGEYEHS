@@ -82,7 +82,7 @@ def define_events(subject, meg_data, epoch_id, mss=None, trials=None, screen=Non
     return metadata, events, events_id, metadata_sup
 
 
-def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax, reject=None,
+def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax, baseline=None, reject=None,
                save_data=False, epochs_save_path=None, epochs_data_fname=None):
     # Sanity check to save data
     if save_data and (not epochs_save_path or not epochs_data_fname):
@@ -101,7 +101,7 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
 
     # Epoch data
     epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=tmin, tmax=tmax, reject=reject,
-                        event_repeated='drop', metadata=metadata, preload=True)
+                        event_repeated='drop', metadata=metadata, preload=True, baseline=baseline)
     # Drop bad epochs
     epochs.drop_bad()
 
@@ -118,7 +118,7 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
     return epochs, events
 
 
-def time_frequency(epochs, l_freq, h_freq, freqs_type, n_cycles_div=4., save_data=False, trf_save_path=None,
+def time_frequency(epochs, l_freq, h_freq, freqs_type, n_cycles_div=4., return_itc=True, save_data=False, trf_save_path=None,
                    power_data_fname=None, itc_data_fname=None):
 
     # Sanity check to save data
@@ -133,7 +133,7 @@ def time_frequency(epochs, l_freq, h_freq, freqs_type, n_cycles_div=4., save_dat
         freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)  # 1 Hz bands
     n_cycles = freqs / n_cycles_div  # different number of cycle per frequency
     power, itc = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
-                                               return_itc=True, decim=3, n_jobs=None, verbose=True)
+                                               return_itc=return_itc, decim=3, n_jobs=None, verbose=True)
 
     if save_data:
         # Save trf data

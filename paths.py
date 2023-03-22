@@ -152,7 +152,7 @@ class paths:
         return preproc_path
 
 
-    def filtered_path(self):
+    def filtered_path_raw(self):
         """
         Paths to the filtered data folder.
 
@@ -162,7 +162,24 @@ class paths:
             Path in str format to the folder containing the filtered data.
         """
 
-        filtered_path = self.main_path + 'Python/Save/Filtered_Data/'
+        filtered_path = self.main_path + 'Python/Save/Filtered_Data_RAW/'
+
+        # Create directory if it doesn't exist
+        os.makedirs(filtered_path, exist_ok=True)
+
+        return filtered_path
+
+    def filtered_path_ica(self):
+        """
+        Paths to the filtered data folder.
+
+        Returns
+        -------
+        filtered_path: str
+            Path in str format to the folder containing the filtered data.
+        """
+
+        filtered_path = self.main_path + 'Python/Save/Filtered_Data_ICA/'
 
         # Create directory if it doesn't exist
         os.makedirs(filtered_path, exist_ok=True)

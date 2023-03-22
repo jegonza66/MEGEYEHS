@@ -158,9 +158,12 @@ def ica_subject(exp_info, subject_code):
     return ica_subject
 
 
-def filtered_data(subject, band_id, preload=False, save_data=False):
+def filtered_data(subject, band_id, use_ica_data=True, preload=False, save_data=False):
 
-    filtered_path = paths().filtered_path() + f'{band_id}/{subject.subject_id}/'
+    if use_ica_data:
+        filtered_path = paths().filtered_path_ica() + f'{band_id}/{subject.subject_id}/'
+    else:
+        filtered_path = paths().filtered_path_raw() + f'{band_id}/{subject.subject_id}/'
 
     # Try to load filtered data
     try:
@@ -172,9 +175,12 @@ def filtered_data(subject, band_id, preload=False, save_data=False):
     except:
         print(f'No previous filtered data found for subject {subject.subject_id} in band {band_id}.\n'
               f'Filtering data...')
-        preproc_data = subject.load_preproc_meg(preload=True)
+        if use_ica_data:
+            meg_data = ica_data(subject=subject, preload=True)
+        else:
+            meg_data = subject.load_preproc_meg(preload=True)
         l_freq, h_freq = functions_general.get_freq_band(band_id)
-        filtered_data = preproc_data.filter(l_freq=l_freq, h_freq=h_freq)
+        filtered_data = meg_data.filter(l_freq=l_freq, h_freq=h_freq)
 
         if save_data:
             print('Saving filtered data')

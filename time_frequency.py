@@ -72,10 +72,8 @@ if 'sac' in epoch_id:
     # baseline = None
 elif 'fix' in epoch_id or 'fix' in epoch_id:
     baseline = (tmin, -0.05)
-elif 'cross1' in epoch_id or 'ms' in epoch_id and mss:
-    baseline = (tmin, tmin+cross1_dur)
-elif 'cross2' in epoch_id:
-    baseline = (tmin, tmin+cross1_dur)
+elif 'cross1' in epoch_id or 'ms' in epoch_id or 'cross2' in epoch_id and mss:
+    baseline = (tmin, tmin + cross1_dur)
 else:
     baseline = (tmin, 0)
 
@@ -215,8 +213,8 @@ plot_general.trf(trf=grand_avg_itc, chs_id=chs_id, baseline=plot_baseline, bline
                  subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
 
 # Power topoplot
-fig = power.plot_topo(baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
-                      cmap='jet', show=display_figs)
+fig = power.plot_topo(baseline=plot_baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
+                      cmap='jet', show=display_figs, title='Power')
 if save_fig:
     fname = f'GA_Power_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
     save.fig(fig=fig, path=trf_fig_path, fname=fname)

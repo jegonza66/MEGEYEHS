@@ -224,7 +224,7 @@ def fig_time_frequency(fontsize=None):
     return fig, axes_topo, ax1
 
 
-def trf(trf, chs_id, plot_xlim, epoch_id, mss, cross1_dur, mss_duration, cross2_dur, baseline=None, bline_mode=None,
+def tfr(tfr, chs_id, epoch_id, mss, cross1_dur, mss_duration, cross2_dur, plot_xlim=None, baseline=None, bline_mode=None,
         subject=None, title=None, topo_times=None, display_figs=False, save_fig=False, fig_path=None, fname=None):
     # Sanity check
     if save_fig and (not fname or not fig_path):
@@ -234,10 +234,12 @@ def trf(trf, chs_id, plot_xlim, epoch_id, mss, cross1_dur, mss_duration, cross2_
     fig, axes_topo, ax_tf = fig_time_frequency(fontsize=14)
 
     # Pick plot channels
-    picks = functions_general.pick_chs(chs_id=chs_id, info=trf.info)
+    picks = functions_general.pick_chs(chs_id=chs_id, info=tfr.info)
 
     # Plot time-frequency
-    trf.plot(picks=picks, baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
+    if not plot_xlim:
+        plot_xlim = (tfr.tmin, tfr.tmax)
+    tfr.plot(picks=picks, baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
              combine='mean', cmap='jet', axes=ax_tf, show=display_figs)
 
     # Plot time markers as vertical lines
@@ -270,7 +272,7 @@ def trf(trf, chs_id, plot_xlim, epoch_id, mss, cross1_dur, mss_duration, cross2_
     # Plot topomaps
     for ax, (title_topo, fmin_fmax) in zip(axes_topo, plot_dict.items()):
         try:
-            trf.plot_topomap(**fmin_fmax, axes=ax, **topomap_kw)
+            tfr.plot_topomap(**fmin_fmax, axes=ax, **topomap_kw)
         except:
             ax.text(0.5, 0.5, 'No data', horizontalalignment='center', verticalalignment='center')
             ax.set_xticks([]), ax.set_yticks([])
@@ -283,6 +285,7 @@ def trf(trf, chs_id, plot_xlim, epoch_id, mss, cross1_dur, mss_duration, cross2_
         fig.suptitle(subject.subject_id + f'_{fname.split("_")[0]}_{chs_id}_{bline_mode}_topotimes_{topo_times}')
     elif not subject:
         fig.suptitle(f'Grand_average_{fname.split("_")[0]}_{chs_id}_{bline_mode}_topotimes_{topo_times}')
+        fname = 'GA_' + fname
     fig.tight_layout()
 
     if save_fig:
