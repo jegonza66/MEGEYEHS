@@ -12,7 +12,7 @@ from scipy import ndimage
 exp_info = setup.exp_info()
 
 mri_path = paths().mri_path()
-subject = load.preproc_subject(exp_info=exp_info, subject_code=3)
+subject = load.preproc_subject(exp_info=exp_info, subject_code=0)
 
 
 subj_path = pathlib.Path(os.path.join(mri_path, subject.subject_id))

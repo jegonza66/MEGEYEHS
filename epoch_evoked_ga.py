@@ -31,20 +31,27 @@ use_ica_data = True
 # Frequency band
 band_id = None
 # Id
-epoch_id = 'l_sac'
+epoch_id = 'tgt_fix'
 # Plot channels
 chs_id = 'mag'
 # PLots
 plot_epochs = True
 plot_gaze = True
-corr_ans = None
-tgt_pres = None
+corr_ans = True
+tgt_pres = True
 mss = None
+reject = False
 
 # Get time windows from epoch_id name
-tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
+map_times = dict(sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)},
+                 fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.2, 0.5)})
+tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
 # Baseline
-baseline = (tmin, 0)
+# Baseline duration
+if 'sac' in epoch_id:
+    baseline = (tmin, 0)
+elif 'fix' in epoch_id or 'fix' in epoch_id:
+    baseline = (tmin, -0.05)
 
 # Specific run path for saving data and plots
 save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
@@ -99,10 +106,10 @@ for subject_code in exp_info.subjects_ids:
         epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
                                                        epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, tmax=tmax,
                                                        save_data=save_data, epochs_save_path=epochs_save_path,
-                                                       epochs_data_fname=epochs_data_fname)
+                                                       epochs_data_fname=epochs_data_fname, reject=reject)
 
     # Pick MEG channels to plot
-    picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
+    picks = functions_general.pick_chs(chs_id=chs_id, info=epochs.info)
     if plot_epochs:
         # Parameters for plotting
         overlay = epochs.metadata['duration']

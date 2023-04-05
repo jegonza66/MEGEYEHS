@@ -96,8 +96,12 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
                                                                                  trials=cond_trials,
                                                                                  meg_data=meg_data)
     # Reject based on channel amplitude
-    if not reject:
+    if reject == None:
+        # Not setting reject parameter will set to default subject value
         reject = dict(mag=subject.config.general.reject_amp)
+    elif reject == False:
+        # Setting reject parameter to False uses No rejection (None in mne will not reject)
+        reject = None
 
     # Epoch data
     epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=tmin, tmax=tmax, reject=reject,
@@ -142,6 +146,35 @@ def time_frequency(epochs, l_freq, h_freq, freqs_type, n_cycles_div=4., return_i
         itc.save(trf_save_path + itc_data_fname, overwrite=True)
 
     return power, itc
+
+
+def get_plot_tf(tfr, plot_xlim=(None, None), plot_max=True, plot_min=True):
+    if plot_xlim:
+        tfr_crop = tfr.copy().crop(tmin=plot_xlim[0], tmax=plot_xlim[1])
+    else:
+        tfr_crop = tfr.copy()
+
+    timefreqs = []
+
+    if plot_max:
+        max_ravel = tfr_crop.data.mean(0).argmax()
+        freq_idx = int(max_ravel / len(tfr_crop.times))
+        time_percent = max_ravel / len(tfr_crop.times) - freq_idx
+        time_idx = round(time_percent * len(tfr_crop.times))
+        max_timefreq = (tfr_crop.times[time_idx], tfr_crop.freqs[freq_idx])
+        timefreqs.append(max_timefreq)
+
+    if plot_min:
+        min_ravel = tfr_crop.data.mean(0).argmin()
+        freq_idx = int(min_ravel / len(tfr_crop.times))
+        time_percent = min_ravel / len(tfr_crop.times) - freq_idx
+        time_idx = round(time_percent * len(tfr_crop.times))
+        min_timefreq = (tfr_crop.times[time_idx], tfr_crop.freqs[freq_idx])
+        timefreqs.append(min_timefreq)
+
+    timefreqs.sort()
+
+    return timefreqs
 
 
 def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', fix_id='fix_emap' , threshold=1.1,
