@@ -25,10 +25,10 @@ else:
 chs_id = 'occipital'  # region_hemisphere
 # ICA / RAW
 use_ica_data = True
-corr_ans = True
-tgt_pres = True
-mss = None
-epoch_id = 'it_fix'
+corr_ans = None
+tgt_pres = None
+mss = 4
+epoch_id = 'fix_ms'
 # epoch_id = 'sac_ms'
 reject = False  # None for subject's default. False for no rejection, dict for specific values
 n_cycles_div = 4.
@@ -63,7 +63,7 @@ map_times = dict(cross1={'tmin': 0, 'tmax': dur, 'plot_xlim': (plot_edge, dur - 
                  ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
                  cross2={'tmin': -cross1_dur - mss_duration[mss], 'tmax': dur, 'plot_xlim': (plot_edge, dur - plot_edge)},
                  sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)},
-                 fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.2, 0.5)})
+                 fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.2)})
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
 
 # Baseline duration

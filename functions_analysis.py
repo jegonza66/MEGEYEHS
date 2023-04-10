@@ -311,7 +311,6 @@ def noise_cov(exp_info, subject, bads, use_ica_data, rank=None):
         # ICA
         save_path_ica = paths().ica_path() + subject.subject_id + '/'
         ica_fname = 'ICA.pkl'
-        ica_components = 64
 
         # Load ICA
         ica = load.var(file_path=save_path_ica + ica_fname)

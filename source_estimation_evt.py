@@ -7,16 +7,16 @@ import save
 from paths import paths
 import load
 import setup
-
+import numpy as np
 
 # --------- Define Parameters ---------#
 save_fig = False
 # Subject
 subject_code = 0
 # Select epochs
-epoch_id = 'fix_vs'
+epoch_id = 'fix_ms'
 # ICA
-use_ica_data = False
+use_ica_data = True
 # Souce model
 use_beamformer = True
 # Trials
@@ -28,14 +28,14 @@ mss = None
 surf_vol = 'volume'
 pick_ori = None  # 'vector' For dipoles, 'max_power' for
 # Plot time
-initial_time = 0.1
+initial_time = None
 # Frequency band
 band_id = None
 
 visualize_alignment = False
 # Get time windows from epoch_id name
 map_times = dict(sac={'tmin': -0.05, 'tmax': 0.07, 'plot_xlim': (-0.05, 0.07)},
-                 fix={'tmin': -0.05, 'tmax': 0.2, 'plot_xlim': (-0.05, 0.2)})
+                 fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.05, 0.2)})
 # -------------------------------------#
 
 
@@ -113,8 +113,7 @@ try:
     # Load data
     if use_beamformer:
         epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
-    else:
-        evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
+    evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
 except:
     if use_ica_data:
         meg_data = load.ica_data(subject=subject)
@@ -140,20 +139,29 @@ except:
 
 # Pick meg channels for source modeling
 evoked.pick('meg')
+epochs.pick('meg')
 
 # --------- Source estimation ---------#
 if use_beamformer:
+    # Load forward model
     fwd = mne.read_forward_solution(fname_fwd)
 
-    noise_cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=meg_data.info['bads'],
+    # Compute covariance matrices from epochs for data and from raw for noise
+    noise_cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=epochs.info['bads'],
                                              use_ica_data=use_ica_data)
-
     data_cov = mne.compute_covariance(epochs)
 
-    filters = make_lcmv(evoked.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov, pick_ori=pick_ori, rank='full')
+    # Define covariance matrices minimum rank
+    rank = min(np.linalg.matrix_rank(noise_cov.data), np.linalg.matrix_rank(data_cov.data))
 
+    # Define linearly constrained minimum variance spatial filter
+    filters = make_lcmv(evoked.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov, pick_ori=pick_ori,
+                        rank=dict(mag=rank))
+
+    # Apply filter and get source estimates
     stc = apply_lcmv(evoked, filters)
 
+    # Plot
     fig = stc.plot(fwd['src'], subject=subject.subject_id, subjects_dir=subjects_dir, initial_time=initial_time)  # , clim=dict(kind='value', lims=(48,55,89)))
 
     fig.tight_layout()
