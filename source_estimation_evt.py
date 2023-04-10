@@ -166,7 +166,7 @@ if use_beamformer:
 
     fig.tight_layout()
     if save_fig:
-        fname = f'{subject.subject_id}_sustained'
+        fname = f'{subject.subject_id}'
         save.fig(fig=fig, path=fig_path, fname=fname)
 
     # 3D Plot
