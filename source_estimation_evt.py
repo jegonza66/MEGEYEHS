@@ -60,7 +60,6 @@ tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=m
 # Baseline duration
 if 'sac' in epoch_id:
     baseline = (tmin, 0)
-    # baseline = None
 elif 'fix' in epoch_id or 'fix' in epoch_id:
     baseline = (tmin, -0.05)
 
@@ -156,7 +155,7 @@ if use_beamformer:
 
     # Define linearly constrained minimum variance spatial filter
     filters = make_lcmv(evoked.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov, pick_ori=pick_ori,
-                        rank=dict(mag=rank))
+                        rank=dict(mag=rank))  # reg parameter is for regularization on rank deficient matrices (rank < channels)
 
     # Apply filter and get source estimates
     stc = apply_lcmv(evoked, filters)
