@@ -10,7 +10,7 @@ import functions_analysis
 
 # --------- Setup ---------#
 # Select subject to run
-subject_code = 0
+subject_code = 2
 use_ica_data = True
 
 # Load experiment info
@@ -38,7 +38,7 @@ else:
 
 # Load digitalization file
 dig_path_subject = dig_path + subject.subject_id
-dig_filepath = dig_path_subject + '/Model_full_head_mesh_5m_headers.pos'
+dig_filepath = dig_path_subject + '/Model_Mesh_5m_headers.pos'
 pos = pd.read_table(dig_filepath, index_col=0)
 
 # Get fiducials from dig
@@ -64,7 +64,7 @@ dig_info_path = dig_path_subject + '/info_raw.fif'
 info_raw.save(dig_info_path, overwrite=True)
 
 # Align and save fiducials and transformation files to FreeSurfer/subject/bem folder
-mne.gui.coregistration(subject=subject.subject_id, subjects_dir=subjects_dir)
+mne.gui.coregistration(subject=subject.subject_id, subjects_dir=subjects_dir, inst=dig_info_path)
 
 # Check mean distances
 trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-trans.fif'.format(subject.subject_id))

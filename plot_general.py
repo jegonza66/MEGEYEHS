@@ -317,7 +317,7 @@ def tfr(tfr, chs_id, epoch_id, mss, cross1_dur, mss_duration, cross2_dur, plot_x
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), plot_max=True, plot_min=True,
+def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), plot_max=True, plot_min=True, vlines_times=[0],
                   vmin=None, vmax=None, display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fname or not trf_fig_path):
@@ -350,19 +350,21 @@ def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, Non
     fig = tfr_plotjoint.plot_joint(timefreqs=timefreqs, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet', vmin=vmin, vmax=vmax,
                                    title=title, show=display_figs)
 
-    # Plot vertical line at time 0
-    try:
-        tf_ax = fig.axes[0]
-        tf_ax.vlines(x=0, ymin=tf_ax.get_ylim()[0], ymax=tf_ax.get_ylim()[1], linestyles='--', colors='gray')
-    except:
-        pass
+    # Plot vertical lines
+    tf_ax = fig.axes[0]
+    for t in vlines_times:
+        try:
+            tf_ax.vlines(x=t, ymin=tf_ax.get_ylim()[0], ymax=tf_ax.get_ylim()[1], linestyles='--', colors='gray')
+        except:
+            pass
 
     if save_fig:
         save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
 
 def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), plot_max=True, plot_min=True,
-                        vmin=None, vmax=None, chs_id='mag', display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
+                        vmin=None, vmax=None, chs_id='mag', vlines_times=[0],
+                        display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fname or not trf_fig_path):
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
@@ -397,12 +399,13 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
     fig = tfr_plotjoint.plot_joint(timefreqs=timefreqs, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet', vmin=vmin, vmax=vmax,
                                    title=title, show=display_figs)
 
-    # Plot vertical line at time 0
-    try:
-        tf_ax = fig.axes[0]
-        tf_ax.vlines(x=0, ymin=tf_ax.get_ylim()[0], ymax=tf_ax.get_ylim()[1], linestyles='--', colors='gray')
-    except:
-        pass
+    # Plot vertical lines
+    tf_ax = fig.axes[0]
+    for t in vlines_times:
+        try:
+            tf_ax.vlines(x=t, ymin=tf_ax.get_ylim()[0], ymax=tf_ax.get_ylim()[1], linestyles='--', colors='gray')
+        except:
+            pass
 
     # Get min and max from all topoplots
     maxs = []

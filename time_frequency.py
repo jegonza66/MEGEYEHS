@@ -81,6 +81,9 @@ else:
     baseline = (tmin, 0)
     plot_baseline = (plot_xlim[0], 0)
 
+# Vlines times
+vlines_times = [0, mss_duration[mss], mss_duration[mss] + 1]
+
 # freqs type
 if log_bands:
     freqs_type = 'log'
@@ -246,13 +249,13 @@ if save_fig:
 
 # Power Plot joint
 fname = f'GA_Power_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-plot_general.tfr_plotjoint_picks(tfr=grand_avg_power, plot_baseline=plot_baseline, bline_mode=bline_mode,
+plot_general.tfr_plotjoint_picks(tfr=grand_avg_power, plot_baseline=plot_baseline, bline_mode=bline_mode, vlines_times=vlines_times,
                                  plot_xlim=plot_xlim, chs_id=chs_id, vmin=None, vmax=None, plot_max=True, plot_min=True,
                                  display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
 
 # ITC Plot joint
 fname = f'GA_ITC_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-plot_general.tfr_plotjoint_picks(tfr=grand_avg_itc, plot_baseline=plot_baseline, bline_mode=bline_mode,
+plot_general.tfr_plotjoint_picks(tfr=grand_avg_itc, plot_baseline=plot_baseline, bline_mode=bline_mode, vlines_times=vlines_times,
                                  plot_xlim=plot_xlim, chs_id=chs_id, vmin=None, vmax=None, plot_max=True, plot_min=True,
                                  display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
 
@@ -260,12 +263,12 @@ plot_general.tfr_plotjoint_picks(tfr=grand_avg_itc, plot_baseline=plot_baseline,
 # Power Plot joint
 fname = f'GA_Power_plotjoint_mag_{bline_mode}_{l_freq}_{h_freq}'
 plot_general.tfr_plotjoint(tfr=grand_avg_power, plot_baseline=plot_baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
-                           vmin=None, vmax=None, plot_max=True, plot_min=True,
+                           vmin=None, vmax=None, plot_max=True, plot_min=True, vlines_times=vlines_times,
                            display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
 
 # ITC Plot joint
 fname = f'GA_ITC_plotjoint_mag_{bline_mode}_{l_freq}_{h_freq}'
 plot_general.tfr_plotjoint(tfr=grand_avg_itc, plot_baseline=plot_baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
-                           vmin=None, vmax=None, plot_max=True, plot_min=True,
+                           vmin=None, vmax=None, plot_max=True, plot_min=True, vlines_times=vlines_times,
                            display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
 

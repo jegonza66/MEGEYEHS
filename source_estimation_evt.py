@@ -10,9 +10,9 @@ import setup
 import numpy as np
 
 # --------- Define Parameters ---------#
-save_fig = False
+save_fig = True
 # Subject
-subject_code = 0
+subject_code = 2
 # Select epochs
 epoch_id = 'fix_ms'
 # ICA
@@ -160,7 +160,7 @@ if use_beamformer:
     stc = apply_lcmv(evoked, filters)
 
     # Plot
-    fig = stc.plot(fwd['src'], subject=subject.subject_id, subjects_dir=subjects_dir, initial_time=initial_time)  # , clim=dict(kind='value', lims=(48,55,89)))
+    fig = stc.plot(fwd['src'], subject=subject.subject_id, subjects_dir=subjects_dir, initial_time=initial_time, clim=dict(kind='value', lims=(0.7, 0.75, 1.1)))
 
     fig.tight_layout()
     if save_fig:
@@ -211,7 +211,11 @@ if not use_beamformer:
 
 
 ## --------- Morph to fsaverage ---------#
-morph = mne.compute_source_morph(src=inv['src'], subject_from=subject.subject_id, subject_to='fsaverage', subjects_dir=subjects_dir)
+if use_beamformer:
+    src = fwd['src']
+else:
+    src = inv['src']
+morph = mne.compute_source_morph(src=src, subject_from=subject.subject_id, subject_to='fsaverage', subjects_dir=subjects_dir)
 stc_fs = morph.apply(stc)
 
 # Plot in fsaverage space
@@ -225,5 +229,14 @@ if surf_vol == 'surface':
                          surface='flat', time_viewer=False, hemi='both',
                          initial_time=initial_time, time_unit='s')
         brain.add_annotation('HCPMMP1_combined', borders=2)
+
+elif surf_vol == 'volume':
+    fig = stc.plot(src, subject=subject.subject_id, subjects_dir=subjects_dir, initial_time=initial_time)  # , clim=dict(kind='value', lims=(48,55,95)))
+    if save_fig:
+        fname = f'{subject.subject_id}_morph_fsaverage'
+        save.fig(fig=fig, path=fig_path, fname=fname)
+
+    stc.plot_3d(src=src, subject=subject.subject_id, subjects_dir=subjects_dir, hemi='both', surface='white',
+                initial_time=initial_time, time_unit='s', smoothing_steps=7)
 
 
