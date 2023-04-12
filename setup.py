@@ -82,6 +82,18 @@ class exp_info:
         # DAC delay (in ms)
         self.DAC_delay = 10
 
+        # Background noise recordings date ids
+        self.noise_recordings = ['20220530', '20220816', '20220915', '20220916', '20220922', '20220923']
+
+        # Participants associated background noise
+        self.subjects_noise = {'15909001': '20220530', '15912001': '20220530', '15910001': '20220530',
+                               '15950001': '20220530', '15911001': '20220530', '11535009': '20220530',
+                               '16191001': '20220816', '16200001': '20220816', '16201001': '20220816',
+                               '16256001': '20220915', '09991040': '20220916', '10925091': '20220916',
+                               '16263002': '20220922', '16269001':  '20220923'}
+
+        self.line_noise_freqs = (50, 100, 110, 150, 200, 250, 300)
+
 
 class config:
     """
@@ -476,12 +488,16 @@ class noise:
         Subject id.
     """
 
-    def __init__(self, exp_info, id='BACK_NOISE'):
+    def __init__(self, exp_info, date_id):
 
-        self.id = id
+        # Noise recording date id
+        self.subject_id = date_id
+
+        # Back Noise directory name
+        self.bkg_noise_dir = 'BACK_NOISE'
 
         # Noise data path
-        self.ctf_path = pathlib.Path(os.path.join(exp_info.ctf_path, self.id))
+        self.ctf_path = pathlib.Path(os.path.join(exp_info.ctf_path, self.bkg_noise_dir))
 
     # MEG data
     def load_raw_meg_data(self):
@@ -492,7 +508,7 @@ class noise:
         print('\nLoading MEG data')
         # get subject path
         subj_path = self.ctf_path
-        ds_files = list(subj_path.glob('*{}*.ds'.format(self.id)))
+        ds_files = list(subj_path.glob('QA_*_{}_01.ds'.format(self.subject_id)))
         ds_files.sort()
 
         # Load sesions
@@ -511,7 +527,7 @@ class noise:
             return raw
         # Missing data
         else:
-            raise ValueError('No .ds files found in subject directory: {}'.format(subj_path))
+            raise ValueError(f'No {ds_files} files found in subject directory: {subj_path}')
 
 
     def load_preproc_data(self, preload=False):
@@ -522,7 +538,7 @@ class noise:
         print('\nLoading Preprocessed MEG data')
         # get subject path
         preproc_path = paths().preproc_path()
-        file_path = pathlib.Path(os.path.join(preproc_path, self.id, f'{self.id}_meg.fif'))
+        file_path = pathlib.Path(os.path.join(preproc_path, self.subject_id, f'{self.subject_id}_meg.fif'))
 
         # Load data
         fif = mne.io.read_raw_fif(file_path, preload=preload)

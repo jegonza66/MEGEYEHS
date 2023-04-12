@@ -922,10 +922,10 @@ def line_noise_psd(subject, raw, filtered, display_fig=False, save_fig=True, fig
     plt.suptitle('Power line noise filtering')
 
     # Plot noise
-    raw.plot_psd(picks='mag', ax=axs[0])
+    raw.plot_psd(picks='mag', ax=axs[0], show=display_fig)
 
     # Plot filtered
-    filtered.plot_psd(picks='mag', ax=axs[1])
+    filtered.plot_psd(picks='mag', ax=axs[1], show=display_fig)
 
     if save_fig:
         # Save

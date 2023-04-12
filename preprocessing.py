@@ -85,17 +85,16 @@ for subject_code in exp_info.subjects_ids:
     functions_preproc.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=exp_info.et_channel_names)
 
     # ---------------- Filter line noise ----------------#
-    freqs = (50, 100, 110, 150, 200, 250, 300)
-    filtered_data = functions_preproc.filter_line_noise(subject=subject, raw=raw, freqs=freqs)
+    filtered_data = functions_preproc.filter_line_noise(subject=subject, raw=raw, freqs=exp_info.line_noise_freqs)
 
     # Extra Add clean annotations to meg data
-    import mne
-
-    preproc_data_path = paths().preproc_path()
-    preproc_save_path = preproc_data_path + subject.subject_id + '/'
-    file_path = preproc_save_path + 'clean_annotations.csv'
-    clean_annotations = mne.read_annotations(fname=file_path)
-    filtered_data.set_annotations(clean_annotations)
+    # import mne
+    #
+    # preproc_data_path = paths().preproc_path()
+    # preproc_save_path = preproc_data_path + subject.subject_id + '/'
+    # file_path = preproc_save_path + 'clean_annotations.csv'
+    # clean_annotations = mne.read_annotations(fname=file_path)
+    # filtered_data.set_annotations(clean_annotations)
 
     # Add bad channels
     filtered_data.info['bads'] = subject.bad_channels

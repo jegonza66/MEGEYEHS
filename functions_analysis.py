@@ -301,8 +301,11 @@ def noise_cov(exp_info, subject, bads, use_ica_data, rank=None):
     :param use_ica_data:
     :return: noise_cov
     '''
+
+    noise_date_id = exp_info.subjects_noise[subject.subject_id]
+
     # Load data
-    noise = setup.noise(exp_info=exp_info, id='BACK_NOISE')
+    noise = setup.noise(exp_info=exp_info, date_id=noise_date_id)
     raw_noise = noise.load_preproc_data()
     # Set bads to match participant's
     raw_noise.info['bads'] = bads
