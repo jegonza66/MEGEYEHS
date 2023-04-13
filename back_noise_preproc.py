@@ -38,6 +38,11 @@ for noise_date_id in exp_info.noise_recordings:
     plot_preproc.line_noise_psd(subject=noise, raw=raw_noise, filtered=filtered_data, display_fig=False,
                                 save_fig=True, fig_path=fig_path, fig_name=fig_name)
 
+    # 3rd order gradient compensation
+    if filtered_data.compensation_grade != 3:
+        filtered_data.apply_gradient_compensation(grade=3, verbose=None)
+
+    # Save
     preproc_data_path = paths().preproc_path()
     preproc_save_path = preproc_data_path + f'{noise.bkg_noise_dir}/'
     os.makedirs(preproc_save_path, exist_ok=True)

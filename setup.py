@@ -538,7 +538,7 @@ class noise:
         print('\nLoading Preprocessed MEG data')
         # get subject path
         preproc_path = paths().preproc_path()
-        file_path = pathlib.Path(os.path.join(preproc_path, self.subject_id, f'{self.subject_id}_meg.fif'))
+        file_path = pathlib.Path(os.path.join(preproc_path, self.bkg_noise_dir, f'{self.subject_id}_meg.fif'))
 
         # Load data
         fif = mne.io.read_raw_fif(file_path, preload=preload)

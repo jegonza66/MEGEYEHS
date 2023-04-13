@@ -9,10 +9,11 @@ import load
 import setup
 import numpy as np
 
+foo = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
 # --------- Define Parameters ---------#
 save_fig = True
 # Subject
-subject_code = 2
+subject_code = '16191001'
 # Select epochs
 epoch_id = 'fix_ms'
 # ICA
@@ -102,11 +103,18 @@ if visualize_alignment:
 
     # Visualize MEG/MRI alignment
     surfaces = dict(brain=0.7, outer_skull=0.5, head=0.4)
-    fig = mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject.subject_id,
-                                 subjects_dir=subjects_dir, surfaces=surfaces,
-                                 show_axes=True, dig=True, eeg=[], meg='sensors',
-                                 coord_frame='meg', mri_fiducials=fids_path)
-
+    # Try plotting with head skin and brain
+    try:
+        fig = mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject.subject_id,
+                                     subjects_dir=subjects_dir, surfaces=surfaces,
+                                     show_axes=True, dig=True, eeg=[], meg='sensors',
+                                     coord_frame='meg', mri_fiducials=fids_path)
+    # Plot only outer skin
+    except:
+        fig = mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject.subject_id,
+                                     subjects_dir=subjects_dir, surfaces='outer_skin',
+                                     show_axes=True, dig=True, eeg=[], meg='sensors',
+                                     coord_frame='meg', mri_fiducials=fids_path)
 try:
     # Load data
     if use_beamformer:
@@ -160,7 +168,9 @@ if use_beamformer:
     stc = apply_lcmv(evoked, filters)
 
     # Plot
-    fig = stc.plot(fwd['src'], subject=subject.subject_id, subjects_dir=subjects_dir, initial_time=initial_time, clim=dict(kind='value', lims=(0.7, 0.75, 1.1)))
+    clims = (stc.data.max()/4, (stc.data.max() - stc.data.max()/3), stc.data.max()*0.9)
+    fig = stc.plot(fwd['src'], subject=subject.subject_id, subjects_dir=subjects_dir, initial_time=initial_time,
+                   clim=dict(kind='value', lims=clims))
 
     fig.tight_layout()
     if save_fig:
