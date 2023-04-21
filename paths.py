@@ -36,7 +36,7 @@ class paths:
             Path in str format to the config directory.
         """
 
-        config_path = self.main_path + 'Config/'
+        config_path = self.main_path + 'Python/Config/'
 
         return config_path
 

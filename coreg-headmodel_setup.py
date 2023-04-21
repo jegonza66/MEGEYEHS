@@ -9,7 +9,7 @@ import functions_analysis
 
 # --------- Setup ---------#
 subjects = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
-subjects = ['16191001', '16263002']
+subjects = ['16200001']
 # subjects = exp_info.subjects_ids
 
 use_ica_data = True
@@ -32,11 +32,12 @@ for subject_code in subjects:
     if use_ica_data:
         # Load subject and meg clean data
         subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
-        meg_data = load.ica_data(subject=subject)
+        # meg_data = load.ica_data(subject=subject)
+        meg_data = subject.load_ica_meg_data()
         data_type = 'ICA'
     else:
         subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-        meg_data = subject.load_preproc_meg()
+        meg_data_orig = subject.load_preproc_meg()
         data_type = 'RAW'
 
     try:
@@ -68,7 +69,7 @@ for subject_code in subjects:
                                                     rpa=rpa.values.ravel(), hsp=pos_array, coord_frame='unknown')
 
         # Make info object
-        dig_info = meg_data.info.copy()
+        dig_info = meg_data.pick('meg').info.copy()
         dig_info.set_montage(montage=dig_montage)
 
         # Save raw instance with info
@@ -77,7 +78,12 @@ for subject_code in subjects:
         info_raw.save(dig_info_path, overwrite=True)
 
         # Align and save fiducials and transformation files to FreeSurfer/subject/bem folder
-        mne.gui.coregistration(subject=subject.subject_id, subjects_dir=subjects_dir, inst=dig_info_path, block=False)
+        try:
+            # Use participants MRI
+            mne.gui.coregistration(subject=subject.subject_id, subjects_dir=subjects_dir, inst=dig_info_path, block=True)
+        except:
+            # Use fsaverage
+            mne.gui.coregistration(subject='fsaverage', subjects_dir=subjects_dir, inst=dig_info_path, block=True)
 
 
     # --------- Bem model ---------#

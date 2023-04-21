@@ -181,7 +181,7 @@ def raw_data(subject):
 
     # If only one session return that session as whole raw data
     elif len(ds_files) == 1:
-        raw2 = mne.io.read_raw_ctf(ds_files[0], system_clock='ignore')
+        raw = mne.io.read_raw_ctf(ds_files[0], system_clock='ignore')
 
     # Missing data
     else:

@@ -13,7 +13,7 @@ foo = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
 # --------- Define Parameters ---------#
 save_fig = True
 # Subject
-subject_code = '16191001'
+subject_code = '15909001'
 # Select epochs
 epoch_id = 'fix_ms'
 # ICA
@@ -33,7 +33,7 @@ initial_time = None
 # Frequency band
 band_id = None
 
-visualize_alignment = False
+visualize_alignment = True
 # Get time windows from epoch_id name
 map_times = dict(sac={'tmin': -0.05, 'tmax': 0.07, 'plot_xlim': (-0.05, 0.07)},
                  fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.05, 0.2)})

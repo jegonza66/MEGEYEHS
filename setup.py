@@ -291,14 +291,16 @@ class raw_subject:
                         setattr(self, general_att, att_value)
 
 
-    # MEG data
+    # Raw MEG data
     def load_raw_meg_data(self):
         """
         MEG data for parent subject as Raw instance of MNE.
         """
 
-        print('\nLoading MEG data')
+        print('\nLoading Raw MEG data')
         # get subject path
+        ctf_path = pathlib.Path(os.path.join(exp_info.ctf_path, self.subject_id))
+        file_path = pathlib.Path(os.path.join(ctf_path, self.subject_id, f'Subject_{self.subject_id}_meg.fif'))
         subj_path = self.ctf_path
         ds_files = list(subj_path.glob('*{}*.ds'.format(self.subject_id)))
         ds_files.sort()
@@ -320,6 +322,27 @@ class raw_subject:
         # Missing data
         else:
             raise ValueError('No .ds files found in subject directory: {}'.format(subj_path))
+
+    # ICA MEG data
+    def load_ica_meg_data(self, preload=False):
+        """
+        ICA MEG data for parent subject as Raw instance of MNE.
+        """
+
+        print('\nLoading ICA MEG data')
+        ica_subj_path = paths().ica_path() + f'{self.subject_id}/'
+
+        # Try to load ica data
+        try:
+            print(f'Loading ica data for subject {self.subject_id}')
+            file_path = pathlib.Path(os.path.join(ica_subj_path, f'Subject_{self.subject_id}_ICA.fif'))
+            # Load data
+            ica_data = mne.io.read_raw_fif(file_path, preload=preload)
+
+        except:
+            raise ValueError(f'No previous ica data found for subject {self.subject_id}')
+
+        return ica_data
 
 
     # ET data
