@@ -13,7 +13,7 @@ foo = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
 # --------- Define Parameters ---------#
 save_fig = True
 # Subject
-subject_code = '15909001'
+subject_code = '16200001'
 # Select epochs
 epoch_id = 'fix_ms'
 # ICA
@@ -93,9 +93,18 @@ os.environ["SUBJECTS_DIR"] = subjects_dir
 
 if visualize_alignment:
     # --------- Coord systems alignment ---------#
+    # Check if subject has MRI data
+    try:
+        fs_subj_path = os.path.join(subjects_dir, subject.subject_id)
+        os.listdir(fs_subj_path)
+        dig = True
+    except:
+        subject_code = 'fsaverage'
+        dig = False
+
     # Path to MRI <-> HEAD Transformation (Saved from coreg)
-    trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-trans.fif'.format(subject.subject_id))
-    fids_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-fiducials.fif'.format(subject.subject_id))
+    trans_path = os.path.join(subjects_dir, subject_code, 'bem', f'{subject_code}-trans.fif')
+    fids_path = os.path.join(subjects_dir, subject_code, 'bem', f'{subject_code}-fiducials.fif')
     dig_info_path = paths().opt_path() + subject.subject_id + '/info_raw.fif'
 
     # Load raw meg data with dig info
@@ -105,15 +114,15 @@ if visualize_alignment:
     surfaces = dict(brain=0.7, outer_skull=0.5, head=0.4)
     # Try plotting with head skin and brain
     try:
-        fig = mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject.subject_id,
+        fig = mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject_code,
                                      subjects_dir=subjects_dir, surfaces=surfaces,
-                                     show_axes=True, dig=True, eeg=[], meg='sensors',
+                                     show_axes=True, dig=dig, eeg=[], meg='sensors',
                                      coord_frame='meg', mri_fiducials=fids_path)
     # Plot only outer skin
     except:
-        fig = mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject.subject_id,
+        fig = mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject_code,
                                      subjects_dir=subjects_dir, surfaces='outer_skin',
-                                     show_axes=True, dig=True, eeg=[], meg='sensors',
+                                     show_axes=True, dig=dig, eeg=[], meg='sensors',
                                      coord_frame='meg', mri_fiducials=fids_path)
 try:
     # Load data
@@ -169,16 +178,15 @@ if use_beamformer:
 
     # Plot
     clims = (stc.data.max()/4, (stc.data.max() - stc.data.max()/3), stc.data.max()*0.9)
-    fig = stc.plot(fwd['src'], subject=subject.subject_id, subjects_dir=subjects_dir, initial_time=initial_time,
+    fig = stc.plot(fwd['src'], subject=subject_code, subjects_dir=subjects_dir, initial_time=initial_time,
                    clim=dict(kind='value', lims=clims))
 
-    fig.tight_layout()
     if save_fig:
         fname = f'{subject.subject_id}'
         save.fig(fig=fig, path=fig_path, fname=fname)
 
     # 3D Plot
-    stc.plot_3d(src=fwd['src'], subject=subject.subject_id, subjects_dir=subjects_dir, hemi='both', surface='white',
+    stc.plot_3d(src=fwd['src'], subject=subject_code, subjects_dir=subjects_dir, hemi='both', surface='white',
                 initial_time=initial_time, time_unit='s', smoothing_steps=7)
 
 

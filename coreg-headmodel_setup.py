@@ -40,51 +40,60 @@ for subject_code in subjects:
         meg_data_orig = subject.load_preproc_meg()
         data_type = 'RAW'
 
+    # Check if subject has MRI data
     try:
-        # Check mean distances
-        trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-trans.fif'.format(subject.subject_id))
+        fs_subj_path = os.path.join(subjects_dir, subject.subject_id)
+        os.listdir(fs_subj_path)
+        try:
+            # Check mean distances if already run transformation
+            trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-trans.fif'.format(subject.subject_id))
+            trans = mne.read_trans(trans_path)
+            print('Distance from head origin to MEG origin: %0.1f mm'
+                  % (1000 * np.linalg.norm(meg_data.info['dev_head_t']['trans'][:3, 3])))
+            print('Distance from head origin to MRI origin: %0.1f mm'
+                  % (1000 * np.linalg.norm(trans['trans'][:3, 3])))
+
+        except:
+            # Load digitalization file
+            dig_path_subject = dig_path + subject.subject_id
+            dig_filepath = dig_path_subject + '/Model_Mesh_5m_headers.pos'
+            pos = pd.read_table(dig_filepath, index_col=0)
+
+            # Get fiducials from dig
+            nasion = pos.loc[pos.index == 'nasion ']
+            lpa = pos.loc[pos.index == 'left ']
+            rpa = pos.loc[pos.index == 'right ']
+
+            # Get head points
+            pos.drop(['nasion ', 'left ', 'right '], inplace=True)
+            pos_array = pos.to_numpy()
+
+            # Make montage
+            dig_montage = mne.channels.make_dig_montage(nasion=nasion.values.ravel(), lpa=lpa.values.ravel(),
+                                                        rpa=rpa.values.ravel(), hsp=pos_array, coord_frame='unknown')
+
+            # Make info object
+            dig_info = meg_data.pick('meg').info.copy()
+            dig_info.set_montage(montage=dig_montage)
+
+            # Save raw instance with info
+            info_raw = mne.io.RawArray(np.zeros((dig_info['nchan'], 1)), dig_info)
+            dig_info_path = dig_path_subject + '/info_raw.fif'
+            info_raw.save(dig_info_path, overwrite=True)
+
+            # Align and save fiducials and transformation files to FreeSurfer/subject/bem folder
+            mne.gui.coregistration(subject=subject.subject_id, subjects_dir=subjects_dir, inst=dig_info_path, block=True)
+
+    # If subject has no MRI data
+    except:
+        subject_code = 'fsaverage'
+        # Check mean distances if already run transformation
+        trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', f'{subject.subject_id}-trans.fif')
         trans = mne.read_trans(trans_path)
         print('Distance from head origin to MEG origin: %0.1f mm'
               % (1000 * np.linalg.norm(meg_data.info['dev_head_t']['trans'][:3, 3])))
         print('Distance from head origin to MRI origin: %0.1f mm'
               % (1000 * np.linalg.norm(trans['trans'][:3, 3])))
-
-    except:
-        # Load digitalization file
-        dig_path_subject = dig_path + subject.subject_id
-        dig_filepath = dig_path_subject + '/Model_Mesh_5m_headers.pos'
-        pos = pd.read_table(dig_filepath, index_col=0)
-
-        # Get fiducials from dig
-        nasion = pos.loc[pos.index == 'nasion ']
-        lpa = pos.loc[pos.index == 'left ']
-        rpa = pos.loc[pos.index == 'right ']
-
-        # Get head points
-        pos.drop(['nasion ', 'left ', 'right '], inplace=True)
-        pos_array = pos.to_numpy()
-
-        # Make montage
-        dig_montage = mne.channels.make_dig_montage(nasion=nasion.values.ravel(), lpa=lpa.values.ravel(),
-                                                    rpa=rpa.values.ravel(), hsp=pos_array, coord_frame='unknown')
-
-        # Make info object
-        dig_info = meg_data.pick('meg').info.copy()
-        dig_info.set_montage(montage=dig_montage)
-
-        # Save raw instance with info
-        info_raw = mne.io.RawArray(np.zeros((dig_info['nchan'], 1)), dig_info)
-        dig_info_path = dig_path_subject + '/info_raw.fif'
-        info_raw.save(dig_info_path, overwrite=True)
-
-        # Align and save fiducials and transformation files to FreeSurfer/subject/bem folder
-        try:
-            # Use participants MRI
-            mne.gui.coregistration(subject=subject.subject_id, subjects_dir=subjects_dir, inst=dig_info_path, block=True)
-        except:
-            # Use fsaverage
-            mne.gui.coregistration(subject='fsaverage', subjects_dir=subjects_dir, inst=dig_info_path, block=True)
-
 
     # --------- Bem model ---------#
     # Source data and models path
@@ -92,7 +101,7 @@ for subject_code in subjects:
     sources_path_subject = sources_path + subject.subject_id
     os.makedirs(sources_path_subject, exist_ok=True)
 
-    model = mne.make_bem_model(subject=subject.subject_id, ico=5, conductivity=[0.3], subjects_dir=subjects_dir)
+    model = mne.make_bem_model(subject=subject_code, ico=5, conductivity=[0.3], subjects_dir=subjects_dir)
     bem = mne.make_bem_solution(model)
 
     # Save
@@ -115,8 +124,8 @@ for subject_code in subjects:
     if volume:
         # Volume
         # Source model
-        surface = subjects_dir + f'/{subject.subject_id}/bem/inner_skull.surf'
-        vol_src = mne.setup_volume_source_space(subject=subject.subject_id, subjects_dir=subjects_dir, surface=surface,
+        surface = subjects_dir + f'/{subject_code}/bem/inner_skull.surf'
+        vol_src = mne.setup_volume_source_space(subject=subject_code, subjects_dir=subjects_dir, surface=surface,
                                                 sphere_units='m', add_interpolator=True)
         fname_src = sources_path_subject + f'/{subject.subject_id}_volume-src.fif'
         mne.write_source_spaces(fname_src, vol_src, overwrite=True)
