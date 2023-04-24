@@ -177,6 +177,12 @@ class config:
                                '16201001': 1.5e-12, '16256001': 3.5e-12, '09991040': 1.2e-12, '10925091': 1.4e-12,
                                '16263002': 2.5e-12, '16269001': 2e-12}
 
+            # Subjects dev <-> head transformation to use
+            self.subjects_head_loc = {'15909001': 0, '15912001': 0, '15910001': 0, '15950001': 0, '15911001': 0,
+                                      '11535009': 0, '16191001': 2, '16200001': 0, '16201001': 0, '16256001': 0,
+                                      '09991040': 0, '10925091': 0, '16263002': 0, '16269001':  0}
+
+
 class raw_subject:
     """
     Class containing subjects data.
@@ -314,14 +320,20 @@ class raw_subject:
                 raws_list.append(raw)
             # MEG data structure
             raw = mne.io.concatenate_raws(raws_list, on_mismatch='ignore')
-            return raw
+
+            # Set dev <-> head transformation from optimal head localization
+            raw.info['dev_head_t'] = raws_list[config.general.subjects_head_loc[self.subject_id]].info['dev_head_t']
+
         # If only one session return that session as whole raw data
         elif len(ds_files) == 1:
             raw = mne.io.read_raw_ctf(ds_files[0], system_clock='ignore')
-            return raw
+
         # Missing data
         else:
             raise ValueError('No .ds files found in subject directory: {}'.format(subj_path))
+
+        return raw
+
 
     # ICA MEG data
     def load_ica_meg_data(self, preload=False):
@@ -543,14 +555,16 @@ class noise:
                 raws_list.append(raw)
             # MEG data structure
             raw = mne.io.concatenate_raws(raws_list, on_mismatch='ignore')
-            return raw
+
         # If only one session return that session as whole raw data
         elif len(ds_files) == 1:
             raw = mne.io.read_raw_ctf(ds_files[0], system_clock='ignore')
-            return raw
+
         # Missing data
         else:
             raise ValueError(f'No {ds_files} files found in subject directory: {subj_path}')
+
+        return raw
 
 
     def load_preproc_data(self, preload=False):

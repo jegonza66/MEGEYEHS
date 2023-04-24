@@ -16,7 +16,7 @@ subjects = ['16191001']
 volume = True
 
 use_ica_data = True
-force_fsaverage = False
+force_fsaverage = True
 
 # Load experiment info
 exp_info = setup.exp_info()
@@ -46,7 +46,7 @@ for subject_code in subjects:
     if force_fsaverage:
         subject_code = 'fsaverage'
         # Check mean distances if already run transformation
-        trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', f'{subject.subject_id}-trans.fif')
+        trans_path = os.path.join(subjects_dir, subject_code, 'bem', f'{subject_code}-trans.fif')
         trans = mne.read_trans(trans_path)
         print('Distance from head origin to MEG origin: %0.1f mm'
               % (1000 * np.linalg.norm(meg_data.info['dev_head_t']['trans'][:3, 3])))
@@ -60,7 +60,7 @@ for subject_code in subjects:
             os.listdir(fs_subj_path)
             try:
                 # Check mean distances if already run transformation
-                trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', '{}-trans.fif'.format(subject.subject_id))
+                trans_path = os.path.join(subjects_dir, subject_code, 'bem', f'{subject_code}-trans.fif')
                 trans = mne.read_trans(trans_path)
                 print('Distance from head origin to MEG origin: %0.1f mm'
                       % (1000 * np.linalg.norm(meg_data.info['dev_head_t']['trans'][:3, 3])))
@@ -102,7 +102,7 @@ for subject_code in subjects:
         except:
             subject_code = 'fsaverage'
             # Check mean distances if already run transformation
-            trans_path = os.path.join(subjects_dir, subject.subject_id, 'bem', f'{subject.subject_id}-trans.fif')
+            trans_path = os.path.join(subjects_dir, subject_code, 'bem', f'{subject_code}-trans.fif')
             trans = mne.read_trans(trans_path)
             print('Distance from head origin to MEG origin: %0.1f mm'
                   % (1000 * np.linalg.norm(meg_data.info['dev_head_t']['trans'][:3, 3])))
@@ -129,7 +129,7 @@ for subject_code in subjects:
 
     # --------- Source space, forward model and inverse operator ---------#
     if volume:
-        save_name = 'volume'
+        # Volume
         # Source model
         surface = subjects_dir + f'/{subject_code}/bem/inner_skull.surf'
         vol_src = mne.setup_volume_source_space(subject=subject_code, subjects_dir=subjects_dir, surface=surface,
@@ -148,7 +148,7 @@ for subject_code in subjects:
         mne.minimum_norm.write_inverse_operator(fname_inv, inv_vol, overwrite=True)
 
     else:
-        save_name = 'surface'
+        #Surface
         # Source model
         src = mne.setup_source_space(subject=subject.subject_id, spacing='oct6', subjects_dir=subjects_dir)
         fname_src = sources_path_subject + f'/{subject_code}_surface-src.fif'

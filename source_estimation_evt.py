@@ -16,7 +16,7 @@ foo = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
 # Subject and Epochs
 save_fig = True
 # Subject
-subject_code = '16200001'
+subject_code = '16191001'
 # Select epochs
 epoch_id = 'fix_ms'
 # ICA
@@ -29,7 +29,7 @@ mss = None
 
 # Source estimation parameters
 # Source data
-force_fsaverage = False
+force_fsaverage = True
 # Souce model
 use_beamformer = True
 surf_vol = 'volume'
@@ -153,8 +153,9 @@ if use_beamformer:
                                              use_ica_data=use_ica_data)
     data_cov = mne.compute_covariance(epochs)
 
-    # Define covariance matrices minimum rank
-    rank = min(np.linalg.matrix_rank(noise_cov.data), np.linalg.matrix_rank(data_cov.data))
+    # Define covariance matrices minimum rank as mag channels - excluded components
+    # rank = min(np.linalg.matrix_rank(noise_cov.data), np.linalg.matrix_rank(data_cov.data))
+    rank = sum([ch_type == 'mag' for ch_type in evoked.get_channel_types()]) - len(evoked.info['bads']) - len(subject.ex_components)
 
     # Define linearly constrained minimum variance spatial filter
     filters = make_lcmv(evoked.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov, pick_ori=pick_ori,
@@ -175,8 +176,8 @@ if use_beamformer:
         save.fig(fig=fig, path=fig_path, fname=fname)
 
     # 3D Plot
-    stc.plot_3d(src=fwd['src'], subject=subject_code, subjects_dir=subjects_dir, hemi='both', surface='white',
-                initial_time=initial_time, time_unit='s', smoothing_steps=7)
+    # stc.plot_3d(src=fwd['src'], subject=subject_code, subjects_dir=subjects_dir, hemi='both', surface='white',
+    #             initial_time=initial_time, time_unit='s', smoothing_steps=7)
 
 
 if not use_beamformer:
@@ -212,8 +213,8 @@ if not use_beamformer:
                 fname += '_fsaverage'
             save.fig(fig=fig, path=fig_path, fname=fname)
 
-        stc.plot_3d(src=inv['src'], subject=subject.subject_id, subjects_dir=subjects_dir, hemi='both', surface='white',
-                    initial_time=initial_time, time_unit='s', smoothing_steps=7)
+        # stc.plot_3d(src=inv['src'], subject=subject.subject_id, subjects_dir=subjects_dir, hemi='both', surface='white',
+        #             initial_time=initial_time, time_unit='s', smoothing_steps=7)
 
 
 
