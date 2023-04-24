@@ -421,20 +421,7 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
         save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
 
-def mri_meg_alignment(subject, subjects_dir=os.path.join(paths().mri_path(), 'FreeSurfer_out'), force_fsaverage=False):
-# --------- Coord systems alignment ---------#
-    if force_fsaverage:
-        subject_code = 'fsaverage'
-        dig = False
-    else:
-        # Check if subject has MRI data
-        try:
-            fs_subj_path = os.path.join(subjects_dir, subject.subject_id)
-            os.listdir(fs_subj_path)
-            dig = True
-        except:
-            subject_code = 'fsaverage'
-            dig = False
+def mri_meg_alignment(subject, subject_code, dig, subjects_dir=os.path.join(paths().mri_path(), 'FreeSurfer_out')):
 
     # Path to MRI <-> HEAD Transformation (Saved from coreg)
     trans_path = os.path.join(subjects_dir, subject_code, 'bem', f'{subject_code}-trans.fif')
@@ -448,13 +435,13 @@ def mri_meg_alignment(subject, subjects_dir=os.path.join(paths().mri_path(), 'Fr
     surfaces = dict(brain=0.7, outer_skull=0.5, head=0.4)
     # Try plotting with head skin and brain
     try:
-        fig = mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject_code,
+        mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject_code,
                                      subjects_dir=subjects_dir, surfaces=surfaces,
                                      show_axes=True, dig=dig, eeg=[], meg='sensors',
                                      coord_frame='meg', mri_fiducials=fids_path)
     # Plot only outer skin
     except:
-        fig = mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject_code,
+        mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject_code,
                                      subjects_dir=subjects_dir, surfaces='outer_skin',
                                      show_axes=True, dig=dig, eeg=[], meg='sensors',
                                      coord_frame='meg', mri_fiducials=fids_path)

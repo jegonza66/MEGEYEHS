@@ -9,8 +9,11 @@ import functions_analysis
 
 # --------- Setup ---------#
 subjects = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
-subjects = ['16200001']
+subjects = ['16191001']
 # subjects = exp_info.subjects_ids
+
+# Define surface or volume source space
+volume = True
 
 use_ica_data = True
 force_fsaverage = False
@@ -116,7 +119,7 @@ for subject_code in subjects:
     bem = mne.make_bem_solution(model)
 
     # Save
-    fname_bem = sources_path_subject + f'/{subject.subject_id}_bem-sol.fif'
+    fname_bem = sources_path_subject + f'/{subject_code}_bem-sol.fif'
     mne.write_bem_solution(fname_bem, bem, overwrite=True)
     # Load
     # bem = mne.read_bem_solution(fname_bem)
@@ -125,15 +128,8 @@ for subject_code in subjects:
     cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=meg_data.info['bads'], use_ica_data=use_ica_data)
 
     # --------- Source space, forward model and inverse operator ---------#
-    # Define surface or volume source space
-    volume = True
     if volume:
         save_name = 'volume'
-    else:
-        save_name = 'surface'
-
-    if volume:
-        # Volume
         # Source model
         surface = subjects_dir + f'/{subject_code}/bem/inner_skull.surf'
         vol_src = mne.setup_volume_source_space(subject=subject_code, subjects_dir=subjects_dir, surface=surface,
@@ -152,7 +148,7 @@ for subject_code in subjects:
         mne.minimum_norm.write_inverse_operator(fname_inv, inv_vol, overwrite=True)
 
     else:
-        # Surface
+        save_name = 'surface'
         # Source model
         src = mne.setup_source_space(subject=subject.subject_id, spacing='oct6', subjects_dir=subjects_dir)
         fname_src = sources_path_subject + f'/{subject_code}_surface-src.fif'

@@ -85,19 +85,31 @@ evoked_save_path = paths().save_path() + f'Evoked_{data_type}/' + run_path
 epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
 evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
 
-# Source data path
-sources_path = paths().sources_path()
-sources_path_subject = sources_path + subject.subject_id
-fname_fwd = sources_path_subject + f'/{subject_code}_volume-fwd.fif'
-fname_inv = sources_path_subject + f'/{subject_code}_{surf_vol}-inv_{data_type}.fif'
-
 # Define Subjects_dir as Freesurfer output folder
 subjects_dir = os.path.join(paths().mri_path(), 'FreeSurfer_out')
 os.environ["SUBJECTS_DIR"] = subjects_dir
 
+# --------- Coord systems alignment ---------#
+if force_fsaverage:
+    subject_code = 'fsaverage'
+    dig = False
+else:
+    # Check if subject has MRI data
+    try:
+        fs_subj_path = os.path.join(subjects_dir, subject.subject_id)
+        os.listdir(fs_subj_path)
+        dig = True
+    except:
+        subject_code = 'fsaverage'
+        dig = False
+
+# Source data path
+sources_path_subject = paths().sources_path() + subject.subject_id
+fname_fwd = sources_path_subject + f'/{subject_code}_volume-fwd.fif'
+fname_inv = sources_path_subject + f'/{subject_code}_{surf_vol}-inv_{data_type}.fif'
 
 if visualize_alignment:
-    plot_general.mri_meg_alignment(subject=subject, subjects_dir=subjects_dir, force_fsaverage=force_fsaverage)
+    plot_general.mri_meg_alignment(subject=subject, subject_code=subject_code, dig=dig, subjects_dir=subjects_dir)
 
 try:
     # Load data
@@ -152,12 +164,14 @@ if use_beamformer:
     stc = apply_lcmv(evoked, filters)
 
     # Plot
-    clims = (stc.data.max()/4, (stc.data.max() - stc.data.max()/3), stc.data.max()*0.9)
+    clims = ((stc.data.max() - stc.data.max()/3), (stc.data.max() - stc.data.max()/4), stc.data.max())
     fig = stc.plot(fwd['src'], subject=subject_code, subjects_dir=subjects_dir, initial_time=initial_time,
                    clim=dict(kind='value', lims=clims))
 
     if save_fig:
         fname = f'{subject.subject_id}'
+        if subject_code == 'fsaverage':
+            fname += '_fsaverage'
         save.fig(fig=fig, path=fig_path, fname=fname)
 
     # 3D Plot
@@ -191,8 +205,11 @@ if not use_beamformer:
     elif surf_vol == 'volume':
         fig = stc.plot(inv['src'], subject=subject.subject_id, subjects_dir=subjects_dir, initial_time=initial_time)#, clim=dict(kind='value', lims=(48,55,95)))
         fig.tight_layout()
+
         if save_fig:
             fname = f'{subject.subject_id}'
+            if subject_code == 'fsaverage':
+                fname += '_fsaverage'
             save.fig(fig=fig, path=fig_path, fname=fname)
 
         stc.plot_3d(src=inv['src'], subject=subject.subject_id, subjects_dir=subjects_dir, hemi='both', surface='white',
