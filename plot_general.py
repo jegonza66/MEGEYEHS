@@ -6,6 +6,7 @@ from paths import paths
 import save
 import functions_general
 import functions_analysis
+import mne
 
 save_path = paths().save_path()
 plot_path = paths().plots_path()
@@ -253,18 +254,7 @@ def tfr(tfr, chs_id, epoch_id, mss, cross1_dur, mss_duration, cross2_dur, plot_x
              combine='mean', cmap='jet', axes=ax_tf, show=display_figs, vmin=vmin, vmax=vmax, dB=dB)
 
     # Plot time markers as vertical lines
-    if 'cross1' in epoch_id:
-        ax_tf.vlines(x=cross1_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
-        try:
-            ax_tf.vlines(x=cross1_dur + mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
-                     linestyles='--', colors='black')
-        except: pass
-        try:
-            ax_tf.vlines(x=cross1_dur + mss_duration[mss] + cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
-                         linestyles='--', colors='black')
-        except: pass
-
-    elif 'ms' in epoch_id and mss:
+    if 'ms' in epoch_id and mss:
         ax_tf.vlines(x=0, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
         try:
             ax_tf.vlines(x=mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
@@ -429,3 +419,42 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
 
     if save_fig:
         save.fig(fig=fig, path=trf_fig_path, fname=fname)
+
+
+def mri_meg_alignment(subject, subjects_dir=os.path.join(paths().mri_path(), 'FreeSurfer_out'), force_fsaverage=False):
+# --------- Coord systems alignment ---------#
+    if force_fsaverage:
+        subject_code = 'fsaverage'
+        dig = False
+    else:
+        # Check if subject has MRI data
+        try:
+            fs_subj_path = os.path.join(subjects_dir, subject.subject_id)
+            os.listdir(fs_subj_path)
+            dig = True
+        except:
+            subject_code = 'fsaverage'
+            dig = False
+
+    # Path to MRI <-> HEAD Transformation (Saved from coreg)
+    trans_path = os.path.join(subjects_dir, subject_code, 'bem', f'{subject_code}-trans.fif')
+    fids_path = os.path.join(subjects_dir, subject_code, 'bem', f'{subject_code}-fiducials.fif')
+    dig_info_path = paths().opt_path() + subject.subject_id + '/info_raw.fif'
+
+    # Load raw meg data with dig info
+    info_raw = mne.io.read_raw_fif(dig_info_path)
+
+    # Visualize MEG/MRI alignment
+    surfaces = dict(brain=0.7, outer_skull=0.5, head=0.4)
+    # Try plotting with head skin and brain
+    try:
+        fig = mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject_code,
+                                     subjects_dir=subjects_dir, surfaces=surfaces,
+                                     show_axes=True, dig=dig, eeg=[], meg='sensors',
+                                     coord_frame='meg', mri_fiducials=fids_path)
+    # Plot only outer skin
+    except:
+        fig = mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject_code,
+                                     subjects_dir=subjects_dir, surfaces='outer_skin',
+                                     show_axes=True, dig=dig, eeg=[], meg='sensors',
+                                     coord_frame='meg', mri_fiducials=fids_path)

@@ -47,9 +47,7 @@ cross2_dur = 1
 vs_dur = 4
 
 # Duration
-if 'cross1' in epoch_id and mss:
-    dur = cross1_dur + mss_duration[mss] + cross2_dur + vs_dur  # seconds
-elif 'ms' in epoch_id:
+if 'ms' in epoch_id:
     dur = mss_duration[mss] + cross2_dur + vs_dur
 elif 'cross2' in epoch_id:
     dur = cross2_dur + vs_dur  # seconds

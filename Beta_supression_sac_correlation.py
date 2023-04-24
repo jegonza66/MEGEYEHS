@@ -73,9 +73,7 @@ for mss in [1, 2, 4]:
     # std_powers[mss] = []
 
     # Duration
-    if 'cross1' in epoch_id and mss:
-        dur = cross1_dur + mss_duration[mss] + cross2_dur + vs_dur  # seconds
-    elif 'ms' in epoch_id:
+    if 'ms' in epoch_id:
         dur = mss_duration[mss] + cross2_dur + vs_dur
     elif 'cross2' in epoch_id:
         dur = cross2_dur + vs_dur  # seconds
@@ -83,8 +81,7 @@ for mss in [1, 2, 4]:
         dur = 0
 
     # Get time windows from epoch_id name
-    map_times = dict(cross1={'tmin': 0, 'tmax': dur, 'plot_xlim': (plot_edge, dur - plot_edge)},
-                     ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
+    map_times = dict(ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
                      cross2={'tmin': -cross1_dur - mss_duration[mss], 'tmax': dur,
                              'plot_xlim': (-cross1_dur - mss_duration[mss] + plot_edge, dur - plot_edge)},
                      sac={'tmin': -0.2, 'tmax': 0.2, 'plot_xlim': (-0.2, 0.2)},
@@ -97,7 +94,7 @@ for mss in [1, 2, 4]:
         # baseline = None
     elif 'fix' in epoch_id or 'fix' in epoch_id:
         baseline = (tmin, -0.05)
-    elif 'cross1' in epoch_id or 'ms' in epoch_id or 'cross2' in epoch_id and mss:
+    elif 'ms' in epoch_id or 'cross2' in epoch_id and mss:
         baseline = (tmin, 0)
     else:
         baseline = (tmin, 0)
@@ -297,9 +294,7 @@ for mss in [1, 2, 4]:
     # std_powers[mss] = []
 
     # Duration
-    if 'cross1' in epoch_id and mss:
-        dur = cross1_dur + mss_duration[mss] + cross2_dur + vs_dur  # seconds
-    elif 'ms' in epoch_id:
+    if 'ms' in epoch_id:
         dur = mss_duration[mss] + cross2_dur + vs_dur
     elif 'cross2' in epoch_id:
         dur = cross2_dur + vs_dur  # seconds
@@ -307,8 +302,7 @@ for mss in [1, 2, 4]:
         dur = 0
 
     # Get time windows from epoch_id name
-    map_times = dict(cross1={'tmin': 0, 'tmax': dur, 'plot_xlim': (plot_edge, dur - plot_edge)},
-                     ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
+    map_times = dict(ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
                      cross2={'tmin': -cross1_dur - mss_duration[mss], 'tmax': dur,
                              'plot_xlim': (-cross1_dur - mss_duration[mss] + plot_edge, dur - plot_edge)},
                      sac={'tmin': -0.25, 'tmax': 0.25, 'plot_xlim': (-0.05, 0.05)},
@@ -321,7 +315,7 @@ for mss in [1, 2, 4]:
         plot_baseline = (plot_xlim[0], 0)
     elif 'fix' in epoch_id or 'fix' in epoch_id:
         baseline = (tmin, -0.05)
-    elif 'cross1' in epoch_id or 'ms' in epoch_id or 'cross2' in epoch_id and mss:
+    elif 'ms' in epoch_id or 'cross2' in epoch_id and mss:
         baseline = (tmin, 0)
     else:
         baseline = (tmin, 0)

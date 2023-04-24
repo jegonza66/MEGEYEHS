@@ -8,9 +8,12 @@ from paths import paths
 import load
 import setup
 import numpy as np
+import plot_general
 
 foo = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
+
 # --------- Define Parameters ---------#
+# Subject and Epochs
 save_fig = True
 # Subject
 subject_code = '16200001'
@@ -18,26 +21,29 @@ subject_code = '16200001'
 epoch_id = 'fix_ms'
 # ICA
 use_ica_data = True
-# Souce model
-use_beamformer = True
+
 # Trials
 corr_ans = None
 tgt_pres = None
 mss = None
 
-# Volume vs Surface estimation
+# Source estimation parameters
+# Source data
+force_fsaverage = False
+# Souce model
+use_beamformer = True
 surf_vol = 'volume'
 pick_ori = None  # 'vector' For dipoles, 'max_power' for
+
 # Plot time
 initial_time = None
 # Frequency band
 band_id = None
 
-visualize_alignment = True
+visualize_alignment = False
 # Get time windows from epoch_id name
 map_times = dict(sac={'tmin': -0.05, 'tmax': 0.07, 'plot_xlim': (-0.05, 0.07)},
                  fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.05, 0.2)})
-# -------------------------------------#
 
 
 # --------- Setup ---------#
@@ -82,48 +88,17 @@ evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
 # Source data path
 sources_path = paths().sources_path()
 sources_path_subject = sources_path + subject.subject_id
-fname_fwd = sources_path_subject + f'/{subject.subject_id}_volume-fwd.fif'
-fname_inv = sources_path_subject + f'/{subject.subject_id}_{surf_vol}-inv_{data_type}.fif'
+fname_fwd = sources_path_subject + f'/{subject_code}_volume-fwd.fif'
+fname_inv = sources_path_subject + f'/{subject_code}_{surf_vol}-inv_{data_type}.fif'
 
 # Define Subjects_dir as Freesurfer output folder
-mri_path = paths().mri_path()
-subjects_dir = os.path.join(mri_path, 'FreeSurfer_out')
+subjects_dir = os.path.join(paths().mri_path(), 'FreeSurfer_out')
 os.environ["SUBJECTS_DIR"] = subjects_dir
 
 
 if visualize_alignment:
-    # --------- Coord systems alignment ---------#
-    # Check if subject has MRI data
-    try:
-        fs_subj_path = os.path.join(subjects_dir, subject.subject_id)
-        os.listdir(fs_subj_path)
-        dig = True
-    except:
-        subject_code = 'fsaverage'
-        dig = False
+    plot_general.mri_meg_alignment(subject=subject, subjects_dir=subjects_dir, force_fsaverage=force_fsaverage)
 
-    # Path to MRI <-> HEAD Transformation (Saved from coreg)
-    trans_path = os.path.join(subjects_dir, subject_code, 'bem', f'{subject_code}-trans.fif')
-    fids_path = os.path.join(subjects_dir, subject_code, 'bem', f'{subject_code}-fiducials.fif')
-    dig_info_path = paths().opt_path() + subject.subject_id + '/info_raw.fif'
-
-    # Load raw meg data with dig info
-    info_raw = mne.io.read_raw_fif(dig_info_path)
-
-    # Visualize MEG/MRI alignment
-    surfaces = dict(brain=0.7, outer_skull=0.5, head=0.4)
-    # Try plotting with head skin and brain
-    try:
-        fig = mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject_code,
-                                     subjects_dir=subjects_dir, surfaces=surfaces,
-                                     show_axes=True, dig=dig, eeg=[], meg='sensors',
-                                     coord_frame='meg', mri_fiducials=fids_path)
-    # Plot only outer skin
-    except:
-        fig = mne.viz.plot_alignment(info_raw.info, trans=trans_path, subject=subject_code,
-                                     subjects_dir=subjects_dir, surfaces='outer_skin',
-                                     show_axes=True, dig=dig, eeg=[], meg='sensors',
-                                     coord_frame='meg', mri_fiducials=fids_path)
 try:
     # Load data
     if use_beamformer:
