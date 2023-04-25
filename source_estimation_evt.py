@@ -12,11 +12,14 @@ import plot_general
 
 foo = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
 
+subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001', '16200001',
+                '16201001', '10925091', '16263002', '16269001']
+
 # --------- Define Parameters ---------#
 # Subject and Epochs
 save_fig = True
 # Subject
-subject_code = '16191001'
+subject_code = '15950001'
 # Select epochs
 epoch_id = 'fix_ms'
 # ICA
@@ -120,7 +123,7 @@ except:
     if use_ica_data:
         meg_data = load.ica_data(subject=subject)
     else:
-        meg_data = subjec.load_preproc_meg_data()
+        meg_data = subject.load_preproc_meg_data()
 
     try:
         epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)

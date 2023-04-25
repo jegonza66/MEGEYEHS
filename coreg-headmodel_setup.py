@@ -12,8 +12,11 @@ exp_info = setup.exp_info()
 
 # --------- Setup ---------#
 subjects = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
-subjects = ['16191001']
-subjects = exp_info.subjects_ids
+
+subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001', '16200001',
+                '16201001', '10925091', '16263002', '16269001']
+
+subjects = ['15950001']
 
 # Define surface or volume source space
 volume = True
@@ -39,7 +42,7 @@ for subject_code in subjects:
         data_type = 'ICA'
     else:
         subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-        meg_data_orig = subjec.load_preproc_meg_data()
+        meg_data_orig = subject.load_preproc_meg_data()
         data_type = 'RAW'
 
     if force_fsaverage:
@@ -114,14 +117,18 @@ for subject_code in subjects:
     sources_path_subject = sources_path + subject.subject_id
     os.makedirs(sources_path_subject, exist_ok=True)
 
-    model = mne.make_bem_model(subject=subject_code, ico=5, conductivity=[0.3], subjects_dir=subjects_dir)
-    bem = mne.make_bem_solution(model)
-
-    # Save
     fname_bem = sources_path_subject + f'/{subject_code}_bem-sol.fif'
-    mne.write_bem_solution(fname_bem, bem, overwrite=True)
-    # Load
-    # bem = mne.read_bem_solution(fname_bem)
+    try:
+        # Load
+        bem = mne.read_bem_solution(fname_bem)
+
+    except:
+        # Compute
+        model = mne.make_bem_model(subject=subject_code, ico=5, conductivity=[0.3], subjects_dir=subjects_dir)
+        bem = mne.make_bem_solution(model)
+
+        # Save
+        mne.write_bem_solution(fname_bem, bem, overwrite=True)
 
     # --------- Background noise covariance ---------#
     cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=meg_data.info['bads'], use_ica_data=use_ica_data)
