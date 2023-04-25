@@ -171,14 +171,14 @@ class config:
             
     class general:
         def __init__(self):
-            # Trial reject parameter based on MEG peack to peack amplitude
+            # Trial reject parameter based on MEG peak to peak amplitude
             self.reject_amp = {'15909001': 1.5e-12, '15912001': 3.5e-12, '15910001': 3e-12, '15950001': 3.5e-12,
                                '15911001': 3.5e-12, '11535009': 3.5e-12, '16191001': 4e-12, '16200001': 2e-12,
                                '16201001': 1.5e-12, '16256001': 3.5e-12, '09991040': 1.2e-12, '10925091': 1.4e-12,
                                '16263002': 2.5e-12, '16269001': 2e-12}
 
             # Subjects dev <-> head transformation to use
-            self.subjects_head_loc = {'15909001': 0, '15912001': 0, '15910001': 0, '15950001': 0, '15911001': 0,
+            self.head_loc_idx = {'15909001': 0, '15912001': 0, '15910001': 0, '15950001': 0, '15911001': 0,
                                       '11535009': 0, '16191001': 2, '16200001': 0, '16201001': 0, '16256001': 0,
                                       '09991040': 0, '10925091': 0, '16263002': 0, '16269001':  0}
 
@@ -256,7 +256,7 @@ class raw_subject:
         class preproc:
             def __init__(self, config, subject_id):
 
-                # Get config.preprocessing attirbutes and get data for corresponding subject
+                # Get config.preprocessing attributes and get data for corresponding subject
                 preproc_attributes = config.preprocessing.__dict__.keys()
 
                 # Iterate over attributes and get data for conrresponding subject
@@ -322,7 +322,7 @@ class raw_subject:
             raw = mne.io.concatenate_raws(raws_list, on_mismatch='ignore')
 
             # Set dev <-> head transformation from optimal head localization
-            raw.info['dev_head_t'] = raws_list[config.general.subjects_head_loc[self.subject_id]].info['dev_head_t']
+            raw.info['dev_head_t'] = raws_list[config.general.head_loc_idx[self.subject_id]].info['dev_head_t']
 
         # If only one session return that session as whole raw data
         elif len(ds_files) == 1:
@@ -478,7 +478,7 @@ class raw_subject:
 
 
     # MEG data
-    def load_preproc_meg(self, preload=False):
+    def load_preproc_meg_data(self, preload=False):
         """
         Preprocessed MEG data for parent subject as raw instance of MNE.
         """

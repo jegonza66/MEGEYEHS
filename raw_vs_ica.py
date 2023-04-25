@@ -37,7 +37,7 @@ epoch_names = {'l_sac': 'Leftward', 'r_sac': 'Rightward', 'u_sac': 'Upward', 'd_
 
 # Load subject object
 subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-raw_data = subject.load_preproc_meg()
+raw_data = subjec.load_preproc_meg_data()
 
 # Load ica subject object
 ica_subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)

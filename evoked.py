@@ -105,7 +105,7 @@ for subject_code in exp_info.subjects_ids:
                 if band_id:
                     meg_data = load.filtered_data(subject=subject, band_id=band_id, save_data=False)
                 else:
-                    meg_data = subject.load_preproc_meg()
+                    meg_data = subjec.load_preproc_meg_data()
 
             # Epoch data
             epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans,

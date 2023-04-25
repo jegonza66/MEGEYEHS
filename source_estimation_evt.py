@@ -120,7 +120,7 @@ except:
     if use_ica_data:
         meg_data = load.ica_data(subject=subject)
     else:
-        meg_data = subject.load_preproc_meg()
+        meg_data = subjec.load_preproc_meg_data()
 
     try:
         epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)

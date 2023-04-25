@@ -174,7 +174,7 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
                             meg_data = load.ica_data(subject=subject)
                         else:
                             # Load meg data
-                            meg_data = subject.load_preproc_meg()
+                            meg_data = subjec.load_preproc_meg_data()
                         for mss, tmin, tmax, epochs_save_path, trf_save_path in zip((mssl, mssh), (tmin_mssl, tmin_mssh),
                                                                                     (tmax_mssl, tmax_mssh),
                                                                                     (epochs_load_path_mssl,
@@ -546,7 +546,7 @@ for subject_code in exp_info.subjects_ids:
                     meg_data = load.ica_data(subject=subject)
                 else:
                     # Load meg data
-                    meg_data = subject.load_preproc_meg()
+                    meg_data = subjec.load_preproc_meg_data()
                 for corr_ans, epochs_save_path, trf_save_path in zip((True, False), (epochs_load_path_corr, epochs_load_path_itc),
                                                                      (trf_load_path_corr, trf_load_path_inc)):
                     # Epoch data
@@ -839,7 +839,7 @@ for mss in [1, 2, 4]:
                         meg_data = load.ica_data(subject=subject)
                     else:
                         # Load meg data
-                        meg_data = subject.load_preproc_meg()
+                        meg_data = subjec.load_preproc_meg_data()
                     for corr_ans, epochs_save_path, trf_save_path in zip((True, False), (epochs_load_path_corr, epochs_load_path_itc),
                                                                          (trf_load_path_corr, trf_load_path_inc)):
                         # Epoch data

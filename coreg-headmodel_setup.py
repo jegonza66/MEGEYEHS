@@ -7,19 +7,18 @@ import setup
 import pandas as pd
 import functions_analysis
 
+# Load experiment info
+exp_info = setup.exp_info()
+
 # --------- Setup ---------#
 subjects = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
 subjects = ['16191001']
-# subjects = exp_info.subjects_ids
+subjects = exp_info.subjects_ids
 
 # Define surface or volume source space
 volume = True
-
 use_ica_data = True
 force_fsaverage = True
-
-# Load experiment info
-exp_info = setup.exp_info()
 
 # Define Subjects_dir as Freesurfer output folder
 mri_path = paths().mri_path()
@@ -40,7 +39,7 @@ for subject_code in subjects:
         data_type = 'ICA'
     else:
         subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-        meg_data_orig = subject.load_preproc_meg()
+        meg_data_orig = subjec.load_preproc_meg_data()
         data_type = 'RAW'
 
     if force_fsaverage:
