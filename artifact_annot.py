@@ -17,7 +17,7 @@ for subject_code in exp_info.subjects_ids:
 
     # --------- Load data ---------#
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-    meg_data = subjec.load_preproc_meg_data()
+    meg_data = subject.load_preproc_meg_data()
 
     # --------- Visual annotation ---------#
     meg_data_visual = meg_data.copy()

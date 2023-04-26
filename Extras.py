@@ -18,7 +18,7 @@ subject_code = exp_info.subjects_ids[0]
 
 # Load subject object
 subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-raw_data = subjec.load_preproc_meg_data()
+raw_data = subject.load_preproc_meg_data()
 info = mne.pick_info(raw_data.info, mne.pick_types(raw_data.info, meg=True, ref_meg=False))
 
 empty_data = np.zeros(info['nchan'])

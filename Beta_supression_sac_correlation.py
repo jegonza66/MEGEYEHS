@@ -145,7 +145,7 @@ for mss in [1, 2, 4]:
                     meg_data = load.ica_data(subject=subject)
                 else:
                     # Load meg data
-                    meg_data = subjec.load_preproc_meg_data()
+                    meg_data = subject.load_preproc_meg_data()
                 # Epoch data
                 epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans,
                                                                tgt_pres=tgt_pres, epoch_id=epoch_id, meg_data=meg_data,
@@ -366,7 +366,7 @@ for mss in [1, 2, 4]:
                     meg_data = load.ica_data(subject=subject)
                 else:
                     # Load meg data
-                    meg_data = subjec.load_preproc_meg_data()
+                    meg_data = subject.load_preproc_meg_data()
                 # Epoch data
                 epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans,
                                                                tgt_pres=tgt_pres, epoch_id=epoch_id, meg_data=meg_data,

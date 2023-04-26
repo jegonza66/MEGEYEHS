@@ -16,12 +16,12 @@ subjects = ['15909001', '15910001', '15950001', '15911001', '16191001', '1626300
 subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001', '16200001',
                 '16201001', '10925091', '16263002', '16269001']
 
-subjects = ['15950001']
+subjects = ['16263002']
 
 # Define surface or volume source space
 volume = True
 use_ica_data = True
-force_fsaverage = True
+force_fsaverage = False
 
 # Define Subjects_dir as Freesurfer output folder
 mri_path = paths().mri_path()

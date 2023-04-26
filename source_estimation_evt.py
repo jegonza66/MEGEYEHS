@@ -2,7 +2,7 @@ import os
 import functions_analysis
 import functions_general
 import mne
-from mne.beamformer import make_lcmv, apply_lcmv
+import mne.beamformer as beamformer
 import save
 from paths import paths
 import load
@@ -19,7 +19,7 @@ subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '115
 # Subject and Epochs
 save_fig = True
 # Subject
-subject_code = '15950001'
+subject_code = '16263002'
 # Select epochs
 epoch_id = 'fix_ms'
 # ICA
@@ -161,11 +161,12 @@ if use_beamformer:
     rank = sum([ch_type == 'mag' for ch_type in evoked.get_channel_types()]) - len(evoked.info['bads']) - len(subject.ex_components)
 
     # Define linearly constrained minimum variance spatial filter
-    filters = make_lcmv(evoked.info, fwd, data_cov, reg=0.05, noise_cov=noise_cov, pick_ori=pick_ori,
-                        rank=dict(mag=rank))  # reg parameter is for regularization on rank deficient matrices (rank < channels)
+    filters = beamformer.make_lcmv(info=epochs.info, forward=fwd, data_cov=data_cov, reg=0.05, noise_cov=noise_cov,
+                                   pick_ori=pick_ori, rank=dict(mag=rank))  # reg parameter is for regularization on rank deficient matrices (rank < channels)
 
     # Apply filter and get source estimates
-    stc = apply_lcmv(evoked, filters)
+    stc = beamformer.apply_lcmv(evoked=evoked, filters=filters)
+    # stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters)
 
     # Plot
     clims = ((stc.data.max() - stc.data.max()/3), (stc.data.max() - stc.data.max()/4), stc.data.max())
@@ -229,28 +230,35 @@ if use_beamformer:
     src = fwd['src']
 else:
     src = inv['src']
-morph = mne.compute_source_morph(src=src, subject_from=subject.subject_id, subject_to='fsaverage', subjects_dir=subjects_dir)
+
+if surf_vol == 'volume':
+    # Load fsaverage volume Source Space
+    fname_fsaverage_src = subjects_dir + '/fsaverage/bem/fsaverage-vol-5-src.fif'
+    src_fs = mne.read_source_spaces(fname_fsaverage_src)
+else:
+    src_fs = None
+
+morph = mne.compute_source_morph(src=src, subject_from=subject.subject_id, subject_to='fsaverage', src_to=src_fs, subjects_dir=subjects_dir)
 stc_fs = morph.apply(stc)
 
 # Plot in fsaverage space
 if surf_vol == 'surface':
     if pick_ori == 'vector':
-        brain = stc_fs.plot(subjects_dir=subjects_dir, subject='fsaverage',
-                            time_viewer=False, hemi='both',
+        brain = stc_fs.plot(subjects_dir=subjects_dir, subject='fsaverage', time_viewer=False, hemi='both',
                             initial_time=initial_time, time_unit='s')
     else:
-        brain = stc_fs.plot(subjects_dir=subjects_dir, subject='fsaverage',
-                         surface='flat', time_viewer=False, hemi='both',
-                         initial_time=initial_time, time_unit='s')
+        brain = stc_fs.plot(subjects_dir=subjects_dir, subject='fsaverage', surface='flat', time_viewer=False,
+                            hemi='both', initial_time=initial_time, time_unit='s')
         brain.add_annotation('HCPMMP1_combined', borders=2)
 
 elif surf_vol == 'volume':
-    fig = stc.plot(src, subject=subject.subject_id, subjects_dir=subjects_dir, initial_time=initial_time)  # , clim=dict(kind='value', lims=(48,55,95)))
+    clims = ((stc_fs.data.max() - stc_fs.data.max() / 3), (stc_fs.data.max() - stc_fs.data.max() / 4), stc_fs.data.max())
+    fig = stc_fs.plot(src_fs, subject='fsaverage', subjects_dir=subjects_dir, initial_time=initial_time, clim=dict(kind='value', lims=clims))
     if save_fig:
         fname = f'{subject.subject_id}_morph_fsaverage'
         save.fig(fig=fig, path=fig_path, fname=fname)
 
-    stc.plot_3d(src=src, subject=subject.subject_id, subjects_dir=subjects_dir, hemi='both', surface='white',
+    stc_fs.plot_3d(src=src, subject=subject.subject_id, subjects_dir=subjects_dir, hemi='both', surface='white',
                 initial_time=initial_time, time_unit='s', smoothing_steps=7)
 
 

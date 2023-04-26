@@ -100,7 +100,7 @@ for subject_code in exp_info.subjects_ids:
         elif use_ica_data:
             meg_data = load.ica_data(subject=subject)
         else:
-            meg_data = subjec.load_preproc_meg_data()
+            meg_data = subject.load_preproc_meg_data()
 
         # Epoch data
         epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,

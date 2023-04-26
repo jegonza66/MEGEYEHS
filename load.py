@@ -153,7 +153,7 @@ def ica_subject(exp_info, subject_code):
         f.close()
     except:
         print(f'Directory: {os.listdir(pathlib.Path(os.path.join(ica_path, subject_id)))}')
-        raise ValueError(f'Preprocessed data for subject {subject_id} not found in {file_path}')
+        raise ValueError(f'ICA data for subject {subject_id} not found in {file_path}')
 
     return ica_subject
 
@@ -209,7 +209,7 @@ def filtered_data(subject, band_id, use_ica_data=True, preload=False, save_data=
         if use_ica_data:
             meg_data = ica_data(subject=subject, preload=True)
         else:
-            meg_data = subjec.load_preproc_meg_data(preload=True)
+            meg_data = subject.load_preproc_meg_data(preload=True)
         l_freq, h_freq = functions_general.get_freq_band(band_id)
         filtered_data = meg_data.filter(l_freq=l_freq, h_freq=h_freq)
 
