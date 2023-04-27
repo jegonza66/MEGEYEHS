@@ -40,7 +40,7 @@ plot_gaze = True
 corr_ans = True
 tgt_pres = True
 mss = None
-reject = False
+reject = None
 
 # Get time windows from epoch_id name
 map_times = dict(sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)},
@@ -106,7 +106,7 @@ for subject_code in exp_info.subjects_ids:
         epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
                                                        epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, tmax=tmax,
                                                        save_data=save_data, epochs_save_path=epochs_save_path,
-                                                       epochs_data_fname=epochs_data_fname, reject=reject)
+                                                       epochs_data_fname=epochs_data_fname, reject=reject, baseline=baseline)
 
     # Pick MEG channels to plot
     picks = functions_general.pick_chs(chs_id=chs_id, info=epochs.info)

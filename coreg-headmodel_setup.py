@@ -13,15 +13,15 @@ exp_info = setup.exp_info()
 # --------- Setup ---------#
 subjects = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
 
-subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001', '16200001',
-                '16201001', '10925091', '16263002', '16269001']
+subjects = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001', '16200001',
+            '16201001', '10925091', '16263002', '16269001']
 
-subjects = ['16263002']
+# subjects = ['15910001', '15950001', '15911001', '16191001', '16263002']
 
 # Define surface or volume source space
-volume = True
+volume = False
 use_ica_data = True
-force_fsaverage = False
+force_fsaverage = True
 
 # Define Subjects_dir as Freesurfer output folder
 mri_path = paths().mri_path()
@@ -156,7 +156,7 @@ for subject_code in subjects:
     else:
         #Surface
         # Source model
-        src = mne.setup_source_space(subject=subject.subject_id, spacing='oct6', subjects_dir=subjects_dir)
+        src = mne.setup_source_space(subject=subject_code, spacing='oct6', subjects_dir=subjects_dir)
         fname_src = sources_path_subject + f'/{subject_code}_surface-src.fif'
         mne.write_source_spaces(fname_src, src, overwrite=True)
 

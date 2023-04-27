@@ -447,6 +447,6 @@ def get_condition_trials(subject, mss=None, corr_ans=None, tgt_pres=None):
     elif tgt_pres == False:
         bh_data = bh_data.loc[bh_data['Tpres'] == 0]
 
-    trials = list(bh_data.index + 1)  # +1 for 0th index
+    trials = list((bh_data.index + 1).astype(str))  # +1 for 0th index
 
     return trials, bh_data

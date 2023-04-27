@@ -62,9 +62,10 @@ def define_events(subject, meg_data, epoch_id, mss=None, trials=None, screen=Non
         #     epoch_keys = [epoch_key for epoch_key in epoch_keys if f'{screen}' in epoch_key]
         if trials != None:
             try:
-                epoch_keys = [epoch_key for epoch_key in epoch_keys if int(epoch_key.split('_t')[-1].split('_')[0]) in trials]
+                epoch_keys = [epoch_key for epoch_key in epoch_keys if
+                              (epoch_key.split('_t')[-1].split('_')[0] in trials and 'end' not in epoch_key)]
             except:
-                print('Trial selection skiped. Epoch_id does not contain trial number.')
+                print('Trial selection skipped. Epoch_id does not contain trial number.')
         # if mss:
         #     trials_mss = subject.bh_data.loc[subject.bh_data['Nstim'] == mss].index + 1  # add 1 due to python 0th indexing
         #     epoch_keys = [epoch_key for epoch_key in epoch_keys if int(epoch_key.split('t')[-1]) in trials_mss]
@@ -82,8 +83,28 @@ def define_events(subject, meg_data, epoch_id, mss=None, trials=None, screen=Non
     return metadata, events, events_id, metadata_sup
 
 
-def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax, baseline=None, reject=None,
+def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax, baseline=(None, 0), reject=None,
                save_data=False, epochs_save_path=None, epochs_data_fname=None):
+    '''
+    :param subject:
+    :param mss:
+    :param corr_ans:
+    :param tgt_pres:
+    :param epoch_id:
+    :param meg_data:
+    :param tmin:
+    :param tmax:
+    :param baseline: tuple
+    Baseline start and end times.
+    :param reject: float|str|bool
+    Peak to peak amplituyde reject parameter. Use 'subject' for subjects default calculated for short fixation epochs.
+     Use False for no rejection. Default to 4e-12 for magnetometers.
+    :param save_data:
+    :param epochs_save_path:
+    :param epochs_data_fname:
+    :return:
+    '''
+
     # Sanity check to save data
     if save_data and (not epochs_save_path or not epochs_data_fname):
         raise ValueError('Please provide path and filename to save data. Else, set save_data to false.')
@@ -98,10 +119,12 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
     # Reject based on channel amplitude
     if reject == None:
         # Not setting reject parameter will set to default subject value
-        reject = dict(mag=subject.config.general.reject_amp)
+        reject = dict(mag=4e-12)
     elif reject == False:
         # Setting reject parameter to False uses No rejection (None in mne will not reject)
         reject = None
+    elif reject == 'subject':
+        reject = dict(mag=subject.config.general.reject_amp)
 
     # Epoch data
     epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=tmin, tmax=tmax, reject=reject,

@@ -19,7 +19,7 @@ subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '115
 # Subject and Epochs
 save_fig = True
 # Subject
-subject_code = '16263002'
+subject_code = '15909001'
 # Select epochs
 epoch_id = 'fix_ms'
 # ICA
@@ -29,6 +29,9 @@ use_ica_data = True
 corr_ans = None
 tgt_pres = None
 mss = None
+
+# Epochs parameters
+reject = 'subject'
 
 # Source estimation parameters
 # Source data
@@ -72,6 +75,10 @@ if 'sac' in epoch_id:
     baseline = (tmin, 0)
 elif 'fix' in epoch_id or 'fix' in epoch_id:
     baseline = (tmin, -0.05)
+else:
+    baseline = (tmin, 0)
+
+
 
 
 # --------- Paths ---------#
@@ -131,8 +138,8 @@ except:
 
         # Epoch data
         epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
-                                                       epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, tmax=tmax,
-                                                       save_data=True, epochs_save_path=epochs_save_path,
+                                                       epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, tmax=tmax, reject=reject,
+                                                       save_data=True, epochs_save_path=epochs_save_path, baseline=baseline,
                                                        epochs_data_fname=epochs_data_fname)
 
     # Define evoked from epochs

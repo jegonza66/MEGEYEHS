@@ -30,7 +30,7 @@ tgt_pres = None
 mss = 4
 epoch_id = 'fix_ms'
 # epoch_id = 'sac_ms'
-reject = False  # None for subject's default. False for no rejection, dict for specific values
+reject = False  # 'subject' for subject's default. False for no rejection, dict for specific values. None for default 4e-12 for magnetometers
 n_cycles_div = 4.
 # Power frequency range
 l_freq = 1
