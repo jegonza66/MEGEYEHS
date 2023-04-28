@@ -7,6 +7,8 @@ import save
 import functions_general
 import functions_analysis
 import mne
+import mne_connectivity
+from nilearn import plotting
 
 save_path = paths().save_path()
 plot_path = paths().plots_path()
@@ -445,3 +447,101 @@ def mri_meg_alignment(subject, subject_code, dig, subjects_dir=os.path.join(path
                                      subjects_dir=subjects_dir, surfaces='outer_skin',
                                      show_axes=True, dig=dig, eeg=[], meg='sensors',
                                      coord_frame='meg', mri_fiducials=fids_path)
+
+
+def connectivity_circle(subject, labels, con, connectivity_method='pli', subject_code=None, display_figs=False, save_fig=False,
+                        fig_path=None, fname=None, fontsize=None, ticksize=None):
+    # Sanity check
+    if save_fig and (not fig_path):
+        raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
+
+    # Plot fonsize params
+    if fontsize:
+        matplotlib.rc({'font.size': fontsize})
+    if ticksize:
+        matplotlib.rc({'xtick.labelsize': ticksize})
+        matplotlib.rc({'ytick.labelsize': ticksize})
+
+    # Get colors for each label
+    label_colors = [label.color for label in labels]
+
+    # Reorder the labels based on their location in the left hemi
+    label_names = [label.name for label in labels]
+    lh_labels = [name for name in label_names if name.endswith('lh')]
+
+    # Get the y-location of the label
+    label_ypos = list()
+    for name in lh_labels:
+        idx = label_names.index(name)
+        ypos = np.mean(labels[idx].pos[:, 1])
+        label_ypos.append(ypos)
+
+    # Reorder the labels based on their location
+    lh_labels = [label for (yp, label) in sorted(zip(label_ypos, lh_labels))]
+
+    # For the right hemi
+    rh_labels = [label[:-2] + 'rh' for label in lh_labels]
+
+    # Save the plot order and create a circular layout
+    node_order = list()
+    node_order.extend(lh_labels[::-1])  # reverse the order
+    node_order.extend(rh_labels)
+
+    node_angles = mne.viz.circular_layout(label_names, node_order, start_pos=90,
+                                          group_boundaries=[0, len(label_names) / 2])
+
+    # Plot the graph using node colors from the FreeSurfer parcellation
+    fig, ax = plt.subplots(figsize=(8, 8), facecolor='black',
+                           subplot_kw=dict(polar=True))
+
+    # Plot
+    mne_connectivity.viz.plot_connectivity_circle(con, label_names, n_lines=200,
+                                                  node_angles=node_angles, node_colors=label_colors,
+                                                  title=f'All-to-All Connectivity ({connectivity_method})', ax=ax,
+                                                  show=display_figs)
+    fig.tight_layout()
+
+    # Save
+    if save_fig:
+        if not fname:
+            fname = f'{subject.subject_id}_circle'
+        if subject_code == 'fsaverage':
+            fname += '_fsaverage'
+        save.fig(fig=fig, path=fig_path, fname=fname)
+
+
+def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_glass_fsaverage', threshold=0.9,
+               node_size=15):
+
+    # Sanity check
+    if save_fig and (not fig_path):
+        raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
+
+    label_names = [label.name for label in labels]
+    # Get the y-location of the label
+    label_xpos = list()
+    label_ypos = list()
+    label_zpos = list()
+    for name in label_names:
+        idx = label_names.index(name)
+        label_xpos.append(np.mean(labels[idx].pos[:, 0]))
+        label_ypos.append(np.mean(labels[idx].pos[:, 1]))
+        label_zpos.append(np.mean(labels[idx].pos[:, 2]))
+
+    # Make node position array and reescale
+    nodes_pos = np.array([label_xpos, label_ypos, label_zpos]).transpose() * 1150
+
+    # Make adjacency matrix symetric for two-way connectome
+    adjacency_matrix = np.maximum(adjacency_matrix, adjacency_matrix.transpose())
+
+    # Plot connectome
+    fig = plotting.plot_connectome(adjacency_matrix=adjacency_matrix, node_coords=nodes_pos,
+                                   edge_threshold=adjacency_matrix.max() * threshold, node_size=node_size)
+
+    # Save
+    if save_fig:
+        if not fname:
+            fname = f'{subject.subject_id}_connectome'
+        if subject_code == 'fsaverage' and 'fsaverage' not in fname:
+            fname += '_fsaverage'
+        save.fig(fig=fig, path=fig_path, fname=fname)
