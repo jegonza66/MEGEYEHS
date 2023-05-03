@@ -29,12 +29,13 @@ tgt_pres = None
 mss = None
 
 # Epochs parameters
-reject = 'subject'
+reject = None
 
 # Source estimation parameters
-force_fsaverage = True
-use_beamformer = True
+force_fsaverage = False
 surf_vol = 'volume'
+ico = 5
+spacing = 5.
 pick_ori = None  # 'vector' For dipoles, 'max_power' for
 
 # Plot time
@@ -57,10 +58,7 @@ else:
     data_type = 'RAW'
 
 # Model
-if use_beamformer:
-    model_name = 'Beamformer'
-else:
-    model_name = 'MNE'
+model_name = 'lcmv'  # ('lcmv', 'dics')
 
 # Get time windows from epoch_id name
 map_times = dict(sac={'tmin': -0.05, 'tmax': 0.07, 'plot_xlim': (-0.05, 0.07)},
@@ -81,7 +79,7 @@ else:
 run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_{tmin}_{tmax}_bline{baseline}/'
 
 # Source plots paths
-fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_{pick_ori}/'
+fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{spacing}_{pick_ori}/'
 
 # Data paths
 epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path
@@ -119,18 +117,12 @@ for subject_code in exp_info.subjects_ids:
             subject_code = 'fsaverage'
             dig = False
 
-    # Source data path
-    sources_path_subject = paths().sources_path() + subject.subject_id
-    fname_fwd = sources_path_subject + f'/{subject_code}_volume-fwd.fif'
-    fname_inv = sources_path_subject + f'/{subject_code}_{surf_vol}-inv_{data_type}.fif'
-
     if visualize_alignment:
         plot_general.mri_meg_alignment(subject=subject, subject_code=subject_code, dig=dig, subjects_dir=subjects_dir)
 
     try:
         # Load data
-        if use_beamformer:
-            epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+        epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
         evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
     except:
         if use_ica_data:
@@ -141,13 +133,11 @@ for subject_code in exp_info.subjects_ids:
         try:
             epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
         except:
-
             # Epoch data
             epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
                                                            epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, tmax=tmax, reject=reject,
                                                            save_data=True, epochs_save_path=epochs_save_path, baseline=baseline,
                                                            epochs_data_fname=epochs_data_fname)
-
         # Define evoked from epochs
         evoked = epochs.average()
 
@@ -160,68 +150,64 @@ for subject_code in exp_info.subjects_ids:
     epochs.pick('meg')
 
     # --------- Source estimation ---------#
-    if use_beamformer:
-        # Load forward model
-        fwd = mne.read_forward_solution(fname_fwd)
+    # Source data path
+    sources_path_subject = paths().sources_path() + subject.subject_id
 
-        # Compute covariance matrices from epochs for data and from raw for noise
-        noise_cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=epochs.info['bads'],
-                                                 use_ica_data=use_ica_data)
-        data_cov = mne.compute_covariance(epochs)
+    # Load forward model
+    if surf_vol == 'volume':
+        fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
+    elif surf_vol == 'surface':
+        fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
+    fwd = mne.read_forward_solution(fname_fwd)
+    src = fwd['src']
 
-        # Define covariance matrices minimum rank as mag channels - excluded components
-        # rank = min(np.linalg.matrix_rank(noise_cov.data), np.linalg.matrix_rank(data_cov.data))
-        rank = sum([ch_type == 'mag' for ch_type in evoked.get_channel_types()]) - len(evoked.info['bads']) - len(subject.ex_components)
+    # Load filter
+    if surf_vol == 'volume':
+        fname_filter = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
+    elif surf_vol == 'surface':
+        fname_filter = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-{model_name}.fif'
+    filters = mne.beamformer.read_beamformer(fname_filter)
 
-        # Define linearly constrained minimum variance spatial filter
-        filters = beamformer.make_lcmv(info=epochs.info, forward=fwd, data_cov=data_cov, reg=0.05, noise_cov=noise_cov,
-                                       pick_ori=pick_ori, rank=dict(mag=rank))  # reg parameter is for regularization on rank deficient matrices (rank < channels)
+    # Apply filter and get source estimates
+    stc = beamformer.apply_lcmv(evoked=evoked, filters=filters)
 
-        # Apply filter and get source estimates
-        stc = beamformer.apply_lcmv(evoked=evoked, filters=filters)
-
-        if subject_code != 'fsaverage':
-            # Morph to fsaverage
-            src = fwd['src']
-
-            # Get Source space for fsaverage
-            if surf_vol == 'volume':
-                # Load fsaverage volume Source Space
-                sources_path_subject = paths().sources_path() + subject.subject_id
-                fname_src = sources_path_subject + f'/fsaverage_volume-src.fif'
-                src_fs = mne.read_source_spaces(fname_src)
-            else:
-                sources_path_subject = paths().sources_path() + subject.subject_id
-                fname_src = sources_path_subject + f'/fsaverage_surface-src.fif'
-                src_fs = mne.read_source_spaces(fname_src)
-
-            # Define morph function
-            morph = mne.compute_source_morph(src=src, subject_from=subject.subject_id, subject_to='fsaverage',
-                                             src_to=src_fs, subjects_dir=subjects_dir)
-            # Morph
-            stc_fs = morph.apply(stc)
-
-            # Append to fs_stcs to make GA
-            stcs_fs.append(stc_fs)
-
+    # Morph to fsaverage
+    if subject_code != 'fsaverage':
+        # Get Source space for fsaverage
+        if surf_vol == 'volume':
+            fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_volume_ico{ico}_{int(spacing)}-src.fif'
         else:
-            # Append to fs_stcs to make GA
-            stcs_fs.append(stc)
+            fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_surface_ico{ico}-src.fif'
 
-        # Plot
-        clims = (stc.data.max()*0.66, stc.data.max()*0.75, stc.data.max())
-        fig = stc.plot(fwd['src'], subject=subject_code, subjects_dir=subjects_dir, initial_time=initial_time,
-                       clim=dict(kind='value', lims=clims))
+        src_fs = mne.read_source_spaces(fname_src)
 
-        if save_fig:
-            fname = f'{subject.subject_id}'
-            if subject_code == 'fsaverage':
-                fname += '_fsaverage'
-            save.fig(fig=fig, path=fig_path, fname=fname)
+        # Define morph function
+        morph = mne.compute_source_morph(src=src, subject_from=subject.subject_id, subject_to='fsaverage',
+                                         src_to=src_fs, subjects_dir=subjects_dir)
+        # Morph
+        stc_fs = morph.apply(stc)
 
-        # 3D Plot
-        # stc.plot_3d(src=fwd['src'], subject=subject_code, subjects_dir=subjects_dir, hemi='both', surface='white',
-        #             initial_time=initial_time, time_unit='s', smoothing_steps=7)
+        # Append to fs_stcs to make GA
+        stcs_fs.append(stc_fs)
+
+    else:
+        # Append to fs_stcs to make GA
+        stcs_fs.append(stc)
+
+    # Plot
+    clims = (stc.data.max()*0.66, stc.data.max()*0.75, stc.data.max())
+    fig = stc.plot(src, subject=subject_code, subjects_dir=subjects_dir, initial_time=initial_time,
+                   clim=dict(kind='value', lims=clims))
+
+    if save_fig:
+        fname = f'{subject.subject_id}'
+        if subject_code == 'fsaverage':
+            fname += '_fsaverage'
+        save.fig(fig=fig, path=fig_path, fname=fname)
+
+    # 3D Plot
+    # stc.plot_3d(src=fwd['src'], subject=subject_code, subjects_dir=subjects_dir, hemi='both', surface='white',
+    #             initial_time=initial_time, time_unit='s', smoothing_steps=7)
 
 
 # Average evoked stcs
@@ -242,14 +228,10 @@ GA_stc.subject = 'fsaverage'
 
 # Read fsaverage surface from any subject
 if surf_vol == 'volume':
-    # Load fsaverage volume Source Space
-    sources_path_subject = paths().sources_path() + subject.subject_id
-    fname_src = sources_path_subject + f'/fsaverage_volume-src.fif'
-    src_fs = mne.read_source_spaces(fname_src)
+    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_volume_ico{ico}_{int(spacing)}-src.fif'
 else:
-    sources_path_subject = paths().sources_path() + subject.subject_id
-    fname_src = sources_path_subject + f'/fsaverage_surface-src.fif'
-    src_fs = mne.read_source_spaces(fname_src)
+    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_surface_ico{ico}-src.fif'
+src_fs = mne.read_source_spaces(fname_src)
 
 # Plot
 clims = (GA_stc.data.max()*0.66, GA_stc.data.max()*0.75, GA_stc.data.max())
@@ -261,48 +243,6 @@ if save_fig:
     if force_fsaverage:
         fname += '_fsaverage'
     save.fig(fig=fig, path=fig_path, fname=fname)
-
-
-
-    # if not use_beamformer:
-    #     # Load
-    #     inv = mne.minimum_norm.read_inverse_operator(fname_inv)
-    #
-    #     # Inverse solution parameters (standard from mne)
-    #     snr = 3.0
-    #     lambda2 = 1.0 / snr ** 2
-    #     # Compute inverse solution to get sources time series
-    #     stc = mne.minimum_norm.apply_inverse(evoked=evoked, inverse_operator=inv, lambda2=lambda2, method='dSPM',
-    #                                          pick_ori=pick_ori)
-    #
-    #     # Plot
-    #     if surf_vol == 'surface':
-    #         if pick_ori == 'vector':
-    #             brain = stc.plot(subjects_dir=subjects_dir, subject=subject.subject_id,
-    #                              time_viewer=False, hemi='both',
-    #                              initial_time=initial_time, time_unit='s',
-    #                              brain_kwargs=dict(silhouette=True), smoothing_steps=7)
-    #         else:
-    #             brain = stc.plot(subjects_dir=subjects_dir, subject=subject.subject_id,
-    #                              surface='inflated', time_viewer=True, hemi='both',
-    #                              initial_time=initial_time, time_unit='s')
-    #
-    #     elif surf_vol == 'volume':
-    #         fig = stc.plot(inv['src'], subject=subject.subject_id, subjects_dir=subjects_dir, initial_time=initial_time)#, clim=dict(kind='value', lims=(48,55,95)))
-    #         fig.tight_layout()
-    #
-    #         if save_fig:
-    #             fname = f'{subject.subject_id}'
-    #             if subject_code == 'fsaverage':
-    #                 fname += '_fsaverage'
-    #             save.fig(fig=fig, path=fig_path, fname=fname)
-    #
-    #         stc.plot_3d(src=inv['src'], subject=subject.subject_id, subjects_dir=subjects_dir, hemi='both', surface='white',
-    #                     initial_time=initial_time, time_unit='s', smoothing_steps=7)
-
-
-
-
 
 
 ## --------- Morph to fsaverage ---------#

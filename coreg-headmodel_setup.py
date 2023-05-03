@@ -6,12 +6,13 @@ import load
 import setup
 import pandas as pd
 import functions_analysis
+import mne.beamformer as beamformer
 
 # Load experiment info
 exp_info = setup.exp_info()
 
 # --------- Setup ---------#
-subjects = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
+subjects_mri = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
 
 subjects = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001', '16200001',
             '16201001', '10925091', '16263002', '16269001']
@@ -19,9 +20,12 @@ subjects = ['15909001', '15912001', '15910001', '15950001', '15911001', '1153500
 # subjects = ['15910001', '15950001', '15911001', '16191001', '16263002']
 
 # Define surface or volume source space
-volume = False
+volume = True
 use_ica_data = True
 force_fsaverage = True
+ico = 5
+spacing = 5.
+pick_ori = None
 
 # Define Subjects_dir as Freesurfer output folder
 mri_path = paths().mri_path()
@@ -115,57 +119,92 @@ for subject_code in subjects:
     # Source data and models path
     sources_path = paths().sources_path()
     sources_path_subject = sources_path + subject.subject_id
+    sources_path_fsaverage = sources_path + 'fsaverage'
     os.makedirs(sources_path_subject, exist_ok=True)
+    os.makedirs(sources_path_fsaverage, exist_ok=True)
 
-    fname_bem = sources_path_subject + f'/{subject_code}_bem-sol.fif'
+    fname_bem = sources_path + subject_code + f'/{subject_code}_bem_ico{ico}-sol.fif'
     try:
         # Load
         bem = mne.read_bem_solution(fname_bem)
-
     except:
         # Compute
-        model = mne.make_bem_model(subject=subject_code, ico=5, conductivity=[0.3], subjects_dir=subjects_dir)
+        model = mne.make_bem_model(subject=subject_code, ico=ico, conductivity=[0.3], subjects_dir=subjects_dir)
         bem = mne.make_bem_solution(model)
-
         # Save
         mne.write_bem_solution(fname_bem, bem, overwrite=True)
 
     # --------- Background noise covariance ---------#
-    cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=meg_data.info['bads'], use_ica_data=use_ica_data)
+    noise_cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=meg_data.info['bads'], use_ica_data=use_ica_data)
+
+    # # Extra
+    # # Change head loc
+    # head_loc_idx = 1
+    # meg_data.info['dev_head_t'] = raws_list[head_loc_idx].info['dev_head_t']
+
+    # --------- Raw data covariance ---------#
+    # Pick meg channels for source modeling
+    meg_data.pick('meg')
+
+    # Compute covariance to withdraw from meg data
+    data_cov = mne.compute_raw_covariance(meg_data, reject=dict(mag=4e-12), rank=None)
 
     # --------- Source space, forward model and inverse operator ---------#
     if volume:
         # Volume
         # Source model
-        surface = subjects_dir + f'/{subject_code}/bem/inner_skull.surf'
-        vol_src = mne.setup_volume_source_space(subject=subject_code, subjects_dir=subjects_dir, surface=surface,
+        fname_src = sources_path + subject_code + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-src.fif'
+        try:
+            # Load
+            src = mne.read_source_spaces(fname_src)
+        except:
+            # Compute
+            src = mne.setup_volume_source_space(subject=subject_code, subjects_dir=subjects_dir, bem=bem, pos=spacing,
                                                 sphere_units='m', add_interpolator=True)
-        fname_src = sources_path_subject + f'/{subject_code}_volume-src.fif'
-        mne.write_source_spaces(fname_src, vol_src, overwrite=True)
+            # Save
+            mne.write_source_spaces(fname_src, src, overwrite=True)
 
         # Forward model
-        fwd_vol = mne.make_forward_solution(meg_data.info, trans=trans_path, src=vol_src, bem=bem)
-        fname_fwd = sources_path_subject + f'/{subject_code}_volume-fwd.fif'
-        mne.write_forward_solution(fname_fwd, fwd_vol, overwrite=True)
+        fwd = mne.make_forward_solution(meg_data.info, trans=trans_path, src=src, bem=bem)
+        fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
+        mne.write_forward_solution(fname_fwd, fwd, overwrite=True)
 
-        # Inverse operator
-        inv_vol = mne.minimum_norm.make_inverse_operator(meg_data.info, fwd_vol, cov)
-        fname_inv = sources_path_subject + f'/{subject_code}_volume-inv_{data_type}.fif'
-        mne.minimum_norm.write_inverse_operator(fname_inv, inv_vol, overwrite=True)
+        # Spatial filter
+        rank = sum([ch_type == 'mag' for ch_type in meg_data.get_channel_types()]) - len(meg_data.info['bads'])
+        if use_ica_data:
+            rank -= len(subject.ex_components)
+
+        # Define linearly constrained minimum variance spatial filter
+        # reg parameter is for regularization on rank deficient matrices (rank < channels)
+        filters = beamformer.make_lcmv(info=meg_data.info, forward=fwd, data_cov=data_cov, reg=0.05,
+                                       noise_cov=noise_cov, pick_ori=pick_ori, rank=dict(mag=rank))
+
+        # Save
+        fname_lmcv = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-lcmv.fif'
+        filters.save(fname=fname_lmcv, overwrite=True)
 
     else:
         #Surface
         # Source model
-        src = mne.setup_source_space(subject=subject_code, spacing='oct6', subjects_dir=subjects_dir)
-        fname_src = sources_path_subject + f'/{subject_code}_surface-src.fif'
+        src = mne.setup_source_space(subject=subject_code, spacing=f'ico{ico}', subjects_dir=subjects_dir)
+        fname_src = sources_path_subject + f'/{subject_code}_surface_ico{ico}-src.fif'
         mne.write_source_spaces(fname_src, src, overwrite=True)
 
         # Forward model
         fwd = mne.make_forward_solution(meg_data.info, trans=trans_path, src=src, bem=bem)
-        fname_fwd = sources_path_subject + f'/{subject_code}_surface-fwd.fif'
+        fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
         mne.write_forward_solution(fname_fwd, fwd, overwrite=True)
 
-        # Inverse operator
-        inv = mne.minimum_norm.make_inverse_operator(meg_data.info, fwd, cov)
-        fname_inv = sources_path_subject + f'/{subject_code}_surface-inv_{data_type}.fif'
-        mne.minimum_norm.write_inverse_operator(fname_inv, inv, overwrite=True)
+        # Spatial filter
+        rank = sum([ch_type == 'mag' for ch_type in meg_data.get_channel_types()]) - len(meg_data.info['bads'])
+        if use_ica_data:
+            rank -= len(subject.ex_components)
+
+        # Define linearly constrained minimum variance spatial filter
+        # reg parameter is for regularization on rank deficient matrices (rank < channels)
+        filters = beamformer.make_lcmv(info=meg_data.info, forward=fwd, data_cov=data_cov, reg=0.05,
+                                       noise_cov=noise_cov, pick_ori=pick_ori, rank=dict(mag=rank))
+
+        # Save
+        fname_lmcv = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-lcmv.fif'
+        filters.save(fname=fname_lmcv, overwrite=True)

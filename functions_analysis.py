@@ -315,7 +315,7 @@ def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', fi
     return ocular_components, sac_epochs, fix_epochs
 
 
-def noise_cov(exp_info, subject, bads, use_ica_data, rank=None):
+def noise_cov(exp_info, subject, bads, use_ica_data, reject=dict(mag=4e-12), rank=None):
     '''
     Compute background noise covariance matrix for source estimation.
     :param exp_info:
@@ -325,7 +325,7 @@ def noise_cov(exp_info, subject, bads, use_ica_data, rank=None):
     :return: noise_cov
     '''
 
-    # Define backgroun noise session id
+    # Define background noise session id
     noise_date_id = exp_info.subjects_noise[subject.subject_id]
 
     # Load data
@@ -352,8 +352,6 @@ def noise_cov(exp_info, subject, bads, use_ica_data, rank=None):
 
     # Pick meg channels for source modeling
     raw_noise.pick('meg')
-
-    reject = dict(mag=subject.config.general.reject_amp)
 
     # Compute covariance to withdraw from meg data
     noise_cov = mne.compute_raw_covariance(raw_noise, reject=reject, rank=rank)

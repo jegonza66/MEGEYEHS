@@ -31,8 +31,11 @@ mss = None
 
 # Source estimation parameters
 force_fsaverage = False
-use_beamformer = True
-# Souce model ('volume'/'surface')
+# Model
+model_name = 'lcmv'
+ico = 5
+spacing = 5.
+# Souce model ('volume'/'surface'/'mixed')
 surf_vol = 'surface'
 pick_ori = None  # 'vector' For dipoles, 'max_power' for
 # Parcelation (aparc / aparc.a2009s)
@@ -98,16 +101,10 @@ run_path_data = f'/Band_None/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_
 epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path_data
 evoked_save_path = paths().save_path() + f'Evoked_{data_type}/' + run_path_data
 
-# Model
-if use_beamformer:
-    model_name = 'Beamformer'
-else:
-    model_name = 'MNE'
-
 # Source plots paths
 run_path_plot = run_path_data.replace('Band_None', f'Band_{band_id}')
 fig_path = paths().plots_path() + f'Connectivity_{data_type}/' + run_path_plot + \
-           f'{model_name}_{surf_vol}_{pick_ori}_{parcelation}_{connectivity_method}/'  # Replace band id for None because Epochs are the same on all bands
+           f'{model_name}_{surf_vol}_ico{ico}_{spacing}_{pick_ori}_{parcelation}_{connectivity_method}/'  # Replace band id for None because Epochs are the same on all bands
 
 # Connectivity matrix
 # Get labels for FreeSurfer 'aparc' cortical parcellation with 34 labels/hemi
@@ -157,10 +154,9 @@ for subj_num, subject_code in enumerate(exp_info.subjects_ids):
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
     evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
 
-    # Source data path
-    sources_path_subject = paths().sources_path() + subject.subject_id
-    fname_fwd = sources_path_subject + f'/{subject_code}_{surf_vol}-fwd.fif'
-    fname_inv = sources_path_subject + f'/{subject_code}_{surf_vol}-inv_{data_type}.fif'
+    # # Source data path
+    # sources_path_subject = paths().sources_path() + subject.subject_id
+    # fname_fwd = sources_path_subject + f'/{subject_code}_{surf_vol}-fwd.fif'
 
     try:
         # Load data
@@ -196,24 +192,27 @@ for subj_num, subject_code in enumerate(exp_info.subjects_ids):
 
 
     # --------- Source estimation ---------#
+    # Source data path
+    sources_path_subject = paths().sources_path() + subject.subject_id
+
     # Load forward model
+    if surf_vol == 'volume':
+        fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
+    elif surf_vol == 'surface':
+        fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
     fwd = mne.read_forward_solution(fname_fwd)
+    src = fwd['src']
 
-    # Compute covariance matrices from epochs for data and from raw for noise
-    noise_cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=epochs.info['bads'],
-                                             use_ica_data=use_ica_data)
-    data_cov = mne.compute_covariance(epochs)
-
-    # Define covariance matrices minimum rank as mag channels - excluded components
-    # rank = min(np.linalg.matrix_rank(noise_cov.data), np.linalg.matrix_rank(data_cov.data))
-    rank = sum([ch_type == 'mag' for ch_type in evoked.get_channel_types()]) - len(evoked.info['bads']) - len(subject.ex_components)
-
-    # Define linearly constrained minimum variance spatial filter
-    filters = beamformer.make_lcmv(info=epochs.info, forward=fwd, data_cov=data_cov, reg=0.05, noise_cov=noise_cov,
-                                   pick_ori=pick_ori, rank=dict(mag=rank))  # reg parameter is for regularization on rank deficient matrices (rank < channels)
+    # Load filter
+    if surf_vol == 'volume':
+        fname_filter = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
+    elif surf_vol == 'surface':
+        fname_filter = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-{model_name}.fif'
+    filters = mne.beamformer.read_beamformer(fname_filter)
 
     # Apply filter and get source estimates
     stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
+
 
     # --------- Connectivity ---------#
     if subject_code != 'fsaverage':
