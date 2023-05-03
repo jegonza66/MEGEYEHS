@@ -79,7 +79,7 @@ else:
 run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_{tmin}_{tmax}_bline{baseline}/'
 
 # Source plots paths
-fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{spacing}_{pick_ori}/'
+fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}/'
 
 # Data paths
 epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path
