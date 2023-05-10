@@ -10,7 +10,8 @@ import load
 import setup
 
 
-def define_events(subject, meg_data, epoch_id, mss=None, trials=None, screen=None, dur=None, tgt=None, dir=None, evt_from_df=False):
+def define_events(subject, meg_data, epoch_id, mss=None, trials=None, evt_dur=None, screen=None, tgt=None,
+                  dir=None, evt_from_df=False):
 
     print('Defining events')
 
@@ -27,8 +28,8 @@ def define_events(subject, meg_data, epoch_id, mss=None, trials=None, screen=Non
             metadata = metadata.loc[(metadata['screen'] == screen)]
         if mss:
             metadata = metadata.loc[(metadata['mss'] == mss)]
-        if dur:
-            metadata = metadata.loc[(metadata['duration'] >= dur)]
+        if evt_dur:
+            metadata = metadata.loc[(metadata['duration'] >= evt_dur)]
         if 'fix' in epoch_id:
             if tgt == 1:
                 metadata = metadata.loc[(metadata['fix_target'] == tgt)]
@@ -58,17 +59,22 @@ def define_events(subject, meg_data, epoch_id, mss=None, trials=None, screen=Non
             epoch_keys = [key for key in epoch_keys if 'sac' not in key]
         if 'fix' not in epoch_id:
             epoch_keys = [key for key in epoch_keys if 'fix' not in key]
-        # if screen:
-        #     epoch_keys = [epoch_key for epoch_key in epoch_keys if f'{screen}' in epoch_key]
         if trials != None:
             try:
                 epoch_keys = [epoch_key for epoch_key in epoch_keys if
                               (epoch_key.split('_t')[-1].split('_')[0] in trials and 'end' not in epoch_key)]
             except:
                 print('Trial selection skipped. Epoch_id does not contain trial number.')
-        # if mss:
-        #     trials_mss = subject.bh_data.loc[subject.bh_data['Nstim'] == mss].index + 1  # add 1 due to python 0th indexing
-        #     epoch_keys = [epoch_key for epoch_key in epoch_keys if int(epoch_key.split('t')[-1]) in trials_mss]
+
+        # Set duration limit
+        if evt_dur:
+            if 'fix' in epoch_id:
+                metadata = subject.fixations
+            elif 'sac' in epoch_id:
+                metadata = subject.saccades
+            metadata = metadata.loc[(metadata['duration'] >= evt_dur)]
+            metadata_ids = list(metadata['id'])
+            epoch_keys = [key for key in epoch_keys if key in metadata_ids]
 
         # Get events and ids matchig selection
         metadata, events, events_id = mne.epochs.make_metadata(events=all_events, event_id=all_event_id,
@@ -83,7 +89,7 @@ def define_events(subject, meg_data, epoch_id, mss=None, trials=None, screen=Non
     return metadata, events, events_id, metadata_sup
 
 
-def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax, baseline=(None, 0), reject=None,
+def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax, trial_dur=None, evt_dur=None, baseline=(None, 0), reject=None,
                save_data=False, epochs_save_path=None, epochs_data_fname=None):
     '''
     :param subject:
@@ -107,15 +113,14 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
 
     # Sanity check to save data
     if save_data and (not epochs_save_path or not epochs_data_fname):
-        raise ValueError('Please provide path and filename to save data. Else, set save_data to false.')
+        raise ValueError('Please provide path and filename to save data. If not, set save_data to false.')
 
     # Trials
-    cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss,
-                                                                      corr_ans=corr_ans, tgt_pres=tgt_pres)
+    cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss, trial_dur=trial_dur,
+                                                                      evt_dur=evt_dur, corr_ans=corr_ans, tgt_pres=tgt_pres)
     # Define events
-    metadata, events, events_id, metadata_sup = define_events(subject=subject, epoch_id=epoch_id,
-                                                                                 trials=cond_trials,
-                                                                                 meg_data=meg_data)
+    metadata, events, events_id, metadata_sup = define_events(subject=subject, epoch_id=epoch_id, evt_dur=evt_dur,
+                                                              trials=cond_trials, meg_data=meg_data)
     # Reject based on channel amplitude
     if reject == None:
         # Not setting reject parameter will set to default subject value

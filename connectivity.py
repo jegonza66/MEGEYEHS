@@ -15,14 +15,15 @@ import numpy as np
 
 
 # --------- Define Parameters ---------#
-save_fig = True
-display_figs = False
+save_fig = False
+display_figs = True
 # Select epochs by id
 epoch_id = 'vs'
+run_id = 'vs'
 # Data
 use_ica_data = True
 # Frequency band
-band_id = 'Theta'
+band_id = 'Broad'
 
 # Trials
 corr_ans = None
@@ -33,11 +34,11 @@ mss = None
 force_fsaverage = False
 # Model
 model_name = 'lcmv'
-ico = 5
-spacing = 5.
+ico = 4
+spacing = 10.
 # Souce model ('volume'/'surface'/'mixed')
 surf_vol = 'surface'
-pick_ori = None  # 'vector' For dipoles, 'max_power' for
+pick_ori = 'max-power'  # 'vector' For dipoles, 'max_power' for
 # Parcelation (aparc / aparc.a2009s)
 parcelation = 'aparc'
 connectivity_method = 'pli'
@@ -54,15 +55,8 @@ cross2_dur = 1
 vs_dur = 4
 plot_edge = 0.15
 
-if 'ms' in epoch_id:
-    dur = mss_duration[mss] + cross2_dur + vs_dur
-elif 'cross2' in epoch_id:
-    dur = cross2_dur + vs_dur  # seconds
-else:
-    dur = 0
-
 # Get time windows from epoch_id name
-map_times = dict(ms={'tmin': -0.1, 'tmax': mss_duration[mss], 'plot_xlim': (0, mss_duration[mss])},
+map_times = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[mss], 'plot_xlim': (0, mss_duration[mss])},
                  cross2={'tmin': 0, 'tmax': cross2_dur, 'plot_xlim': (0, cross2_dur)},
                  vs={'tmin': 0, 'tmax': vs_dur, 'plot_xlim': (0, vs_dur)},
                  sac={'tmin': -0.05, 'tmax': 0.07, 'plot_xlim': (-0.05, 0.07)},
@@ -70,6 +64,11 @@ map_times = dict(ms={'tmin': -0.1, 'tmax': mss_duration[mss], 'plot_xlim': (0, m
 
 # Get times
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
+con_tmin = 0
+if run_id == 'cross1':
+    con_tmax = cross1_dur
+else:
+    con_tmax = tmax
 
 # Baseline duration
 if 'sac' in epoch_id:
@@ -78,10 +77,8 @@ elif 'fix' in epoch_id or 'fix' in epoch_id:
     baseline = (tmin, -0.05)
 elif 'ms' in epoch_id or 'cross2' in epoch_id and mss:
     baseline = (tmin, 0)
-    plot_baseline = (plot_xlim[0], 0)
 else:
     baseline = (tmin, 0)
-    plot_baseline = (plot_xlim[0], 0)
 
 # Load experiment info
 exp_info = setup.exp_info()
@@ -103,20 +100,33 @@ evoked_save_path = paths().save_path() + f'Evoked_{data_type}/' + run_path_data
 
 # Source plots paths
 run_path_plot = run_path_data.replace('Band_None', f'Band_{band_id}')
+run_path_plot = run_path_plot.replace(epoch_id, run_id)
 fig_path = paths().plots_path() + f'Connectivity_{data_type}/' + run_path_plot + \
            f'{model_name}_{surf_vol}_ico{ico}_{spacing}_{pick_ori}_{parcelation}_{connectivity_method}/'  # Replace band id for None because Epochs are the same on all bands
 
-# Connectivity matrix
-# Get labels for FreeSurfer 'aparc' cortical parcellation with 34 labels/hemi
-fsaverage_labels = mne.read_labels_from_annot(subject='fsaverage', parc=parcelation, subjects_dir=subjects_dir)
-# Remove 'unknown' label for fsaverage aparc labels
-if parcelation == 'aparc':
-    print("Dropping extra 'unkown' label from lh.")
-    drop_idxs = [i for i, label in enumerate(fsaverage_labels) if 'unknown' in label.name]
+# Set up connectivity matrix
+if surf_vol == 'surface':  # or surf_vol == 'mixed':
+    # Get labels for FreeSurfer 'aparc' cortical parcellation with 34 labels/hemi
+    fsaverage_labels = mne.read_labels_from_annot(subject='fsaverage', parc=parcelation, subjects_dir=subjects_dir)
+    # Remove 'unknown' label for fsaverage aparc labels
+    if parcelation == 'aparc':
+        print("Dropping extra 'unkown' label from lh.")
+        drop_idxs = [i for i, label in enumerate(fsaverage_labels) if 'unknown' in label.name]
+        for drop_idx in drop_idxs:
+            fsaverage_labels.pop(drop_idx)
+    con_matrix = np.zeros((len(exp_info.subjects_ids), len(fsaverage_labels), len(fsaverage_labels)))
+    # if surf_vol == 'mixed':
+    #     fsaverage_labels + [1]
+if surf_vol == 'volume':
+    labels_fname = subjects_dir + f'/fsaverage/mri/aparc+aseg.mgz'
+    fsaverage_labels = mne.get_volume_labels_from_aseg(labels_fname, return_colors=True)
+    # Drop extra labels in fsaverage
+    drop_idxs = [i for i, label in enumerate(fsaverage_labels[0]) if (label == 'ctx-lh-corpuscallosum' or
+                                                                   label == 'ctx-rh-corpuscallosum')]
     for drop_idx in drop_idxs:
-        fsaverage_labels.pop(drop_idx)
-
-con_matrix = np.zeros((len(exp_info.subjects_ids), len(fsaverage_labels), len(fsaverage_labels)))
+        fsaverage_labels[0].pop(drop_idx)
+        fsaverage_labels[1].pop(drop_idx)
+    con_matrix = np.zeros((len(exp_info.subjects_ids), len(fsaverage_labels[0]), len(fsaverage_labels[0])))
 
 # Turn on/off show figures
 if display_figs:
@@ -200,7 +210,10 @@ for subj_num, subject_code in enumerate(exp_info.subjects_ids):
         fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
     elif surf_vol == 'surface':
         fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
+    # elif surf_vol == 'mixed':
+    #     fname_fwd = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}-fwd.fif'
     fwd = mne.read_forward_solution(fname_fwd)
+    # Get sources from forward model
     src = fwd['src']
 
     # Load filter
@@ -208,6 +221,8 @@ for subj_num, subject_code in enumerate(exp_info.subjects_ids):
         fname_filter = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
     elif surf_vol == 'surface':
         fname_filter = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-{model_name}.fif'
+    # elif surf_vol == 'mixed':
+    #     fname_filter = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
     filters = mne.beamformer.read_beamformer(fname_filter)
 
     # Apply filter and get source estimates
@@ -215,27 +230,26 @@ for subj_num, subject_code in enumerate(exp_info.subjects_ids):
 
 
     # --------- Connectivity ---------#
-    if subject_code != 'fsaverage':
+    if surf_vol == 'volume':
+        labels = subjects_dir + f'/{subject_code}/mri/aparc+aseg.mgz'
+    elif subject_code != 'fsaverage':
         # Get labels for FreeSurfer cortical parcellation
         labels = mne.read_labels_from_annot(subject=subject_code, parc=parcelation, subjects_dir=subjects_dir)
     else:
         labels = fsaverage_labels
 
-    # Get sources from forward model
-    src = fwd['src']
     # Average the source estimates within each label using sign-flips to reduce signal cancellations, also here we return a generator
-    label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=labels, src=src, mode='mean_flip', return_generator=True)
+    label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=labels, src=src, mode='auto', return_generator=True)
 
     # Compute connectivity
-    con_tmin = 0
     con = mne_connectivity.spectral_connectivity_epochs(label_ts, method=connectivity_method, mode='multitaper', sfreq=epochs.info['sfreq'],
-                                                        fmin=fmin, fmax=fmax, tmin=con_tmin, tmax=tmax, faverage=True,  mt_adaptive=True)
+                                                        fmin=fmin, fmax=fmax, tmin=con_tmin, tmax=con_tmax, faverage=True,  mt_adaptive=True)
 
     # Get connectivity matrix
     con_matrix[subj_num] = con.get_data(output='dense')[:, :, 0]
 
     # Plot circle
-    plot_general.connectivity_circle(subject=subject, labels=labels, con=con_matrix[subj_num], connectivity_method='pli',
+    plot_general.connectivity_circle(subject=subject, labels=labels, surf_vol=surf_vol, con=con_matrix[subj_num], connectivity_method='pli',
                                      subject_code=subject_code, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path, fname=None)
 
     # Plot connectome
@@ -249,7 +263,7 @@ ga_con_matrix = con_matrix.mean(0)
 
 
 # Plot circle
-plot_general.connectivity_circle(subject='GA', labels=labels, con=ga_con_matrix, connectivity_method='pli', subject_code='fsaverage',
+plot_general.connectivity_circle(subject='GA', labels=labels, surf_vol=surf_vol, con=ga_con_matrix, connectivity_method='pli', subject_code='fsaverage',
                                  display_figs=display_figs, save_fig=save_fig, fig_path=fig_path, fname='GA_circle')
 
 

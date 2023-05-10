@@ -20,12 +20,12 @@ subjects = ['15909001', '15912001', '15910001', '15950001', '15911001', '1153500
 # subjects = ['15910001', '15950001', '15911001', '16191001', '16263002']
 
 # Define surface or volume source space
-volume = True
+surf_vol = 'mixed'
 use_ica_data = True
-force_fsaverage = True
-ico = 5
-spacing = 5.
-pick_ori = None
+force_fsaverage = False
+ico = 4
+spacing = 10.
+pick_ori = 'max-power'
 
 # Define Subjects_dir as Freesurfer output folder
 mri_path = paths().mri_path()
@@ -150,7 +150,7 @@ for subject_code in subjects:
     data_cov = mne.compute_raw_covariance(meg_data, reject=dict(mag=4e-12), rank=None)
 
     # --------- Source space, forward model and inverse operator ---------#
-    if volume:
+    if surf_vol == 'volume':
         # Volume
         # Source model
         fname_src = sources_path + subject_code + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-src.fif'
@@ -183,12 +183,18 @@ for subject_code in subjects:
         fname_lmcv = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-lcmv.fif'
         filters.save(fname=fname_lmcv, overwrite=True)
 
-    else:
-        #Surface
+    elif surf_vol == 'surface':
+        # Surface
         # Source model
-        src = mne.setup_source_space(subject=subject_code, spacing=f'ico{ico}', subjects_dir=subjects_dir)
         fname_src = sources_path_subject + f'/{subject_code}_surface_ico{ico}-src.fif'
-        mne.write_source_spaces(fname_src, src, overwrite=True)
+        try:
+            # Load
+            src = mne.read_source_spaces(fname_src)
+        except:
+            # Compute
+            src = mne.setup_source_space(subject=subject_code, spacing=f'ico{ico}', subjects_dir=subjects_dir)
+            # Save
+            mne.write_source_spaces(fname_src, src, overwrite=True)
 
         # Forward model
         fwd = mne.make_forward_solution(meg_data.info, trans=trans_path, src=src, bem=bem)
@@ -207,4 +213,58 @@ for subject_code in subjects:
 
         # Save
         fname_lmcv = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-lcmv.fif'
+        filters.save(fname=fname_lmcv, overwrite=True)
+
+    elif surf_vol == 'mixed':
+        fname_src_mix = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}-src.fif'
+        try:
+            # Load
+            src_surf = mne.read_source_spaces(fname_src_surf)
+        except:
+            # Mixed
+            # Surface source model
+            fname_src_surf = sources_path_subject + f'/{subject_code}_surface_ico{ico}-src.fif'
+            try:
+                # Load
+                src_surf = mne.read_source_spaces(fname_src_surf)
+            except:
+                # Compute
+                src_surf = mne.setup_source_space(subject=subject_code, spacing=f'ico{ico}', subjects_dir=subjects_dir)
+                # Save
+                mne.write_source_spaces(fname_src_surf, src_surf, overwrite=True)
+
+            # Volume source model
+            fname_src_vol = sources_path + subject_code + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-src.fif'
+            try:
+                # Load
+                src_vol = mne.read_source_spaces(fname_src_vol)
+            except:
+                # Compute
+                src_vol = mne.setup_volume_source_space(subject=subject_code, subjects_dir=subjects_dir, bem=bem,
+                                                    pos=spacing, sphere_units='m', add_interpolator=True)
+                # Save
+                mne.write_source_spaces(fname_src_vol, src_vol, overwrite=True)
+
+            # Mixed source space
+            src = src_surf + src_vol
+            # Save
+            mne.write_source_spaces(fname_src_mix, src, overwrite=True)
+
+        # Forward model
+        fwd = mne.make_forward_solution(meg_data.info, trans=trans_path, src=src, bem=bem)
+        fname_fwd = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}-fwd.fif'
+        mne.write_forward_solution(fname_fwd, fwd, overwrite=True)
+
+        # Spatial filter
+        rank = sum([ch_type == 'mag' for ch_type in meg_data.get_channel_types()]) - len(meg_data.info['bads'])
+        if use_ica_data:
+            rank -= len(subject.ex_components)
+
+        # Define linearly constrained minimum variance spatial filter
+        # reg parameter is for regularization on rank deficient matrices (rank < channels)
+        filters = beamformer.make_lcmv(info=meg_data.info, forward=fwd, data_cov=data_cov, reg=0.05,
+                                       noise_cov=noise_cov, pick_ori=pick_ori, rank=dict(mag=rank))
+
+        # Save
+        fname_lmcv = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-lcmv.fif'
         filters.save(fname=fname_lmcv, overwrite=True)

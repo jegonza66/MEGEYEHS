@@ -33,13 +33,16 @@ reject = None
 
 # Source estimation parameters
 force_fsaverage = False
-surf_vol = 'volume'
-ico = 5
-spacing = 5.
-pick_ori = None  # 'vector' For dipoles, 'max_power' for
+# Model
+model_name = 'lcmv'  # ('lcmv', 'dics')
+surf_vol = 'mixed'
+ico = 4
+spacing = 10.
+pick_ori = 'max-power'  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximices output power
 
-# Plot time
+# Plot
 initial_time = None
+cbar_percent_lims = (99.9, 99.95, 100)
 
 # Frequency band
 band_id = None
@@ -57,9 +60,6 @@ if use_ica_data:
 else:
     data_type = 'RAW'
 
-# Model
-model_name = 'lcmv'  # ('lcmv', 'dics')
-
 # Get time windows from epoch_id name
 map_times = dict(sac={'tmin': -0.05, 'tmax': 0.07, 'plot_xlim': (-0.05, 0.07)},
                  fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.05, 0.2)})
@@ -74,6 +74,12 @@ elif 'fix' in epoch_id or 'fix' in epoch_id:
     baseline = (tmin, -0.05)
 else:
     baseline = (tmin, 0)
+
+# Plot colobar limits
+if pick_ori == 'max-power':
+    clim = dict(kind='percent', pos_lims=cbar_percent_lims)
+else:
+    clim = dict(kind='percent', lims=cbar_percent_lims)
 
 # --------- Paths ---------#
 run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_{tmin}_{tmax}_bline{baseline}/'
@@ -158,6 +164,8 @@ for subject_code in exp_info.subjects_ids:
         fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
     elif surf_vol == 'surface':
         fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
+    elif surf_vol == 'mixed':
+        fname_fwd = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}-fwd.fif'
     fwd = mne.read_forward_solution(fname_fwd)
     src = fwd['src']
 
@@ -166,6 +174,8 @@ for subject_code in exp_info.subjects_ids:
         fname_filter = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
     elif surf_vol == 'surface':
         fname_filter = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-{model_name}.fif'
+    elif surf_vol == 'mixed':
+        fname_filter = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
     filters = mne.beamformer.read_beamformer(fname_filter)
 
     # Apply filter and get source estimates
@@ -176,8 +186,10 @@ for subject_code in exp_info.subjects_ids:
         # Get Source space for fsaverage
         if surf_vol == 'volume':
             fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_volume_ico{ico}_{int(spacing)}-src.fif'
-        else:
+        elif surf_vol == 'surface':
             fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_surface_ico{ico}-src.fif'
+        elif surf_vol == 'mixed':
+            fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_mixed_ico{ico}_{int(spacing)}-src.fif'
 
         src_fs = mne.read_source_spaces(fname_src)
 
@@ -195,9 +207,8 @@ for subject_code in exp_info.subjects_ids:
         stcs_fs.append(stc)
 
     # Plot
-    clims = (stc.data.max()*0.66, stc.data.max()*0.75, stc.data.max())
     fig = stc.plot(src, subject=subject_code, subjects_dir=subjects_dir, initial_time=initial_time,
-                   clim=dict(kind='value', lims=clims))
+                   clim=clim)
 
     if save_fig:
         fname = f'{subject.subject_id}'
@@ -211,7 +222,7 @@ for subject_code in exp_info.subjects_ids:
 
 
 # Average evoked stcs
-source_data_fs = np.zeros((len(stcs_fs), stcs_fs[0].data.shape[0], stcs_fs[0].data.shape[1]))
+source_data_fs = np.zeros(tuple([len(stcs_fs)]+[size for size in stcs_fs[0].data.shape]))
 for i, stc in enumerate(stcs_fs):
     source_data_fs[i] = stcs_fs[i].data
 GA_stc_data = source_data_fs.mean(0)
@@ -229,14 +240,15 @@ GA_stc.subject = 'fsaverage'
 # Read fsaverage surface from any subject
 if surf_vol == 'volume':
     fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_volume_ico{ico}_{int(spacing)}-src.fif'
-else:
+elif surf_vol == 'surface':
     fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_surface_ico{ico}-src.fif'
+elif surf_vol == 'mixed':
+    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_mixed_ico{ico}_{int(spacing)}-src.fif'
 src_fs = mne.read_source_spaces(fname_src)
 
 # Plot
-clims = (GA_stc.data.max()*0.66, GA_stc.data.max()*0.75, GA_stc.data.max())
 fig = GA_stc.plot(src_fs, subject='fsaverage', subjects_dir=subjects_dir, initial_time=initial_time,
-                  clim=dict(kind='value', lims=clims))
+                  clim=clim)
 
 if save_fig:
     fname = 'GA'

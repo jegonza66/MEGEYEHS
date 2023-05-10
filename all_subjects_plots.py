@@ -6,7 +6,7 @@ import load
 import save
 import matplotlib.pyplot as plt
 
-
+save_fig = False
 save_path = paths().save_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
@@ -60,8 +60,25 @@ plot_preproc.sac_main_seq(subject=subjects, ax=axs[1, 1])
 
 fig.tight_layout()
 
-save_path = paths().plots_path() + 'Preprocessing/' + subjects.subject_id + '/'
-fname = f'{subjects.subject_id} Multipanel'
-save.fig(fig=fig, path=save_path, fname=fname)
+if save_fig:
+    save_path = paths().plots_path() + 'Preprocessing/' + subjects.subject_id + '/'
+    fname = f'{subjects.subject_id} Multipanel'
+    save.fig(fig=fig, path=save_path, fname=fname)
 
+## VS duration
+
+vs_dur = subjects.rt
+vs_dur = vs_dur.fillna(10)
+
+fig, ax = plt.subplots()
+
+ax.hist(vs_dur, bins=70, range=(0, 10), edgecolor='black', linewidth=1.2, density=False, stacked=True)
+ax.set_title('VS duration')
+ax.set_xlabel('Time (s)')
+ax.set_ylabel('Quantity')
+
+threshold = 4
+vs_dur_thr = vs_dur[vs_dur[0] > threshold]
+ratio = len(vs_dur_thr)/len(vs_dur)*100
+print(f'Percentage so samples kept using {threshold}s threshold: {round(ratio, 1)}%')
 

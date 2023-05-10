@@ -434,7 +434,7 @@ def get_mss(epoch_id):
     return mss
 
 
-def get_condition_trials(subject, mss=None, corr_ans=None, tgt_pres=None):
+def get_condition_trials(subject, mss=None, trial_dur=None, corr_ans=None, tgt_pres=None):
     bh_data = subject.bh_data
     if corr_ans:
         bh_data = bh_data.loc[subject.corr_ans == 1]
@@ -442,6 +442,10 @@ def get_condition_trials(subject, mss=None, corr_ans=None, tgt_pres=None):
         bh_data = bh_data.loc[subject.corr_ans == 0]
     if mss:
         bh_data = bh_data.loc[bh_data['Nstim'] == mss]
+    if trial_dur:
+        rt = subject.rt
+        good_trials = np.where(rt > trial_dur)[0]
+        bh_data = bh_data.iloc[good_trials]
     if tgt_pres:
         bh_data = bh_data.loc[bh_data['Tpres'] == 1]
     elif tgt_pres == False:

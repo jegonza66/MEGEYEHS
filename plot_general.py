@@ -449,7 +449,7 @@ def mri_meg_alignment(subject, subject_code, dig, subjects_dir=os.path.join(path
                                      coord_frame='meg', mri_fiducials=fids_path)
 
 
-def connectivity_circle(subject, labels, con, connectivity_method='pli', subject_code=None, display_figs=False, save_fig=False,
+def connectivity_circle(subject, labels, con, surf_vol, connectivity_method='pli', subject_code=None, display_figs=False, save_fig=False,
                         fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fig_path):
@@ -463,11 +463,18 @@ def connectivity_circle(subject, labels, con, connectivity_method='pli', subject
         matplotlib.rc({'ytick.labelsize': ticksize})
 
     # Get colors for each label
-    label_colors = [label.color for label in labels]
+    if surf_vol == 'surface':
+        label_colors = [label.color for label in labels]
+    elif surf_vol == 'volume':
+        label_colors = labels[1]
 
     # Reorder the labels based on their location in the left hemi
-    label_names = [label.name for label in labels]
-    lh_labels = [name for name in label_names if name.endswith('lh')]
+    if surf_vol == 'surface':
+        label_names = [label.name for label in labels]
+        lh_labels = [name for name in label_names if name.endswith('lh')]
+    elif surf_vol == 'volume':
+        label_names = labels[0]
+        lh_labels = [name for name in label_names if ('lh' in name or 'Left' in name)]
 
     # Get the y-location of the label
     label_ypos = list()
@@ -510,7 +517,7 @@ def connectivity_circle(subject, labels, con, connectivity_method='pli', subject
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_glass_fsaverage', threshold=0.9,
+def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_glass_fsaverage', connections_num=10,
                node_size=15):
 
     # Sanity check
@@ -529,14 +536,15 @@ def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, 
         label_zpos.append(np.mean(labels[idx].pos[:, 2]))
 
     # Make node position array and reescale
-    nodes_pos = np.array([label_xpos, label_ypos, label_zpos]).transpose() * 1150
+    nodes_pos = np.array([label_xpos, label_ypos, label_zpos]).transpose() * 1000
 
     # Make adjacency matrix symetric for two-way connectome
     adjacency_matrix = np.maximum(adjacency_matrix, adjacency_matrix.transpose())
 
     # Plot connectome
+    edge_threshold = np.sort(adjacency_matrix, axis=None)[-int(connections_num)*2]
     fig = plotting.plot_connectome(adjacency_matrix=adjacency_matrix, node_coords=nodes_pos,
-                                   edge_threshold=adjacency_matrix.max() * threshold, node_size=node_size)
+                                   edge_threshold=edge_threshold, node_size=node_size)
 
     # Save
     if save_fig:
