@@ -89,8 +89,8 @@ def define_events(subject, meg_data, epoch_id, mss=None, trials=None, evt_dur=No
     return metadata, events, events_id, metadata_sup
 
 
-def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax, trial_dur=None, evt_dur=None, baseline=(None, 0), reject=None,
-               save_data=False, epochs_save_path=None, epochs_data_fname=None):
+def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax, trial_dur=None, evt_dur=None,
+               baseline=(None, 0), reject=dict(mag=5e-12), save_data=False, epochs_save_path=None, epochs_data_fname=None):
     '''
     :param subject:
     :param mss:
@@ -117,15 +117,12 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
 
     # Trials
     cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss, trial_dur=trial_dur,
-                                                                      evt_dur=evt_dur, corr_ans=corr_ans, tgt_pres=tgt_pres)
+                                                                      corr_ans=corr_ans, tgt_pres=tgt_pres)
     # Define events
     metadata, events, events_id, metadata_sup = define_events(subject=subject, epoch_id=epoch_id, evt_dur=evt_dur,
                                                               trials=cond_trials, meg_data=meg_data)
     # Reject based on channel amplitude
-    if reject == None:
-        # Not setting reject parameter will set to default subject value
-        reject = dict(mag=4e-12)
-    elif reject == False:
+    if reject == False:
         # Setting reject parameter to False uses No rejection (None in mne will not reject)
         reject = None
     elif reject == 'subject':
