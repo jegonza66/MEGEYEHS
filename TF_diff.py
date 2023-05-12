@@ -254,24 +254,24 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
             # Plot power time-frequency
             # MS
             fname = f'Power_ms_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-            plot_general.tfr(subject=subject, tfr=power_diff_ms, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
+            plot_general.tfr_bands(subject=subject, tfr=power_diff_ms, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
                              cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                              display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
             # Cross2
             fname = f'Power_cross2_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-            plot_general.tfr(subject=subject, tfr=power_diff_cross2, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
+            plot_general.tfr_bands(subject=subject, tfr=power_diff_cross2, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
                              cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                              display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
 
             # Plot ITC time-frequency
             # MS
             fname = f'ITC_ms_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-            plot_general.tfr(subject=subject, tfr=itc_diff_ms, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
+            plot_general.tfr_bands(subject=subject, tfr=itc_diff_ms, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
                              cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                              display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
             # Cross2
             fname = f'ITC_cross2_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-            plot_general.tfr(subject=subject, tfr=itc_diff_cross2, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
+            plot_general.tfr_bands(subject=subject, tfr=itc_diff_cross2, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
                              cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                              display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
 
@@ -315,13 +315,13 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
     # Plot Power time-frequency
     # MS
     fname = f'Power_ms_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr(tfr=grand_avg_power_ms_diff, chs_id=chs_id,
+    plot_general.tfr_bands(tfr=grand_avg_power_ms_diff, chs_id=chs_id,
                      epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                      subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname,
                      vmin=-0.15, vmax=0.15, fontsize=16, ticksize=18)
     # Cross2
     fname = f'Power_cross2_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr(tfr=grand_avg_power_cross2_diff, chs_id=chs_id,
+    plot_general.tfr_bands(tfr=grand_avg_power_cross2_diff, chs_id=chs_id,
                      epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                      subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname,
                      vmin=-0.15, vmax=0.15, fontsize=16, ticksize=18)
@@ -329,13 +329,13 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
     # Plot ITC time-frequency
     # MS
     fname = f'ITC_ms_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr(tfr=grand_avg_itc_ms_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur,
+    plot_general.tfr_bands(tfr=grand_avg_itc_ms_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur,
                      mss_duration=mss_duration, cross2_dur=cross2_dur, subject=None, display_figs=display_figs,
                      save_fig=save_fig, fig_path=trf_fig_path, fname=fname,
                      vmin=-0.15, vmax=0.15, fontsize=16, ticksize=18)
     # Cross2
     fname = f'ITC_cross2_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr(tfr=grand_avg_itc_cross2_diff, chs_id=chs_id,  epoch_id=epoch_id, mss=mss,
+    plot_general.tfr_bands(tfr=grand_avg_itc_cross2_diff, chs_id=chs_id,  epoch_id=epoch_id, mss=mss,
                      cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                      subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname,
                      vmin=-0.15, vmax=0.15, fontsize=16, ticksize=18)
@@ -605,12 +605,12 @@ for subject_code in exp_info.subjects_ids:
 
     # Plot power time-frequency
     fname = f'Power_{epoch_id}_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr(subject=subject, tfr=power_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
+    plot_general.tfr_bands(subject=subject, tfr=power_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
                      cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                      display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
     # Plot ITC time-frequency
     fname = f'ITC_{epoch_id}_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr(subject=subject, tfr=itc_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
+    plot_general.tfr_bands(subject=subject, tfr=itc_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
                      cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                      display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
 
@@ -646,12 +646,12 @@ except:
 
 # Plot Power time-frequency
 fname = f'Power_{epoch_id}_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-plot_general.tfr(tfr=grand_avg_power_diff, chs_id=chs_id,
+plot_general.tfr_bands(tfr=grand_avg_power_diff, chs_id=chs_id,
                  epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                  subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
 # Plot ITC time-frequency
 fname = f'ITC_{epoch_id}_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-plot_general.tfr(tfr=grand_avg_itc_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration,
+plot_general.tfr_bands(tfr=grand_avg_itc_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration,
                  cross2_dur=cross2_dur,
                  subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
 
@@ -892,12 +892,12 @@ for mss in [1, 2, 4]:
 
         # Plot power time-frequency
         fname = f'Power_{epoch_id}_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-        plot_general.tfr(subject=subject, tfr=power_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
+        plot_general.tfr_bands(subject=subject, tfr=power_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
                          cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                          display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
         # Plot ITC time-frequency
         fname = f'ITC_{epoch_id}_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-        plot_general.tfr(subject=subject, tfr=itc_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
+        plot_general.tfr_bands(subject=subject, tfr=itc_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
                          cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                          display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
 
@@ -935,12 +935,12 @@ for mss in [1, 2, 4]:
 
     # Plot Power time-frequency
     fname = f'Power_{epoch_id}_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr(tfr=grand_avg_power_diff, chs_id=chs_id,
+    plot_general.tfr_bands(tfr=grand_avg_power_diff, chs_id=chs_id,
                      epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
                      subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
     # Plot ITC time-frequency
     fname = f'ITC_{epoch_id}_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr(tfr=grand_avg_itc_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration,
+    plot_general.tfr_bands(tfr=grand_avg_itc_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration,
                      cross2_dur=cross2_dur,
                      subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
 

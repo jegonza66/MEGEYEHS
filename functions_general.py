@@ -348,9 +348,8 @@ def get_freq_band(band_id):
     return l_freq, h_freq
 
 
-def get_time_lims(epoch_id, map=None):
+def get_time_lims(epoch_id, mss, cross1_dur, mss_duration, cross2_dur, dur, plot_edge, map=None,):
     '''
-
     :param epoch_id: str
         String with the name of the epochs to select.
     :param map: dict
@@ -365,30 +364,160 @@ def get_time_lims(epoch_id, map=None):
         time start and end to plot.
 
     '''
-    done = False
-    if map:
-        for key in map.keys():
-            if key in epoch_id:
-                tmin = map[key]['tmin']
-                tmax = map[key]['tmax']
-                plot_xlim = map[key]['plot_xlim']
-                done = True
-    if not done:
-        print('Using default time values')
-        if 'fix' in epoch_id:
-            tmin = -0.1
-            tmax = 0.2
-            plot_xlim = (tmin, tmax)
-        elif 'sac' in epoch_id:
-            tmin = -0.05
-            tmax = 0.1
-            plot_xlim = (tmin, tmax)
-        else:
-            tmin = -0.1
-            tmax = 0.1
-            plot_xlim = (-0.05, 0.1)
+    if map and epoch_id in map.keys():
+        tmin = map[epoch_id]['tmin']
+        tmax = map[epoch_id]['tmax']
+        plot_xlim = map[epoch_id]['plot_xlim']
+
+    else:
+        try:
+            print('Using default time values')
+            map = dict(ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
+                       cross2={'tmin': -cross1_dur - mss_duration[mss], 'tmax': dur,
+                               'plot_xlim': (-cross1_dur - mss_duration[mss] + plot_edge, dur - plot_edge)},
+                       vs={'tmin': -cross1_dur - mss_duration[mss] - cross2_dur, 'tmax': dur,
+                           'plot_xlim': (-cross1_dur - mss_duration[mss] - cross2_dur + plot_edge, dur - plot_edge)},
+                       sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)},
+                       fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)})
+            tmin = map[epoch_id]['tmin']
+            tmax = map[epoch_id]['tmax']
+            plot_xlim = map[epoch_id]['plot_xlim']
+        except:
+            raise ValueError('Epoch id not in default map keys.')
 
     return tmin, tmax, plot_xlim
+
+
+def get_duration(epoch_id, vs_dur,  mss):
+    mss_duration = {1: 2, 2: 3.5, 4: 5, None: 2}
+    cross2_dur = 1
+    cross1_dur = 0.75
+
+    # Duration
+    if 'ms' in epoch_id:
+        dur = mss_duration[mss] + cross2_dur + vs_dur[mss][0]
+    elif 'cross2' in epoch_id:
+        dur = cross2_dur + vs_dur[mss][-0]  # seconds
+    elif 'vs' in epoch_id:
+        dur = vs_dur[mss][0]  # seconds
+    else:
+        dur = 0
+
+    return dur, cross1_dur, cross2_dur, mss_duration
+
+
+def get_baseline_duration(epoch_id, mss, tmin, tmax, plot_xlim, cross1_dur, mss_duration, cross2_dur, map=None):
+    # Baseline duration
+    if map and epoch_id in map.keys():
+        baseline = (map[epoch_id]['baseline'][0], map[epoch_id]['baseline'][1])
+        plot_baseline = (map[epoch_id]['plot_baseline'][0], map[epoch_id]['plot_baseline'][1])
+
+    elif 'sac' in epoch_id:
+        baseline = (tmin, 0)
+        plot_baseline = (plot_xlim[0], 0)
+        # baseline = None
+    elif 'fix' in epoch_id or 'fix' in epoch_id:
+        baseline = (tmin, -0.05)
+        plot_baseline = (plot_xlim[0], 0)
+    elif 'ms' in epoch_id:
+        baseline = (-cross1_dur, 0)
+        plot_baseline = baseline
+    elif 'cross2' in epoch_id and mss:
+        baseline = (-mss_duration[mss] - cross2_dur, -mss_duration[mss])
+        plot_baseline = baseline
+    elif 'vs' in epoch_id and mss:
+        baseline = (-cross1_dur -cross2_dur - mss_duration[mss], -cross2_dur - mss_duration[mss])
+        plot_baseline = baseline
+    else:
+        tmax = tmin + cross1_dur
+        if tmax.is_integer():
+            tmax = int(tmax)
+        baseline = (tmin, tmax)
+        plot_baseline = baseline
+
+    if baseline[0] < tmin:
+        baseline = (tmin, baseline[1])
+    if baseline[1] > tmax:
+        baseline = (baseline[1], tmax)
+    if baseline[0] > baseline[1]:
+        print('Baseline start is greater than end. Setting to (0, 0)')
+        baseline = (0, 0)
+
+    if plot_baseline[0] < tmin:
+        plot_baseline = (tmin, plot_baseline[1])
+    if plot_baseline[1] > tmax:
+        plot_baseline = (plot_baseline[0], tmax)
+    if plot_baseline[0] > plot_baseline[1]:
+        print('Plot_baseline start is greater than end. Setting to (0, 0)')
+        plot_baseline = (0, 0)
+
+    return baseline, plot_baseline
+
+
+def get_plots_timefreqs(epoch_id, mss, cross2_dur, mss_duration, topo_bands, plot_xlim, timefreqs_joint=None):
+    '''
+    :param epoch_id:
+    :param timefreqs_joint: list of tuples. Each tuple represents the time and frequency of the topoplot.
+    :param mss:
+    :param cross2_dur:
+    :param mss_duration:
+    :param topo_bands:
+    :return:
+    '''
+    # Plot_joint topoplots time frequencies
+    if epoch_id == 'ms' and mss:
+        if not timefreqs_joint:
+            timefreqs_joint = [(0.55, 10)]
+
+            vs_timefreq = {1: [(2.5, 10), (3.15, 10), (3.75, 10)],
+                           2: [(4, 10), (4.65, 10), (5.25, 10)],
+                           4: [(5.5, 10), (6.15, 10), (6.75, 10)]}
+
+            timefreqs_joint += vs_timefreq[mss]
+
+            # Check that time freqs are contained in plot times
+            timefreqs_joint = [timefreq for timefreq in timefreqs_joint if timefreq[0] > plot_xlim[0] and timefreq[0] < plot_xlim[1]]
+
+        timefreqs_tfr = {}
+        for i, time_freq in enumerate(timefreqs_joint):
+            # Get plot time from time defined for plot_joint
+            time = time_freq[0]
+            # Get frequencies from frequency id previously defined
+            fmin, fmax = get_freq_band(band_id=topo_bands[i])
+            timefreqs_tfr[f'topo{i}'] = dict(title=topo_bands[i], tmin=time, tmax=time, fmin=fmin, fmax=fmax)
+
+        #TFR vlines
+        vlines_times = [0, mss_duration[mss], mss_duration[mss] + 1]
+
+    elif epoch_id == 'vs' and mss:
+        if not timefreqs_joint:
+            ms_timefreq = {1: [(-2.45, 10)],
+                           2: [(-3.95, 10)],
+                           4: [(-5.45, 10)]}
+            timefreqs_joint = ms_timefreq[mss] + [(-0.5, 10), (0.15, 10), (0.75, 10)]
+
+            # Check that time freqs are contained in plot times
+            timefreqs_joint = [timefreq for timefreq in timefreqs_joint if timefreq[0] > plot_xlim[0] and timefreq[0] < plot_xlim[1]]
+
+        timefreqs_tfr = {}
+        for i, time_freq in enumerate(timefreqs_joint):
+            # Get plot time from time defined for plot_joint
+            time = time_freq[0]
+            # Get frequencies from frequency id previously defined
+            fmin, fmax = get_freq_band(band_id=topo_bands[i])
+            timefreqs_tfr[f'topo{i}'] = dict(title=topo_bands[i], tmin=time, tmax=time, fmin=fmin, fmax=fmax)
+
+        # TFR vlines
+        vlines_times = [- cross2_dur - mss_duration[mss], -cross2_dur, 0]
+
+    elif 'fix' in epoch_id:
+        timefreqs_joint = [(0.095, 10)]
+        vlines_times = None
+    else:
+        timefreqs_joint = None
+        vlines_times = None
+
+    return timefreqs_joint, timefreqs_tfr, vlines_times
 
 
 def get_item(epoch_id):
@@ -435,6 +564,15 @@ def get_mss(epoch_id):
 
 
 def get_condition_trials(subject, mss=None, trial_dur=None, corr_ans=None, tgt_pres=None):
+    '''
+
+    :param subject:
+    :param mss:
+    :param trial_dur: tuple. Minimum and maximun duration of visual search.
+    :param corr_ans:
+    :param tgt_pres:
+    :return:
+    '''
     bh_data = subject.bh_data
     if corr_ans:
         bh_data = bh_data.loc[subject.corr_ans == 1]
@@ -444,8 +582,10 @@ def get_condition_trials(subject, mss=None, trial_dur=None, corr_ans=None, tgt_p
         bh_data = bh_data.loc[bh_data['Nstim'] == mss]
     if trial_dur:
         rt = subject.rt
-        good_trials = np.where(rt > trial_dur)[0]
-        bh_data = bh_data.iloc[good_trials]
+        good_trials = np.where((rt > trial_dur[0]) & (rt < trial_dur[1]))[0]
+        matching_trials = list(set(good_trials) & set(bh_data.index))
+        matching_trials.sort()
+        bh_data = bh_data.loc[matching_trials]
     if tgt_pres:
         bh_data = bh_data.loc[bh_data['Tpres'] == 1]
     elif tgt_pres == False:

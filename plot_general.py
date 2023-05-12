@@ -211,7 +211,7 @@ def fig_psd():
     return fig, axs_topo, ax_psd
 
 
-def fig_time_frequency(fontsize=None, ticksize=None):
+def fig_tf_bands(fontsize=None, ticksize=None):
 
     if fontsize:
         matplotlib.rc({'font.size': fontsize})
@@ -230,9 +230,9 @@ def fig_time_frequency(fontsize=None, ticksize=None):
     return fig, axes_topo, ax1
 
 
-def tfr(tfr, chs_id, epoch_id, mss, cross1_dur, mss_duration, cross2_dur, plot_xlim=(None, None), baseline=None, bline_mode=None,
-        dB=False, vmin=None, vmax=None, subject=None, title=None, topo_times=None, display_figs=False, save_fig=False, fig_path=None, fname=None,
-        fontsize=None, ticksize=None):
+def tfr_bands(tfr, chs_id, plot_xlim=(None, None), baseline=None, bline_mode=None,
+        dB=False, vmin=None, vmax=None, subject=None, title=None, vlines_times=[0], topo_times=None, display_figs=False,
+        save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None):
 
     # Sanity check
     if save_fig and (not fname or not fig_path):
@@ -246,7 +246,7 @@ def tfr(tfr, chs_id, epoch_id, mss, cross1_dur, mss_duration, cross2_dur, plot_x
         dB = False
 
     # Define figure
-    fig, axes_topo, ax_tf = fig_time_frequency(fontsize=fontsize, ticksize=ticksize)
+    fig, axes_topo, ax_tf = fig_tf_bands(fontsize=fontsize, ticksize=ticksize)
 
     # Pick plot channels
     picks = functions_general.pick_chs(chs_id=chs_id, info=tfr.info)
@@ -256,24 +256,11 @@ def tfr(tfr, chs_id, epoch_id, mss, cross1_dur, mss_duration, cross2_dur, plot_x
              combine='mean', cmap='jet', axes=ax_tf, show=display_figs, vmin=vmin, vmax=vmax, dB=dB)
 
     # Plot time markers as vertical lines
-    if 'ms' in epoch_id and mss:
-        ax_tf.vlines(x=0, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
+    for t in vlines_times:
         try:
-            ax_tf.vlines(x=mss_duration[mss], ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
-                         linestyles='--', colors='black')
-        except: pass
-        try:
-            ax_tf.vlines(x=mss_duration[mss] + cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1],
-                         linestyles='--', colors='black')
-        except: pass
-
-    elif 'cross2' in epoch_id:
-        try:
-            ax_tf.vlines(x=cross2_dur, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
-        except: pass
-
-    else:
-        ax_tf.vlines(x=0, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='black')
+            ax_tf.vlines(x=t, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='gray')
+        except:
+            pass
 
     # Topomaps parameters
     if not topo_times:
@@ -309,7 +296,118 @@ def tfr(tfr, chs_id, epoch_id, mss, cross1_dur, mss_duration, cross2_dur, plot_x
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), plot_max=True, plot_min=True, vlines_times=[0],
+def fig_tf_times(time_len, timefreqs_tfr, fontsize=None, ticksize=None):
+
+    if fontsize:
+        matplotlib.rc({'font.size': fontsize})
+    if ticksize:
+        matplotlib.rc({'xtick.labelsize': ticksize})
+        matplotlib.rc({'ytick.labelsize': ticksize})
+
+    figsize = (18, 5)
+    # width_ratios = [1 for timefreq in timefreqs_tfr]
+    # height_ratios = [3.5, 2]
+    # fig, axes = plt.subplots(2, len(timefreqs_tfr), figsize=figsize, gridspec_kw={'width_ratios': width_ratios, 'height_ratios':height_ratios})
+    fig = plt.figure(figsize=figsize)
+
+    # # Remove first row axes to adapt length
+    # for ax in axes[0, :]:
+    #     ax.remove()
+    #
+    # # Define axes for topomaps
+    axes_topo = []
+    for i in range(len(timefreqs_tfr)):
+        width = 0.1 + 0.05
+        start_pos = 0.075 + i * width
+        ax = fig.add_axes([start_pos, 0.05, 0.1, 0.3])
+        axes_topo.append(ax)
+
+    # Define TFR axis
+    ax_len = time_len/12
+    ax_tfr = fig.add_axes([0.075, 0.55, ax_len, 0.3])
+
+    # Define axis for colorbar
+    start_pos = 0.075 + (i+1) * width
+    ax_cbar = fig.add_axes([start_pos, 0.05, 0.005, 0.25])
+
+    return fig, axes_topo, ax_tfr, ax_cbar
+
+
+def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=None, bline_mode=None, dB=False, vmin=None, vmax=None,
+              topo_vmin=None, topo_vmax=None, subject=None, title=None, vlines_times=None,
+              display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None):
+
+    # Sanity check
+    if save_fig and (not fname or not fig_path):
+        raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
+
+    if plot_xlim == (None, None):
+        plot_xlim = (tfr.tmin, tfr.tmax)
+
+    # Turn off dB if baseline mode is incompatible with taking log10
+    if dB and bline_mode in ['mean', 'logratio']:
+        dB = False
+
+    # Define figure
+    time_len = plot_xlim[1] - plot_xlim[0]
+    fig, axes_topo, ax_tf, ax_cbar = fig_tf_times(time_len=time_len, timefreqs_tfr=timefreqs_tfr, fontsize=fontsize, ticksize=ticksize)
+
+    # Pick plot channels
+    picks = functions_general.pick_chs(chs_id=chs_id, info=tfr.info)
+
+    # Plot time-frequency
+    tfr_plot = tfr.copy().apply_baseline(baseline=baseline, mode=bline_mode)
+    tfr_plot.plot(picks=picks, tmin=plot_xlim[0], tmax=plot_xlim[1], combine='mean', cmap='jet', axes=ax_tf,
+             show=display_figs, vmin=vmin, vmax=vmax, dB=dB)
+
+    # Plot time markers as vertical lines
+    if not vlines_times:
+        vlines_times = [0]
+    for t in vlines_times:
+        try:
+            ax_tf.vlines(x=t, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='gray')
+        except:
+            pass
+
+    # Plot topomaps
+    for i, (ax, (key, topo_timefreqs)) in enumerate(zip(axes_topo, timefreqs_tfr.items())):
+        # Topomaps parameters
+        topomap_kw = dict(ch_type='mag', tmin=topo_timefreqs['tmin'], tmax=topo_timefreqs['tmax'],
+                          fmin=topo_timefreqs['fmin'], fmax=topo_timefreqs['fmax'], vlim=(topo_vmin, topo_vmax),
+                          cmap='jet', colorbar=False, baseline=baseline,  mode=bline_mode, show=display_figs)
+
+        try:
+            tfr.plot_topomap(axes=ax, **topomap_kw)
+        except:
+            ax.text(0.5, 0.5, 'No data', horizontalalignment='center', verticalalignment='center')
+            ax.set_xticks([]), ax.set_yticks([])
+        ax.set_title(topo_timefreqs['title'], color=f'C{i}', fontweight='bold')
+
+    # Colorbar
+    norm = matplotlib.colors.Normalize(vmin=topo_vmin, vmax=topo_vmax)
+    sm = matplotlib.cm.ScalarMappable(norm=norm, cmap='jet')
+    # Get colorbar axis
+    fig.colorbar(sm, cax=ax_cbar)
+
+    # Figure title
+    topo_times = [timefreq['tmin'] for (key, timefreq) in timefreqs_tfr.items()]
+    if title:
+        fig.suptitle(title)
+    elif subject:
+        fig.suptitle(subject.subject_id + f'_{fname.split("_")[0]}_{chs_id}_{bline_mode}_topotimes{topo_times}')
+    elif not subject:
+        fig.suptitle(f'Grand_average_{fname.split("_")[0]}_{chs_id}_{bline_mode}_topotimes{topo_times}')
+        fname = 'GA_' + fname
+
+    # fig.tight_layout()
+
+    if save_fig:
+        fname += f'_topotimes_{topo_times}'
+        os.makedirs(fig_path, exist_ok=True)
+        save.fig(fig=fig, path=fig_path, fname=fname)
+
+
+def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, plot_max=True, plot_min=True, vlines_times=[0],
                   vmin=None, vmax=None, display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fname or not trf_fig_path):
@@ -331,7 +429,8 @@ def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, Non
     tfr_plotjoint = tfr_plotjoint.pick(picks)
 
     # Get maximum
-    timefreqs = functions_analysis.get_plot_tf(tfr=tfr_plotjoint, plot_xlim=plot_xlim, plot_max=plot_max, plot_min=plot_min)
+    if not timefreqs:
+        timefreqs = functions_analysis.get_plot_tf(tfr=tfr_plotjoint, plot_xlim=plot_xlim, plot_max=plot_max, plot_min=plot_min)
 
     # Title
     if fname:
@@ -354,8 +453,8 @@ def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, Non
         save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
 
-def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), plot_max=True, plot_min=True,
-                        vmin=None, vmax=None, chs_id='mag', vlines_times=[0],
+def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None,
+                        plot_max=True, plot_min=True, vmin=None, vmax=None, chs_id='mag', vlines_times=None,
                         display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fname or not trf_fig_path):
@@ -379,7 +478,8 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
     tfr_plotjoint = tfr_plotjoint.pick(picks)
 
     # Get maximum
-    timefreqs = functions_analysis.get_plot_tf(tfr=tfr_plotjoint, plot_xlim=plot_xlim, plot_max=plot_max, plot_min=plot_min)
+    if not timefreqs:
+        timefreqs = functions_analysis.get_plot_tf(tfr=tfr_plotjoint, plot_xlim=plot_xlim, plot_max=plot_max, plot_min=plot_min)
 
     # Title
     if fname:
@@ -388,30 +488,35 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
         f'{bline_mode}'
 
     # Plot tf plot joint
-    fig = tfr_plotjoint.plot_joint(timefreqs=timefreqs, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet', vmin=vmin, vmax=vmax,
+    fig = tfr_plotjoint.plot_joint(timefreqs=timefreqs, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet',
                                    title=title, show=display_figs)
 
     # Plot vertical lines
     tf_ax = fig.axes[0]
+    if not vlines_times:
+        vlines_times = [0]
     for t in vlines_times:
         try:
             tf_ax.vlines(x=t, ymin=tf_ax.get_ylim()[0], ymax=tf_ax.get_ylim()[1], linestyles='--', colors='gray')
         except:
             pass
 
+    # Overwrite topoplots
     # Get min and max from all topoplots
-    maxs = []
-    for timefreq in timefreqs:
-        data = tfr_topo.copy().crop(tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1]).data.ravel()
-        maxs.append(np.abs(data).max())
-    vmax = np.max(maxs)
+    if not vmin and not vmax:
+        maxs = []
+        for timefreq in timefreqs:
+            data = tfr_topo.copy().crop(tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1]).data.ravel()
+            maxs.append(np.abs(data).max())
+        vmax = np.max(maxs)
+        vmin = -vmax
 
     # Get topo axes and overwrite
     topo_axes = fig.axes[1:-1]
     for ax, timefreq in zip(topo_axes, timefreqs):
         fmin_fmax = dict(fmin=timefreq[1], fmax=timefreq[1])
         topomap_kw = dict(ch_type='mag', tmin=timefreq[0], tmax=timefreq[0], colorbar=False, show=display_figs)
-        tfr_topo.plot_topomap(**fmin_fmax, axes=ax, **topomap_kw, cmap='jet', vlim=(-vmax, vmax))
+        tfr_topo.plot_topomap(**fmin_fmax, axes=ax, **topomap_kw, cmap='jet', vlim=(vmin, vmax))
 
     norm = matplotlib.colors.Normalize(vmin=-vmax, vmax=vmax)
     sm = matplotlib.cm.ScalarMappable(norm=norm, cmap='jet')

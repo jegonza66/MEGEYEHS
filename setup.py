@@ -585,7 +585,7 @@ class noise:
 
 class all_subjects:
 
-    def __init__(self, all_fixations, all_saccades, all_bh_data, all_rt, all_corr_ans):
+    def __init__(self, all_fixations, all_saccades, all_bh_data, all_rt, all_corr_ans, all_mss):
         self.subject_id = 'All_Subjects'
         self.fixations = all_fixations
         self.saccades = all_saccades
@@ -593,3 +593,4 @@ class all_subjects:
         self.bh_data = all_bh_data
         self.rt = all_rt
         self.corr_ans = all_corr_ans
+        self.mss = all_mss

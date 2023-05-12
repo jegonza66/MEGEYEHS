@@ -20,12 +20,12 @@ subjects = ['15909001', '15912001', '15910001', '15950001', '15911001', '1153500
 # subjects = ['15910001', '15950001', '15911001', '16191001', '16263002']
 
 # Define surface or volume source space
-surf_vol = 'mixed'
+surf_vol = 'surface'
 use_ica_data = True
 force_fsaverage = False
 ico = 4
 spacing = 10.
-pick_ori = 'max-power'
+pick_ori = None
 
 # Define Subjects_dir as Freesurfer output folder
 mri_path = paths().mri_path()

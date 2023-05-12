@@ -15,15 +15,15 @@ import numpy as np
 
 
 # --------- Define Parameters ---------#
-save_fig = False
-display_figs = True
+save_fig = True
+display_figs = False
 # Select epochs by id
-epoch_id = 'vs'
-run_id = 'vs'
+epoch_id = 'ms'
+run_id = 'ms'
 # Data
 use_ica_data = True
 # Frequency band
-band_id = 'Broad'
+band_id = 'Beta'
 
 # Trials
 corr_ans = None
@@ -38,7 +38,7 @@ ico = 4
 spacing = 10.
 # Souce model ('volume'/'surface'/'mixed')
 surf_vol = 'surface'
-pick_ori = 'max-power'  # 'vector' For dipoles, 'max_power' for
+pick_ori = None  # 'vector' For dipoles, 'max_power' for
 # Parcelation (aparc / aparc.a2009s)
 parcelation = 'aparc'
 connectivity_method = 'pli'
@@ -52,33 +52,28 @@ fmin, fmax = functions_general.get_freq_band(band_id=band_id)
 mss_duration = {1: 2, 2: 3.5, 4: 5, None: 2}
 cross1_dur = 0.75
 cross2_dur = 1
-vs_dur = 4
 plot_edge = 0.15
+vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
+trial_dur = vs_dur[mss]
 
 # Get time windows from epoch_id name
-map_times = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[mss], 'plot_xlim': (0, mss_duration[mss])},
-                 cross2={'tmin': 0, 'tmax': cross2_dur, 'plot_xlim': (0, cross2_dur)},
-                 vs={'tmin': 0, 'tmax': vs_dur, 'plot_xlim': (0, vs_dur)},
-                 sac={'tmin': -0.05, 'tmax': 0.07, 'plot_xlim': (-0.05, 0.07)},
-                 fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.05, 0.2)})
-
-# Get times
-tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
+map = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[mss], 'plot_xlim': (None, None)},
+           vs={'tmin': - cross2_dur, 'tmax': vs_dur[mss][0], 'plot_xlim': (None, None)})
+tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur,
+                                                        mss_duration=mss_duration, cross2_dur=cross2_dur, dur=None,
+                                                        plot_edge=plot_edge, map=map)
 con_tmin = 0
 if run_id == 'cross1':
-    con_tmax = cross1_dur
+    con_tmin = -cross1_dur
+    con_tmax = 0
+elif run_id == 'cross2':
+    con_tmin = -cross2_dur
+    con_tmax = 0
 else:
     con_tmax = tmax
 
-# Baseline duration
-if 'sac' in epoch_id:
-    baseline = (tmin, 0)
-elif 'fix' in epoch_id or 'fix' in epoch_id:
-    baseline = (tmin, -0.05)
-elif 'ms' in epoch_id or 'cross2' in epoch_id and mss:
-    baseline = (tmin, 0)
-else:
-    baseline = (tmin, 0)
+# Get baseline duration for epoch_id
+baseline = None
 
 # Load experiment info
 exp_info = setup.exp_info()
@@ -93,10 +88,13 @@ if use_ica_data:
 else:
     data_type = 'RAW'
 
-run_path_data = f'/Band_None/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_{tmin}_{tmax}_bline{baseline}/'
 # Data paths
-epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path_data
-evoked_save_path = paths().save_path() + f'Evoked_{data_type}/' + run_path_data
+run_path_data = f'/Band_None/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
+if (epoch_id == 'ms' or epoch_id == 'vs') and trial_dur:
+    run_path_data += f'_tdur{trial_dur}'
+
+epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path_data + f'_{tmin}_{tmax}_bline{baseline}/'
+evoked_save_path = paths().save_path() + f'Evoked_{data_type}/' + run_path_data + f'_{tmin}_{tmax}_bline{baseline}/'
 
 # Source plots paths
 run_path_plot = run_path_data.replace('Band_None', f'Band_{band_id}')
@@ -164,10 +162,6 @@ for subj_num, subject_code in enumerate(exp_info.subjects_ids):
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
     evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
 
-    # # Source data path
-    # sources_path_subject = paths().sources_path() + subject.subject_id
-    # fname_fwd = sources_path_subject + f'/{subject_code}_{surf_vol}-fwd.fif'
-
     try:
         # Load data
         epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
@@ -181,12 +175,11 @@ for subj_num, subject_code in enumerate(exp_info.subjects_ids):
         try:
             epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
         except:
-
             # Epoch data
             epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
-                                                           epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, tmax=tmax,
-                                                           baseline=baseline, reject=None, save_data=True,
-                                                           epochs_save_path=epochs_save_path,
+                                                           epoch_id=epoch_id, meg_data=meg_data, trial_dur=trial_dur,
+                                                           tmin=tmin, tmax=tmax, baseline=baseline, reject=None,
+                                                           save_data=True, epochs_save_path=epochs_save_path,
                                                            epochs_data_fname=epochs_data_fname)
 
         # Define evoked from epochs

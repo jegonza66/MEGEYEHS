@@ -22,64 +22,65 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'occipital'  # region_hemisphere
+chs_id = 'parietal'  # region_hemisphere
 # ICA / RAW
 use_ica_data = True
+epoch_id = 'vs'
 corr_ans = None
 tgt_pres = None
 mss = 4
-epoch_id = 'fix_ms'
-# epoch_id = 'sac_ms'
-reject = False  # 'subject' for subject's default. False for no rejection, dict for specific values. None for default 4e-12 for magnetometers
+reject = None  # 'subject' for subject's default. False for no rejection, dict for specific values. None for default 4e-12 for magnetometers
 n_cycles_div = 4.
 # Power frequency range
 l_freq = 1
 h_freq = 40
 log_bands = False
 
+# Plots parameters
+# Colorbar
+vmin_power, vmax_power = -0.3, 0.3
+vmin_itc, vmax_itc = None, None
+topo_vmin, topo_vmax = -0.3, 0.3
+# plot_joint max and min topoplots
+plot_max, plot_min = False, False
 # Baseline method
 bline_mode = 'logratio'
+# Topoplot bands
+topo_bands = ['Alpha', 'Alpha', 'Theta', 'Alpha']
+
+# Trial durations
+vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
+plot_edge = 0.15
+trial_dur = vs_dur[mss]
+
 #----------#
 
-# Duration
-mss_duration = {1: 2, 2: 3.5, 4: 5, None: 0}
-cross1_dur = 0.75
-cross2_dur = 1
-vs_dur = 4
-plot_edge = 0.15
-
-# Duration
-if 'ms' in epoch_id:
-    dur = mss_duration[mss] + cross2_dur + vs_dur
-elif 'cross2' in epoch_id:
-    dur = cross2_dur + vs_dur  # seconds
-else:
-    dur = 0
+# Windows durations
+dur, cross1_dur, cross2_dur, mss_duration = functions_general.get_duration(epoch_id=epoch_id, vs_dur=vs_dur, mss=mss)
 
 # Get time windows from epoch_id name
-map_times = dict(ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
-                 cross2={'tmin': -cross1_dur - mss_duration[mss], 'tmax': dur, 'plot_xlim': (plot_edge, dur - plot_edge)},
-                 sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)},
-                 fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.2)})
-tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
 
-# Baseline duration
-if 'sac' in epoch_id:
-    baseline = (tmin, 0)
-    plot_baseline = (plot_xlim[0], 0)
-    # baseline = None
-elif 'fix' in epoch_id or 'fix' in epoch_id:
-    baseline = (tmin, -0.05)
-    plot_baseline = (plot_xlim[0], 0)
-elif 'ms' in epoch_id or 'cross2' in epoch_id and mss:
-    baseline = (tmin, 0)
-    plot_baseline = (plot_xlim[0], 0)
+tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur,
+                                                        mss_duration=mss_duration, cross2_dur=cross2_dur, dur=dur,
+                                                        plot_edge=plot_edge)
+
+# Define time-frequency bands to plot in plot_joint
+if (plot_max or plot_min):
+    timefreqs_joint, timefreqs_tfr, vlines_times = functions_general.get_plots_timefreqs(epoch_id=epoch_id, mss=mss,
+                                                                                         cross2_dur=cross2_dur,
+                                                                                         mss_duration=mss_duration,
+                                                                                         topo_bands=topo_bands, plot_xlim=plot_xlim)
+    timefreqs_joint = None
 else:
-    baseline = (tmin, 0)
-    plot_baseline = (plot_xlim[0], 0)
+    timefreqs_joint, timefreqs_tfr, vlines_times = functions_general.get_plots_timefreqs(epoch_id=epoch_id, mss=mss,
+                                                                                         cross2_dur=cross2_dur,
+                                                                                         mss_duration=mss_duration,
+                                                                                         topo_bands=topo_bands, plot_xlim=plot_xlim)
 
-# Vlines times
-vlines_times = [0, mss_duration[mss], mss_duration[mss] + 1]
+# Get baseline duration for epoch_id
+baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=epoch_id, mss=mss, tmin=tmin, tmax=tmax, plot_xlim=plot_xlim,
+                                                                  cross1_dur=cross1_dur, mss_duration=mss_duration,
+                                                                  cross2_dur=cross2_dur)
 
 # freqs type
 if log_bands:
@@ -95,6 +96,8 @@ else:
 
 # Save ids
 save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
+if (epoch_id == 'ms' or epoch_id == 'vs') and trial_dur:
+    save_id += f'_tdur{trial_dur}'
 plot_id = f'{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}/'
 
 # Save data paths
@@ -153,7 +156,7 @@ except:
                     meg_data = subject.load_preproc_meg_data()
 
                 # Epoch data
-                epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans,
+                epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, trial_dur=trial_dur,
                                                                tgt_pres=tgt_pres, baseline=baseline, reject=reject,
                                                                epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, tmax=tmax,
                                                                save_data=save_data, epochs_save_path=epochs_save_path,
@@ -170,16 +173,14 @@ except:
 
         # Plot power time-frequency
         fname = f'Power_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-        plot_general.tfr(subject=subject, tfr=power, chs_id=chs_id, plot_xlim=plot_xlim, epoch_id=epoch_id, mss=mss,
-                         cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
+        plot_general.tfr_bands(subject=subject, tfr=power, chs_id=chs_id, plot_xlim=plot_xlim,
                          baseline=plot_baseline, bline_mode=bline_mode,
                          display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname,
                          fontsize=16, ticksize=18)
 
         # Plot ITC time-frequency
         fname = f'ITC_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-        plot_general.tfr(subject=subject, tfr=itc, chs_id=chs_id, plot_xlim=plot_xlim, epoch_id=epoch_id, mss=mss,
-                         cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
+        plot_general.tfr_bands(subject=subject, tfr=itc, chs_id=chs_id, plot_xlim=plot_xlim,
                          baseline=plot_baseline, bline_mode=bline_mode,
                          display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname,
                          fontsize=16, ticksize=18)
@@ -211,26 +212,21 @@ except:
         grand_avg_itc.save(trf_save_path + grand_avg_itc_fname, overwrite=True)
 
 
-
 # Plot Power time-frequency
 fname = f'Power_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-plot_general.tfr(tfr=grand_avg_power, chs_id=chs_id, baseline=plot_baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
-                 epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
-                 subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname,
-                 vmin=None, vmax=None, fontsize=16, ticksize=18)
+plot_general.tfr_times(tfr=grand_avg_power, chs_id=chs_id, timefreqs_tfr=timefreqs_tfr, baseline=plot_baseline, bline_mode=bline_mode,
+                       plot_xlim=plot_xlim, vlines_times=vlines_times, topo_vmin=topo_vmin, topo_vmax=topo_vmax, subject=None, display_figs=display_figs,
+                       save_fig=save_fig, fig_path=trf_fig_path, fname=fname, vmin=vmin_power, vmax=vmax_power, fontsize=16, ticksize=18)
 
 # Plot ITC time-frequency
 fname = f'ITC_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-plot_general.tfr(tfr=grand_avg_itc, chs_id=chs_id, baseline=plot_baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
-                 epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
-                 subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname,
-                 vmin=None, vmax=None, fontsize=16, ticksize=18)
-
-
+plot_general.tfr_times(tfr=grand_avg_itc, chs_id=chs_id, timefreqs_tfr=timefreqs_tfr, baseline=plot_baseline, bline_mode=bline_mode,
+                       plot_xlim=plot_xlim, vlines_times=vlines_times, topo_vmin=topo_vmin, topo_vmax=topo_vmax, subject=None, display_figs=display_figs,
+                       save_fig=save_fig, fig_path=trf_fig_path, fname=fname, vmin=vmin_itc, vmax=vmax_itc, fontsize=16, ticksize=18)
 
 # Power topoplot
 fig = grand_avg_power.plot_topo(baseline=plot_baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
-                      cmap='jet', show=display_figs, title='Power')
+                                cmap='jet', show=display_figs, title='Power')
 if save_fig:
     fname = f'GA_Power_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
     save.fig(fig=fig, path=trf_fig_path, fname=fname)
@@ -242,30 +238,28 @@ if save_fig:
     fname = f'GA_ITC_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
     save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
-
-
 # Power Plot joint
 fname = f'GA_Power_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
 plot_general.tfr_plotjoint_picks(tfr=grand_avg_power, plot_baseline=plot_baseline, bline_mode=bline_mode, vlines_times=vlines_times,
-                                 plot_xlim=plot_xlim, chs_id=chs_id, vmin=None, vmax=None, plot_max=True, plot_min=True,
-                                 display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
+                                 timefreqs=timefreqs_joint, plot_xlim=plot_xlim, chs_id=chs_id, vmin=vmin_power, vmax=vmax_power,
+                                 plot_max=plot_max, plot_min=plot_min, display_figs=display_figs, save_fig=save_fig,
+                                 trf_fig_path=trf_fig_path, fname=fname)
 
 # ITC Plot joint
 fname = f'GA_ITC_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
 plot_general.tfr_plotjoint_picks(tfr=grand_avg_itc, plot_baseline=plot_baseline, bline_mode=bline_mode, vlines_times=vlines_times,
-                                 plot_xlim=plot_xlim, chs_id=chs_id, vmin=None, vmax=None, plot_max=True, plot_min=True,
-                                 display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
-
+                                 timefreqs=timefreqs_joint, plot_xlim=plot_xlim, chs_id=chs_id, vmin=vmin_itc, vmax=vmax_itc,
+                                 plot_max=plot_max, plot_min=plot_min, display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
 
 # Power Plot joint
 fname = f'GA_Power_plotjoint_mag_{bline_mode}_{l_freq}_{h_freq}'
 plot_general.tfr_plotjoint(tfr=grand_avg_power, plot_baseline=plot_baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
-                           vmin=None, vmax=None, plot_max=True, plot_min=True, vlines_times=vlines_times,
-                           display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
+                           vmin=vmin_power, vmax=vmax_power, timefreqs=timefreqs_joint, plot_max=plot_max, plot_min=plot_min,
+                           vlines_times=vlines_times, display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
 
 # ITC Plot joint
 fname = f'GA_ITC_plotjoint_mag_{bline_mode}_{l_freq}_{h_freq}'
 plot_general.tfr_plotjoint(tfr=grand_avg_itc, plot_baseline=plot_baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
-                           vmin=None, vmax=None, plot_max=True, plot_min=True, vlines_times=vlines_times,
-                           display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
+                           vmin=vmin_itc, vmax=vmax_itc, timefreqs=timefreqs_joint, plot_max=plot_max, plot_min=plot_min,
+                           vlines_times=vlines_times, display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
 
