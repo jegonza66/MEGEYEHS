@@ -622,8 +622,8 @@ def connectivity_circle(subject, labels, con, surf_vol, connectivity_method='pli
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_glass_fsaverage', connections_num=10,
-               node_size=15):
+def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_glass_fsaverage', connections_num=30,
+               node_size=10, node_color='k', linewidth=2):
 
     # Sanity check
     if save_fig and (not fig_path):
@@ -649,12 +649,57 @@ def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, 
     # Plot connectome
     edge_threshold = np.sort(adjacency_matrix, axis=None)[-int(connections_num)*2]
     fig = plotting.plot_connectome(adjacency_matrix=adjacency_matrix, node_coords=nodes_pos,
-                                   edge_threshold=edge_threshold, node_size=node_size)
+                                   edge_threshold=edge_threshold, node_size=node_size, node_color=node_color,
+                                   edge_kwargs=dict(linewidth=linewidth))
 
     # Save
     if save_fig:
         if not fname:
             fname = f'{subject.subject_id}_connectome'
+        if subject_code == 'fsaverage' and 'fsaverage' not in fname:
+            fname += '_fsaverage'
+        save.fig(fig=fig, path=fig_path, fname=fname)
+
+
+def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_glass_fsaverage'):
+
+    # Sanity check
+    if save_fig and (not fig_path):
+        raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
+
+    label_names = [label.name for label in labels]
+    # Get the y-location of the label
+    label_ypos = list()
+    for name in label_names:
+        idx = label_names.index(name)
+        label_ypos.append(np.mean(labels[idx].pos[:, 1]))
+
+    # Make adjacency matrix sorted from frontal to posterior
+    adjacency_matrix = np.maximum(adjacency_matrix, adjacency_matrix.transpose())
+    sort = np.argsort(label_ypos)
+    adjacency_matrix = np.maximum(adjacency_matrix, adjacency_matrix.transpose())
+    sorted_matrix = adjacency_matrix[sort[::-1]]
+    sorted_matrix = sorted_matrix[:, sort[::-1]]
+
+    sorted_labels = [label_names[i] for i in sort][::-1]
+
+    vmin = np.sort(sorted_matrix.ravel())[len(label_ypos)]
+    vmax = np.sort(sorted_matrix.ravel())[-1]
+
+    fig = plt.figure(figsize=(8, 5))
+    im = plt.imshow(sorted_matrix, vmin=vmin, vmax=vmax)
+    fig.colorbar(im)
+
+    ax = plt.gca()
+    ax.set_yticklabels(sorted_labels)
+    ax.set_xticklabels([])
+
+    plt.suptitle('')
+
+    # Save
+    if save_fig:
+        if not fname:
+            fname = f'{subject.subject_id}_matrix'
         if subject_code == 'fsaverage' and 'fsaverage' not in fname:
             fname += '_fsaverage'
         save.fig(fig=fig, path=fig_path, fname=fname)

@@ -18,12 +18,12 @@ import numpy as np
 save_fig = True
 display_figs = False
 # Select epochs by id
-epoch_id = 'ms'
-run_id = 'ms'
+epoch_id = 'vs'
+run_id = 'vs'
 # Data
 use_ica_data = True
 # Frequency band
-band_id = 'Beta'
+band_id = 'Gamma'
 
 # Trials
 corr_ans = None
@@ -62,14 +62,19 @@ map = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[mss], 'plot_xlim': (Non
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur,
                                                         mss_duration=mss_duration, cross2_dur=cross2_dur, dur=None,
                                                         plot_edge=plot_edge, map=map)
-con_tmin = 0
+
+# conectivity matrix counts time starting from 0
 if run_id == 'cross1':
-    con_tmin = -cross1_dur
-    con_tmax = 0
+    con_tmin = 0
+    con_tmax = cross1_dur
+elif run_id == 'ms':
+    con_tmin = cross1_dur
+    con_tmax = tmax
 elif run_id == 'cross2':
-    con_tmin = -cross2_dur
-    con_tmax = 0
-else:
+    con_tmin = 0
+    con_tmax = cross2_dur
+elif run_id == 'vs':
+    con_tmin = cross2_dur
     con_tmax = tmax
 
 # Get baseline duration for epoch_id
@@ -88,19 +93,22 @@ if use_ica_data:
 else:
     data_type = 'RAW'
 
-# Data paths
-run_path_data = f'/Band_None/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
+# Load data paths
+run_path_data = f'Band_None/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
 if (epoch_id == 'ms' or epoch_id == 'vs') and trial_dur:
     run_path_data += f'_tdur{trial_dur}'
 
 epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path_data + f'_{tmin}_{tmax}_bline{baseline}/'
 evoked_save_path = paths().save_path() + f'Evoked_{data_type}/' + run_path_data + f'_{tmin}_{tmax}_bline{baseline}/'
 
-# Source plots paths
+# Source plots and data spaths
 run_path_plot = run_path_data.replace('Band_None', f'Band_{band_id}')
-run_path_plot = run_path_plot.replace(epoch_id, run_id)
+run_path_plot = run_path_plot.replace(f'{epoch_id}_', f'{run_id}_')
 fig_path = paths().plots_path() + f'Connectivity_{data_type}/' + run_path_plot + \
-           f'{model_name}_{surf_vol}_ico{ico}_{spacing}_{pick_ori}_{parcelation}_{connectivity_method}/'  # Replace band id for None because Epochs are the same on all bands
+           f'/{model_name}_{surf_vol}_ico{ico}_{spacing}_{pick_ori}_{parcelation}_{connectivity_method}/'  # Replace band id for None because Epochs are the same on all bands
+save_path = paths().save_path() + f'Connectivity_{data_type}/' + run_path_plot + \
+            f'/{model_name}_{surf_vol}_ico{ico}_{spacing}_{pick_ori}_{parcelation}_{connectivity_method}/'
+os.makedirs(save_path, exist_ok=True)
 
 # Set up connectivity matrix
 if surf_vol == 'surface':  # or surf_vol == 'mixed':
@@ -161,93 +169,107 @@ for subj_num, subject_code in enumerate(exp_info.subjects_ids):
     # Data filenames
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
     evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
+    # Save figures path
+    fig_path_subj = fig_path + f'{subject.subject_id}/'
+    # Connectivity data fname
+    fname = save_path + f'{subject.subject_id}'
 
     try:
-        # Load data
-        epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
-        evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
+        mne_connectivity.read_connectivity(fname)
     except:
-        if use_ica_data:
-            meg_data = load.ica_data(subject=subject)
-        else:
-            meg_data = subject.load_preproc_meg_data()
-
         try:
+            # Load data
             epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+            evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
         except:
-            # Epoch data
-            epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
-                                                           epoch_id=epoch_id, meg_data=meg_data, trial_dur=trial_dur,
-                                                           tmin=tmin, tmax=tmax, baseline=baseline, reject=None,
-                                                           save_data=True, epochs_save_path=epochs_save_path,
-                                                           epochs_data_fname=epochs_data_fname)
+            if use_ica_data:
+                meg_data = load.ica_data(subject=subject)
+            else:
+                meg_data = subject.load_preproc_meg_data()
 
-        # Define evoked from epochs
-        evoked = epochs.average()
+            try:
+                epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+            except:
+                # Epoch data
+                epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
+                                                               epoch_id=epoch_id, meg_data=meg_data, trial_dur=trial_dur,
+                                                               tmin=tmin, tmax=tmax, baseline=baseline, reject=None,
+                                                               save_data=True, epochs_save_path=epochs_save_path,
+                                                               epochs_data_fname=epochs_data_fname)
 
-        # Save evoked data
-        os.makedirs(evoked_save_path, exist_ok=True)
-        evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
+            # Define evoked from epochs
+            evoked = epochs.average()
 
-    # Pick meg channels for source modeling
-    evoked.pick('meg')
-    epochs.pick('meg')
+            # Save evoked data
+            os.makedirs(evoked_save_path, exist_ok=True)
+            evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
 
-
-    # --------- Source estimation ---------#
-    # Source data path
-    sources_path_subject = paths().sources_path() + subject.subject_id
-
-    # Load forward model
-    if surf_vol == 'volume':
-        fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
-    elif surf_vol == 'surface':
-        fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
-    # elif surf_vol == 'mixed':
-    #     fname_fwd = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}-fwd.fif'
-    fwd = mne.read_forward_solution(fname_fwd)
-    # Get sources from forward model
-    src = fwd['src']
-
-    # Load filter
-    if surf_vol == 'volume':
-        fname_filter = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
-    elif surf_vol == 'surface':
-        fname_filter = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-{model_name}.fif'
-    # elif surf_vol == 'mixed':
-    #     fname_filter = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
-    filters = mne.beamformer.read_beamformer(fname_filter)
-
-    # Apply filter and get source estimates
-    stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
+        # Pick meg channels for source modeling
+        evoked.pick('meg')
+        epochs.pick('meg')
 
 
-    # --------- Connectivity ---------#
-    if surf_vol == 'volume':
-        labels = subjects_dir + f'/{subject_code}/mri/aparc+aseg.mgz'
-    elif subject_code != 'fsaverage':
-        # Get labels for FreeSurfer cortical parcellation
-        labels = mne.read_labels_from_annot(subject=subject_code, parc=parcelation, subjects_dir=subjects_dir)
-    else:
-        labels = fsaverage_labels
+        # --------- Source estimation ---------#
+        # Source data path
+        sources_path_subject = paths().sources_path() + subject.subject_id
 
-    # Average the source estimates within each label using sign-flips to reduce signal cancellations, also here we return a generator
-    label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=labels, src=src, mode='auto', return_generator=True)
+        # Load forward model
+        if surf_vol == 'volume':
+            fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
+        elif surf_vol == 'surface':
+            fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
+        # elif surf_vol == 'mixed':
+        #     fname_fwd = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}-fwd.fif'
+        fwd = mne.read_forward_solution(fname_fwd)
+        # Get sources from forward model
+        src = fwd['src']
 
-    # Compute connectivity
-    con = mne_connectivity.spectral_connectivity_epochs(label_ts, method=connectivity_method, mode='multitaper', sfreq=epochs.info['sfreq'],
-                                                        fmin=fmin, fmax=fmax, tmin=con_tmin, tmax=con_tmax, faverage=True,  mt_adaptive=True)
+        # Load filter
+        if surf_vol == 'volume':
+            fname_filter = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
+        elif surf_vol == 'surface':
+            fname_filter = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-{model_name}.fif'
+        # elif surf_vol == 'mixed':
+        #     fname_filter = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
+        filters = mne.beamformer.read_beamformer(fname_filter)
+
+        # Apply filter and get source estimates
+        stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
+
+
+        # --------- Connectivity ---------#
+        if surf_vol == 'volume':
+            labels = subjects_dir + f'/{subject_code}/mri/aparc+aseg.mgz'
+        elif subject_code != 'fsaverage':
+            # Get labels for FreeSurfer cortical parcellation
+            labels = mne.read_labels_from_annot(subject=subject_code, parc=parcelation, subjects_dir=subjects_dir)
+        else:
+            labels = fsaverage_labels
+
+        # Average the source estimates within each label using sign-flips to reduce signal cancellations, also here we return a generator
+        label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=labels, src=src, mode='auto', return_generator=True)
+
+        # Compute connectivity
+        con = mne_connectivity.spectral_connectivity_epochs(label_ts, method=connectivity_method, mode='multitaper', sfreq=epochs.info['sfreq'],
+                                                            fmin=fmin, fmax=fmax, tmin=con_tmin, tmax=con_tmax, faverage=True,  mt_adaptive=True)
+
+        # Save
+        con.save(fname)
 
     # Get connectivity matrix
     con_matrix[subj_num] = con.get_data(output='dense')[:, :, 0]
 
     # Plot circle
     plot_general.connectivity_circle(subject=subject, labels=labels, surf_vol=surf_vol, con=con_matrix[subj_num], connectivity_method='pli',
-                                     subject_code=subject_code, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path, fname=None)
+                                     subject_code=subject_code, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_subj, fname=None)
 
     # Plot connectome
     plot_general.connectome(subject=subject, labels=labels, adjacency_matrix=con_matrix[subj_num], subject_code=subject_code,
-                            save_fig=True, fig_path=fig_path, fname=None)
+                            save_fig=save_fig, fig_path=fig_path_subj, fname=None)
+
+    # Plot connectivity matrix
+    plot_general.plot_con_matrix(subject=subject, labels=labels, adjacency_matrix=con_matrix[subj_num], subject_code=subject_code,
+                                 save_fig=save_fig, fig_path=fig_path_subj, fname=None)
 
 
 # --------- Grand Average ---------#
@@ -262,9 +284,10 @@ plot_general.connectivity_circle(subject='GA', labels=labels, surf_vol=surf_vol,
 
 # Plot connectome
 plot_general.connectome(subject='GA', labels=labels, adjacency_matrix=ga_con_matrix, subject_code='fsaverage',
-                        save_fig=True, fig_path=fig_path, fname='GA_connectome')
+                        save_fig=save_fig, fig_path=fig_path, fname='GA_connectome')
 
-
+plot_general.plot_con_matrix(subject='GA', labels=labels, adjacency_matrix=ga_con_matrix, subject_code='fsaverage',
+                             save_fig=save_fig, fig_path=fig_path, fname='GA_matrix')
 
 # # Plot markers positions
 # plotting.plot_markers(np.arange(len(labels)), nodes_pos*1000)
