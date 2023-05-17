@@ -26,17 +26,18 @@ else:
 use_ica_data = True
 band_id = None
 # Id
-epoch_id = 'blue'
+epoch_id = 'red'
 # Pick MEG chs (Select channels or set picks = 'mag')
-chs_id = 'mag'
+chs_id = 'occipital'
 # Plot eye movements
 plot_gaze = False
 corr_ans = None
 tgt_pres = None
 mss = None
+reject = None
 
 # Get time windows from epoch_id name
-tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
+tmin, tmax, plot_xlim = -0.2, 0.6, (-0.1, 0.5)
 # Baseline
 baseline = (tmin, -0.1)
 
@@ -109,10 +110,11 @@ for subject_code in exp_info.subjects_ids:
 
             # Epoch data
             epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans,
-                                                           tgt_pres=tgt_pres,
-                                                           epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, tmax=tmax,
-                                                           save_data=save_data, epochs_save_path=epochs_save_path,
-                                                           epochs_data_fname=epochs_data_fname)
+                                                           tgt_pres=tgt_pres, epoch_id=epoch_id, meg_data=meg_data,
+                                                           tmin=tmin, tmax=tmax, save_data=save_data,
+                                                           epochs_save_path=epochs_save_path,
+                                                           epochs_data_fname=epochs_data_fname, reject=reject,
+                                                           baseline=baseline)
 
             # ----- Evoked -----#
             # Define evoked and append for GA
