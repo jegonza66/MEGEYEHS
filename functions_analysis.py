@@ -59,7 +59,7 @@ def define_events(subject, meg_data, epoch_id, mss=None, trials=None, evt_dur=No
             epoch_keys = [key for key in epoch_keys if 'sac' not in key]
         if 'fix' not in epoch_id:
             epoch_keys = [key for key in epoch_keys if 'fix' not in key]
-        if trials != None:
+        if trials != None and epoch_id != 'blue' and epoch_id != 'red':
             try:
                 epoch_keys = [epoch_key for epoch_key in epoch_keys if
                               (epoch_key.split('_t')[-1].split('_')[0] in trials and 'end' not in epoch_key)]
