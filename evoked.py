@@ -26,20 +26,20 @@ else:
 use_ica_data = True
 band_id = None
 # Id
-epoch_id = 'red'
+epoch_id = 'tgt_fix'
 # Pick MEG chs (Select channels or set picks = 'mag')
-chs_id = 'occipital'
+chs_id = 'temporal_R'
 # Plot eye movements
 plot_gaze = False
-corr_ans = None
-tgt_pres = None
+corr_ans = True
+tgt_pres = True
 mss = None
 reject = None
 
 # Get time windows from epoch_id name
-tmin, tmax, plot_xlim = -0.2, 0.6, (-0.1, 0.5)
+tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
 # Baseline
-baseline = (tmin, -0.1)
+baseline = (-0.3, -0.05)
 
 # Data type
 if use_ica_data:
@@ -54,12 +54,14 @@ run_path = f'/Band_{band_id}/{save_id}_{tmin}_{tmax}_bline{baseline}/'
 # Save data paths
 epochs_save_path = save_path + f'Epochs_{data_type}/' + run_path
 evoked_save_path = save_path + f'Evoked_{data_type}/' + run_path
+grand_avg_data_fname = f'Grand_average_ave.fif'
 # Save figures paths
 epochs_fig_path = plot_path + f'Epochs_{data_type}/' + run_path
 evoked_fig_path = plot_path + f'Evoked_{data_type}/' + run_path
 
 
 evokeds = []
+
 for subject_code in exp_info.subjects_ids:
 
     if use_ica_data:
@@ -72,7 +74,6 @@ for subject_code in exp_info.subjects_ids:
     # Data filenames
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
     evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
-    grand_avg_data_fname = f'Grand_average_ave.fif'
 
     try:
         # Load evoked data
@@ -141,6 +142,7 @@ for subject_code in exp_info.subjects_ids:
     plot_general.evoked(evoked_meg=evoked_meg, evoked_misc=evoked_misc,
                         picks=picks, plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs,
                         save_fig=save_fig, fig_path=evoked_fig_path, fname=fname)
+
 
 # Compute grand average
 grand_avg = mne.grand_average(evokeds, interpolate_bads=False)

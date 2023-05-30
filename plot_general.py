@@ -369,19 +369,52 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
         except:
             pass
 
-    # Plot topomaps
-    for i, (ax, (key, topo_timefreqs)) in enumerate(zip(axes_topo, timefreqs_tfr.items())):
-        # Topomaps parameters
-        topomap_kw = dict(ch_type='mag', tmin=topo_timefreqs['tmin'], tmax=topo_timefreqs['tmax'],
-                          fmin=topo_timefreqs['fmin'], fmax=topo_timefreqs['fmax'], vlim=(topo_vmin, topo_vmax),
-                          cmap='jet', colorbar=False, baseline=baseline,  mode=bline_mode, show=display_figs)
+    # Get min and max from all topoplots
+    if topo_vmin == None and topo_vmax == None:
+        maxs = []
+        if type(timefreqs_tfr) == dict:
+            for topo_timefreqs in timefreqs_tfr.items():
+                tfr_crop = tfr_plot.copy().crop(tmin=topo_timefreqs[1]['tmin'], tmax=topo_timefreqs[1]['tmax'],
+                                                fmin=topo_timefreqs[1]['fmin'], fmax=topo_timefreqs[1]['fmax'])
+                data = tfr_crop.data.ravel()
+                maxs.append(data.max())
+        elif type(timefreqs_tfr) == list:
+            for topo_timefreqs in timefreqs_tfr:
+                tfr_crop = tfr_plot.copy().crop(tmin=topo_timefreqs[0], tmax=topo_timefreqs[0],
+                                                fmin=topo_timefreqs[1], fmax=topo_timefreqs[1])
+                data = tfr_crop.data.ravel()
+                maxs.append(data.max())
+        topo_vmax = np.max(maxs)
+        topo_vmin = -topo_vmax
 
-        try:
-            tfr.plot_topomap(axes=ax, **topomap_kw)
-        except:
-            ax.text(0.5, 0.5, 'No data', horizontalalignment='center', verticalalignment='center')
-            ax.set_xticks([]), ax.set_yticks([])
-        ax.set_title(topo_timefreqs['title'], color=f'C{i}', fontweight='bold')
+    # Plot topomaps
+    if type(timefreqs_tfr) == dict:
+        for i, (ax, (key, topo_timefreqs)) in enumerate(zip(axes_topo, timefreqs_tfr.items())):
+            # Topomaps parameters
+            topomap_kw = dict(ch_type='mag', tmin=topo_timefreqs['tmin'], tmax=topo_timefreqs['tmax'],
+                              fmin=topo_timefreqs['fmin'], fmax=topo_timefreqs['fmax'], vlim=(topo_vmin, topo_vmax),
+                              cmap='jet', colorbar=False, baseline=baseline,  mode=bline_mode, show=display_figs)
+
+            try:
+                tfr.plot_topomap(axes=ax, **topomap_kw)
+            except:
+                ax.text(0.5, 0.5, 'No data', horizontalalignment='center', verticalalignment='center')
+                ax.set_xticks([]), ax.set_yticks([])
+            ax.set_title(topo_timefreqs['title'], color=f'C{i}', fontweight='bold')
+
+    elif type(timefreqs_tfr) == list:
+        for i, (ax, (topo_timefreqs)) in enumerate(zip(axes_topo, timefreqs_tfr)):
+            # Topomaps parameters
+            topomap_kw = dict(ch_type='mag', tmin=topo_timefreqs[0], tmax=topo_timefreqs[0],
+                              fmin=topo_timefreqs[1], fmax=topo_timefreqs[1], vlim=(topo_vmin, topo_vmax),
+                              cmap='jet', colorbar=False, baseline=baseline, mode=bline_mode, show=display_figs)
+
+            try:
+                tfr.plot_topomap(axes=ax, **topomap_kw)
+            except:
+                ax.text(0.5, 0.5, 'No data', horizontalalignment='center', verticalalignment='center')
+                ax.set_xticks([]), ax.set_yticks([])
+            ax.set_title(topo_timefreqs, color=f'C{i}', fontweight='bold')
 
     # Colorbar
     norm = matplotlib.colors.Normalize(vmin=topo_vmin, vmax=topo_vmax)
@@ -390,7 +423,10 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
     fig.colorbar(sm, cax=ax_cbar)
 
     # Figure title
-    topo_times = [timefreq['tmin'] for (key, timefreq) in timefreqs_tfr.items()]
+    try:
+        topo_times = [timefreq['tmin'] for (key, timefreq) in timefreqs_tfr.items()]
+    except:
+        topo_times = [timefreq[0] for timefreq in timefreqs_tfr]
     if title:
         fig.suptitle(title)
     elif subject:
@@ -407,7 +443,7 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, plot_max=True, plot_min=True, vlines_times=[0],
+def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, plot_max=True, plot_min=True, vlines_times=None,
                   vmin=None, vmax=None, display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fname or not trf_fig_path):
@@ -443,6 +479,8 @@ def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, Non
 
     # Plot vertical lines
     tf_ax = fig.axes[0]
+    if not vlines_times:
+        vlines_times = [0]
     for t in vlines_times:
         try:
             tf_ax.vlines(x=t, ymin=tf_ax.get_ylim()[0], ymax=tf_ax.get_ylim()[1], linestyles='--', colors='gray')
@@ -478,7 +516,7 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
     tfr_plotjoint = tfr_plotjoint.pick(picks)
 
     # Get maximum
-    if not timefreqs:
+    if timefreqs == None:
         timefreqs = functions_analysis.get_plot_tf(tfr=tfr_plotjoint, plot_xlim=plot_xlim, plot_max=plot_max, plot_min=plot_min)
 
     # Title
@@ -503,22 +541,23 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
 
     # Overwrite topoplots
     # Get min and max from all topoplots
-    if not vmin and not vmax:
+    if vmin == None and vmax == None:
         maxs = []
         for timefreq in timefreqs:
-            data = tfr_topo.copy().crop(tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1]).data.ravel()
-            maxs.append(np.abs(data).max())
+            tfr_crop = tfr_topo.copy().crop(tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1])
+            data = tfr_crop.data.ravel()
+            maxs.append(data.max())
         vmax = np.max(maxs)
         vmin = -vmax
 
     # Get topo axes and overwrite
     topo_axes = fig.axes[1:-1]
     for ax, timefreq in zip(topo_axes, timefreqs):
-        fmin_fmax = dict(fmin=timefreq[1], fmax=timefreq[1])
-        topomap_kw = dict(ch_type='mag', tmin=timefreq[0], tmax=timefreq[0], colorbar=False, show=display_figs)
-        tfr_topo.plot_topomap(**fmin_fmax, axes=ax, **topomap_kw, cmap='jet', vlim=(vmin, vmax))
+        topomap_kw = dict(ch_type='mag', tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1],
+                          colorbar=False, show=display_figs)
+        tfr_topo.plot_topomap(axes=ax, cmap='jet', vlim=(vmin, vmax), **topomap_kw)
 
-    norm = matplotlib.colors.Normalize(vmin=-vmax, vmax=vmax)
+    norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
     sm = matplotlib.cm.ScalarMappable(norm=norm, cmap='jet')
     # Get colorbar axis
     cbar_ax = fig.axes[-1]

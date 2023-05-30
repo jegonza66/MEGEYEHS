@@ -15,15 +15,16 @@ import numpy as np
 
 
 # --------- Define Parameters ---------#
-save_fig = True
+save_fig = False
 display_figs = False
+save_data=False
 # Select epochs by id
-epoch_id = 'vs'
-run_id = 'vs'
+epoch_id = 'ms'
+run_id = 'ms'
 # Data
 use_ica_data = True
 # Frequency band
-band_id = 'Gamma'
+band_id = 'Alpha'
 
 # Trials
 corr_ans = None
@@ -194,7 +195,7 @@ for subj_num, subject_code in enumerate(exp_info.subjects_ids):
                 epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
                                                                epoch_id=epoch_id, meg_data=meg_data, trial_dur=trial_dur,
                                                                tmin=tmin, tmax=tmax, baseline=baseline, reject=None,
-                                                               save_data=True, epochs_save_path=epochs_save_path,
+                                                               save_data=save_data, epochs_save_path=epochs_save_path,
                                                                epochs_data_fname=epochs_data_fname)
 
             # Define evoked from epochs

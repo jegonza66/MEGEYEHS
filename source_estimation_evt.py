@@ -10,16 +10,12 @@ import setup
 import numpy as np
 import plot_general
 
-foo = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
-
-subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001', '16200001',
-                '16201001', '10925091', '16263002', '16269001']
 
 # --------- Define Parameters ---------#
 # Subject and Epochs
 save_fig = True
 # Select epochs
-epoch_id = 'fix_ms'
+epoch_id = 'sac_vs'
 # ICA
 use_ica_data = True
 
@@ -35,9 +31,9 @@ reject = None
 force_fsaverage = False
 # Model
 model_name = 'lcmv'  # ('lcmv', 'dics')
-surf_vol = 'mixed'
-ico = 4
-spacing = 10.
+surf_vol = 'volume'
+ico = 5
+spacing = 5.
 pick_ori = 'max-power'  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximices output power
 
 # Plot
@@ -61,7 +57,7 @@ else:
     data_type = 'RAW'
 
 # Get time windows from epoch_id name
-map_times = dict(sac={'tmin': -0.05, 'tmax': 0.07, 'plot_xlim': (-0.05, 0.07)},
+map_times = dict(sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.05, 0.2)},
                  fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.05, 0.2)})
 
 # Get times
@@ -237,7 +233,7 @@ except:
 GA_stc.data = GA_stc_data
 GA_stc.subject = 'fsaverage'
 
-# Read fsaverage surface from any subject
+# Read fsaverage surface
 if surf_vol == 'volume':
     fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_volume_ico{ico}_{int(spacing)}-src.fif'
 elif surf_vol == 'surface':
@@ -247,8 +243,8 @@ elif surf_vol == 'mixed':
 src_fs = mne.read_source_spaces(fname_src)
 
 # Plot
-fig = GA_stc.plot(src_fs, subject='fsaverage', subjects_dir=subjects_dir, initial_time=initial_time,
-                  clim=clim)
+fig = GA_stc.plot(src_fs, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0.11,
+                  clim='auto')
 
 if save_fig:
     fname = 'GA'

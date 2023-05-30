@@ -123,7 +123,7 @@ else:
 #-----  Select frequency band -----#
 band_id = None
 chs_id = 'mag'
-epoch_id = 'l_sac'
+epoch_id = 'it_fix'
 
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)

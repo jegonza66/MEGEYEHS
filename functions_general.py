@@ -159,6 +159,37 @@ def find_last_within(array, low_bound, up_bound):
         return False, False
 
 
+
+def find_all_within(array, low_bound, up_bound):
+    """
+    Find the first element from an array in a certain interval
+
+    Parameters
+    ----------
+    array: ndarray
+        The 1D array to look in for the values.
+    low_bound: float
+        the lower boundary of the search interval
+    up_bound: float
+        the upper boundary of the search interval
+
+    Returns
+    -------
+    idx: int
+      The index of the elements in the array that are cotained by the given bounds.
+    value: float
+      The values of the array in the found indexes.
+    """
+
+    array = np.asarray(array)
+    elements = np.where(np.logical_and((array > low_bound), (array < up_bound)))[0]
+    try:
+        idx = np.max(elements)
+        return idx, array[idx]
+    except:
+        return False, False
+
+
 def first_trial(evt_buttons):
     """
     Get event corresponding to last green button press before 1st trial begins
@@ -348,7 +379,7 @@ def get_freq_band(band_id):
     return l_freq, h_freq
 
 
-def get_time_lims(epoch_id, mss, cross1_dur, mss_duration, cross2_dur, dur, plot_edge, map=None,):
+def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
     '''
     :param epoch_id: str
         String with the name of the epochs to select.
@@ -371,6 +402,7 @@ def get_time_lims(epoch_id, mss, cross1_dur, mss_duration, cross2_dur, dur, plot
 
     else:
         try:
+            dur, cross1_dur, cross2_dur, mss_duration, vs_dur = get_duration(epoch_id=epoch_id, mss=mss)
             print('Using default time values')
             map = dict(ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
                        cross2={'tmin': -cross1_dur - mss_duration[mss], 'tmax': dur,
@@ -379,17 +411,28 @@ def get_time_lims(epoch_id, mss, cross1_dur, mss_duration, cross2_dur, dur, plot
                            'plot_xlim': (-cross1_dur - mss_duration[mss] - cross2_dur + plot_edge, dur - plot_edge)},
                        sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)},
                        fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)})
-            tmin = map[epoch_id]['tmin']
-            tmax = map[epoch_id]['tmax']
-            plot_xlim = map[epoch_id]['plot_xlim']
+            if 'fix' in epoch_id:
+                tmin = map['fix']['tmin']
+                tmax = map['fix']['tmax']
+                plot_xlim = map['fix']['plot_xlim']
+            elif 'sac' in epoch_id:
+                tmin = map['sac']['tmin']
+                tmax = map['sac']['tmax']
+                plot_xlim = map['sac']['plot_xlim']
+            else:
+                tmin = map[epoch_id]['tmin']
+                tmax = map[epoch_id]['tmax']
+                plot_xlim = map[epoch_id]['plot_xlim']
         except:
             raise ValueError('Epoch id not in default map keys.')
 
     return tmin, tmax, plot_xlim
 
 
-def get_duration(epoch_id, vs_dur,  mss):
+def get_duration(epoch_id,  mss, vs_dur=None):
     mss_duration = {1: 2, 2: 3.5, 4: 5, None: 2}
+    if not vs_dur:
+        vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
     cross2_dur = 1
     cross1_dur = 0.75
 
@@ -403,7 +446,7 @@ def get_duration(epoch_id, vs_dur,  mss):
     else:
         dur = 0
 
-    return dur, cross1_dur, cross2_dur, mss_duration
+    return dur, cross1_dur, cross2_dur, mss_duration, vs_dur
 
 
 def get_baseline_duration(epoch_id, mss, tmin, tmax, plot_xlim, cross1_dur, mss_duration, cross2_dur, map=None):
@@ -469,9 +512,9 @@ def get_plots_timefreqs(epoch_id, mss, cross2_dur, mss_duration, topo_bands, plo
         if not timefreqs_joint:
             timefreqs_joint = [(0.55, 10)]
 
-            vs_timefreq = {1: [(2.5, 10), (3.15, 10), (3.75, 10)],
-                           2: [(4, 10), (4.65, 10), (5.25, 10)],
-                           4: [(5.5, 10), (6.15, 10), (6.75, 10)]}
+            vs_timefreq = {1: [(2.5, 10), (3.15, 7), (3.75, 10)],
+                           2: [(4, 10), (4.65, 7), (5.25, 10)],
+                           4: [(5.5, 10), (6.15, 7), (6.75, 10)]}
 
             timefreqs_joint += vs_timefreq[mss]
 
@@ -494,7 +537,7 @@ def get_plots_timefreqs(epoch_id, mss, cross2_dur, mss_duration, topo_bands, plo
             ms_timefreq = {1: [(-2.45, 10)],
                            2: [(-3.95, 10)],
                            4: [(-5.45, 10)]}
-            timefreqs_joint = ms_timefreq[mss] + [(-0.5, 10), (0.15, 10), (0.75, 10)]
+            timefreqs_joint = ms_timefreq[mss] + [(-0.7, 8), (0.15, 6), (0.75, 10)]
 
             # Check that time freqs are contained in plot times
             timefreqs_joint = [timefreq for timefreq in timefreqs_joint if timefreq[0] > plot_xlim[0] and timefreq[0] < plot_xlim[1]]
@@ -513,9 +556,11 @@ def get_plots_timefreqs(epoch_id, mss, cross2_dur, mss_duration, topo_bands, plo
     elif 'fix' in epoch_id:
         timefreqs_joint = [(0.095, 10)]
         vlines_times = None
+        timefreqs_tfr = timefreqs_joint
     else:
         timefreqs_joint = None
         vlines_times = None
+        timefreqs_tfr = timefreqs_joint
 
     return timefreqs_joint, timefreqs_tfr, vlines_times
 

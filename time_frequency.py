@@ -22,47 +22,45 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'parietal'  # region_hemisphere
+chs_id = 'occipital'  # region_hemisphere
 # ICA / RAW
 use_ica_data = True
-epoch_id = 'vs'
+epoch_id = 'tgt_fix'
 corr_ans = None
 tgt_pres = None
-mss = 4
-reject = None  # 'subject' for subject's default. False for no rejection, dict for specific values. None for default 4e-12 for magnetometers
-n_cycles_div = 4.
+mss = None
+reject = None  # 'subject' for subject's default. False for no rejection, dict for specific values. None for default 5e-12 for magnetometers
+n_cycles_div = 2.
 # Power frequency range
 l_freq = 1
 h_freq = 40
 log_bands = False
 
+# Trial durations
+vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
+plot_edge = 0.15
+trial_dur = vs_dur[mss]  # Edit this to determine the minimum visual search duration for the trial selection (this will also affect ms trials)
+
 # Plots parameters
 # Colorbar
-vmin_power, vmax_power = -0.3, 0.3
+vmin_power, vmax_power = None, None
 vmin_itc, vmax_itc = None, None
-topo_vmin, topo_vmax = -0.3, 0.3
+topo_vmin, topo_vmax = None, None
 # plot_joint max and min topoplots
-plot_max, plot_min = False, False
+plot_max, plot_min = True, True
 # Baseline method
 bline_mode = 'logratio'
 # Topoplot bands
 topo_bands = ['Alpha', 'Alpha', 'Theta', 'Alpha']
 
-# Trial durations
-vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
-plot_edge = 0.15
-trial_dur = vs_dur[mss]
-
 #----------#
 
 # Windows durations
-dur, cross1_dur, cross2_dur, mss_duration = functions_general.get_duration(epoch_id=epoch_id, vs_dur=vs_dur, mss=mss)
+dur, cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration(epoch_id=epoch_id, vs_dur=vs_dur, mss=mss)
 
 # Get time windows from epoch_id name
-
-tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur,
-                                                        mss_duration=mss_duration, cross2_dur=cross2_dur, dur=dur,
-                                                        plot_edge=plot_edge)
+map = dict(tgt_fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3, 0.6)})
+tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=plot_edge, map=map)
 
 # Define time-frequency bands to plot in plot_joint
 if (plot_max or plot_min):
@@ -81,7 +79,7 @@ else:
 baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=epoch_id, mss=mss, tmin=tmin, tmax=tmax, plot_xlim=plot_xlim,
                                                                   cross1_dur=cross1_dur, mss_duration=mss_duration,
                                                                   cross2_dur=cross2_dur)
-
+plot_baseline = None
 # freqs type
 if log_bands:
     freqs_type = 'log'
@@ -97,11 +95,11 @@ else:
 # Save ids
 save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
 if (epoch_id == 'ms' or epoch_id == 'vs') and trial_dur:
-    save_id += f'_tdur{trial_dur}'
-plot_id = f'{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}/'
+    save_id += '_tdur{trial_dur}'
+plot_id = f'{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}_cycles{int(n_cycles_div)}/'
 
 # Save data paths
-trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/{save_id}_{tmin}_{tmax}_bline{baseline}/'
+trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/{save_id}_{tmin}_{tmax}_bline{baseline}_cycles{int(n_cycles_div)}/'
 epochs_save_path = paths().save_path() + f'Epochs_{data_type}/Band_None/{save_id}_{tmin}_{tmax}_bline{baseline}/'
 # Save figures paths
 trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + plot_id + f'{chs_id}/'
@@ -241,7 +239,7 @@ if save_fig:
 # Power Plot joint
 fname = f'GA_Power_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
 plot_general.tfr_plotjoint_picks(tfr=grand_avg_power, plot_baseline=plot_baseline, bline_mode=bline_mode, vlines_times=vlines_times,
-                                 timefreqs=timefreqs_joint, plot_xlim=plot_xlim, chs_id=chs_id, vmin=vmin_power, vmax=vmax_power,
+                                 timefreqs=timefreqs_joint, plot_xlim=plot_xlim, chs_id=chs_id, vmin=vmin_power, vmax=vmin_power,
                                  plot_max=plot_max, plot_min=plot_min, display_figs=display_figs, save_fig=save_fig,
                                  trf_fig_path=trf_fig_path, fname=fname)
 
