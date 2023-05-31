@@ -22,8 +22,11 @@ class paths:
         elif self.name == 'desktop-59r7a1d\\usuario\n':  # Desktop
             self.main_path = 'C:/Users/Usuario/OneDrive - The University of Nottingham/MEGEYEHS/'
 
-        else:  # Notts
+        elif self.name == 'ad\\lpajg1\n':  # Notts
             self.main_path = 'C:/Users/lpajg1/OneDrive - The University of Nottingham/MEGEYEHS/'
+
+        else:
+            raise ValueError(f'No paths set for pc: {self.name}')
 
 
     def config_path(self):

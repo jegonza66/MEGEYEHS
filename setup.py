@@ -224,13 +224,6 @@ class raw_subject:
         else:
             print('Subject not found')
 
-        # Subject's data paths
-        self.ctf_path = pathlib.Path(os.path.join(exp_info.ctf_path, self.subject_id))
-        self.et_path = pathlib.Path(os.path.join(exp_info.et_path, self.subject_id))
-        self.bh_path = pathlib.Path(os.path.join(exp_info.bh_path, self.subject_id))
-        self.mri_path = pathlib.Path(os.path.join(exp_info.mri_path, self.subject_id))
-        self.opt_path = pathlib.Path(os.path.join(exp_info.opt_path, self.subject_id))
-
         # Define subject group and bad channels by matching id index
         self.bad_channels = exp_info.subjects_bad_channels[self.subject_id]
         self.group = exp_info.subjects_groups[self.subject_id]
@@ -304,10 +297,8 @@ class raw_subject:
         """
 
         print('\nLoading Raw MEG data')
-        # get subject path
-        ctf_path = pathlib.Path(os.path.join(exp_info.ctf_path, self.subject_id))
-        file_path = pathlib.Path(os.path.join(ctf_path, self.subject_id, f'Subject_{self.subject_id}_meg.fif'))
-        subj_path = self.ctf_path
+        # Get subject path
+        subj_path = pathlib.Path(os.path.join(paths().ctf_path(), self.subject_id))
         ds_files = list(subj_path.glob('*{}*.ds'.format(self.subject_id)))
         ds_files.sort()
 
@@ -322,7 +313,7 @@ class raw_subject:
             raw = mne.io.concatenate_raws(raws_list, on_mismatch='ignore')
 
             # Set dev <-> head transformation from optimal head localization
-            raw.info['dev_head_t'] = raws_list[config.general.head_loc_idx[self.subject_id]].info['dev_head_t']
+            raw.info['dev_head_t'] = raws_list[config().general.head_loc_idx[self.subject_id]].info['dev_head_t']
 
         # If only one session return that session as whole raw data
         elif len(ds_files) == 1:
@@ -333,6 +324,23 @@ class raw_subject:
             raise ValueError('No .ds files found in subject directory: {}'.format(subj_path))
 
         return raw
+
+
+    # MEG data
+    def load_preproc_meg_data(self, preload=False):
+        """
+        Preprocessed MEG data for parent subject as raw instance of MNE.
+        """
+
+        print('\nLoading Preprocessed MEG data')
+        # get subject path
+        preproc_path = paths().preproc_path()
+        file_path = pathlib.Path(os.path.join(preproc_path, self.subject_id, f'Subject_{self.subject_id}_meg.fif'))
+
+        # Load data
+        fif = mne.io.read_raw_fif(file_path, preload=preload)
+
+        return fif
 
 
     # ICA MEG data
@@ -394,7 +402,7 @@ class raw_subject:
 
         print('\nLoading ET data')
         # get subject path
-        subj_path = self.et_path
+        subj_path = pathlib.Path(os.path.join(paths().et_path(), self.subject_id))
         # Load asc file
         asc_file_path = list(subj_path.glob('*{}*.asc'.format(self.subject_id)))[0]
 
@@ -468,30 +476,13 @@ class raw_subject:
         Behavioural data for parent subject as pandas DataFrames.
         """
         # Get subject path
-        subj_path = self.bh_path
+        subj_path = pathlib.Path(os.path.join(paths().bh_path(), self.subject_id))
         bh_file = list(subj_path.glob('*.csv'.format(self.subject_id)))[0]
 
         # Load DataFrame
         df = pd.read_csv(bh_file)
 
         return df
-
-
-    # MEG data
-    def load_preproc_meg_data(self, preload=False):
-        """
-        Preprocessed MEG data for parent subject as raw instance of MNE.
-        """
-
-        print('\nLoading Preprocessed MEG data')
-        # get subject path
-        preproc_path = paths().preproc_path()
-        file_path = pathlib.Path(os.path.join(preproc_path, self.subject_id, f'Subject_{self.subject_id}_meg.fif'))
-
-        # Load data
-        fif = mne.io.read_raw_fif(file_path, preload=preload)
-
-        return fif
 
 
 class noise:
@@ -542,7 +533,7 @@ class noise:
 
         print('\nLoading MEG data')
         # get subject path
-        subj_path = self.ctf_path
+        subj_path = pathlib.Path(os.path.join(paths().ctf_path(), 'BACK_NOISE'))
         ds_files = list(subj_path.glob('QA_*_{}_01.ds'.format(self.subject_id)))
         ds_files.sort()
 
