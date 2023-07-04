@@ -508,15 +508,16 @@ def get_plots_timefreqs(epoch_id, mss, cross2_dur, mss_duration, topo_bands, plo
     :return:
     '''
     # Plot_joint topoplots time frequencies
-    if epoch_id == 'ms' and mss:
+    if epoch_id == 'ms':
         if not timefreqs_joint:
             timefreqs_joint = [(0.55, 10)]
 
-            vs_timefreq = {1: [(2.5, 10), (3.15, 7), (3.75, 10)],
+            if mss:
+                vs_timefreq = {1: [(2.5, 10), (3.15, 7), (3.75, 10)],
                            2: [(4, 10), (4.65, 7), (5.25, 10)],
                            4: [(5.5, 10), (6.15, 7), (6.75, 10)]}
 
-            timefreqs_joint += vs_timefreq[mss]
+                timefreqs_joint += vs_timefreq[mss]
 
             # Check that time freqs are contained in plot times
             timefreqs_joint = [timefreq for timefreq in timefreqs_joint if timefreq[0] > plot_xlim[0] and timefreq[0] < plot_xlim[1]]
@@ -532,12 +533,16 @@ def get_plots_timefreqs(epoch_id, mss, cross2_dur, mss_duration, topo_bands, plo
         #TFR vlines
         vlines_times = [0, mss_duration[mss], mss_duration[mss] + 1]
 
-    elif epoch_id == 'vs' and mss:
+    elif epoch_id == 'vs':
+        vs_timefreqs = [(-0.7, 8), (0.15, 6), (0.75, 10)]
         if not timefreqs_joint:
-            ms_timefreq = {1: [(-2.45, 10)],
-                           2: [(-3.95, 10)],
-                           4: [(-5.45, 10)]}
-            timefreqs_joint = ms_timefreq[mss] + [(-0.7, 8), (0.15, 6), (0.75, 10)]
+            if mss:
+                ms_timefreq = {1: [(-2.45, 10)],
+                               2: [(-3.95, 10)],
+                               4: [(-5.45, 10)]}
+                timefreqs_joint = ms_timefreq[mss] + vs_timefreqs
+            else:
+                timefreqs_joint = vs_timefreqs
 
             # Check that time freqs are contained in plot times
             timefreqs_joint = [timefreq for timefreq in timefreqs_joint if timefreq[0] > plot_xlim[0] and timefreq[0] < plot_xlim[1]]

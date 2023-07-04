@@ -35,6 +35,8 @@ corr_ans = True
 tgt_pres = True
 mss = None
 reject = None
+trial_dur = None
+evt_dur = 0.4
 
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
@@ -68,7 +70,7 @@ for i, epoch_id in enumerate(epoch_ids):
         evokeds[epoch_id][chs_id] = []
 
         # Specific run path for saving data and plots
-        save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
+        save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
         run_path = f'/Band_{band_id}/{save_id}_{tmin}_{tmax}_bline{baseline}/'
 
         # Save data paths
@@ -153,7 +155,7 @@ fig.tight_layout()
 
 if save_fig:
     fig_path = paths().plots_path() + f'Evoked_{data_type}/it_vs_fix/'
-    fname = f'Evoked_{chs_id}'
+    fname = f'Evoked_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{chs_id}'
     save.fig(fig=fig, path=fig_path, fname=fname)
 
 ## it_vs_fix TRF
@@ -192,6 +194,9 @@ labels = ['TRF Distractor', 'TRF Target']
 # Trials
 corr_ans = True
 tgt_pres = True
+mss = None
+trial_dur = None
+evt_dur = 0.4
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = -0.2, 0.6, (-0.1, 0.5)
 # Baseline
@@ -214,7 +219,7 @@ stds = {}
 bads = []
 
 # Save path
-save_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
+save_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
 
 # Figure
 matplotlib.rc({'font.size': 20})
@@ -253,8 +258,8 @@ for i, epoch_id in enumerate(epoch_ids[:2]):
                 meg_data = subject.load_preproc_meg_data()
 
             # Data filenames
-            trf_path = save_path + f'{subject_code}/'
-            trf_fname = f'TRF_{epoch_ids}.pkl'
+            trf_path = save_path
+            trf_fname = f'TRF_{subject_code}.pkl'
 
             # Load rf data
             rf = load.var(trf_path + trf_fname)
@@ -335,7 +340,7 @@ axs[1].set_xlim(left=-0.2, right=0.5)
 fig.tight_layout()
 
 if save_fig:
-    fig_path = paths().plots_path() + f'TRF_{data_type}/{epoch_ids}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/it_vs_fix/'
+    fig_path = paths().plots_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/it_vs_fix/'
     if FRF_TRF:
         fname = f'FRF_TRF_{chs_id}'
     else:

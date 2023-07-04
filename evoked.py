@@ -26,15 +26,17 @@ else:
 use_ica_data = True
 band_id = None
 # Id
-epoch_id = 'tgt_fix'
+epoch_id = 'it_fix'
 # Pick MEG chs (Select channels or set picks = 'mag')
-chs_id = 'temporal_R'
+chs_id = 'mag'
 # Plot eye movements
 plot_gaze = False
 corr_ans = True
 tgt_pres = True
 mss = None
 reject = None
+trial_dur = None
+evt_dur = 0.4
 
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
@@ -48,7 +50,7 @@ else:
     data_type = 'RAW'
 
 # Specific run path for saving data and plots
-save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
+save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
 run_path = f'/Band_{band_id}/{save_id}_{tmin}_{tmax}_bline{baseline}/'
 
 # Save data paths
@@ -113,7 +115,7 @@ for subject_code in exp_info.subjects_ids:
             epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans,
                                                            tgt_pres=tgt_pres, epoch_id=epoch_id, meg_data=meg_data,
                                                            tmin=tmin, tmax=tmax, save_data=save_data,
-                                                           epochs_save_path=epochs_save_path,
+                                                           epochs_save_path=epochs_save_path, evt_dur=evt_dur,
                                                            epochs_data_fname=epochs_data_fname, reject=reject,
                                                            baseline=baseline)
 

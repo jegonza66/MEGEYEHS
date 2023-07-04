@@ -67,14 +67,18 @@ def define_events(subject, meg_data, epoch_id, mss=None, trials=None, evt_dur=No
                 print('Trial selection skipped. Epoch_id does not contain trial number.')
 
         # Set duration limit
-        if evt_dur:
-            if 'fix' in epoch_id:
-                metadata = subject.fixations
-            elif 'sac' in epoch_id:
-                metadata = subject.saccades
-            metadata = metadata.loc[(metadata['duration'] >= evt_dur)]
-            metadata_ids = list(metadata['id'])
-            epoch_keys = [key for key in epoch_keys if key in metadata_ids]
+        if 'fix' in epoch_id:
+            metadata = subject.fixations
+            if evt_dur:
+                metadata = metadata.loc[(metadata['duration'] >= evt_dur)]
+                metadata_ids = list(metadata['id'])
+                epoch_keys = [key for key in epoch_keys if key in metadata_ids]
+        elif 'sac' in epoch_id:
+            metadata = subject.saccades
+            if evt_dur:
+                metadata = metadata.loc[(metadata['duration'] >= evt_dur)]
+                metadata_ids = list(metadata['id'])
+                epoch_keys = [key for key in epoch_keys if key in metadata_ids]
 
         # Get events and ids matchig selection
         metadata, events, events_id = mne.epochs.make_metadata(events=all_events, event_id=all_event_id,

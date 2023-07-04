@@ -22,18 +22,18 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'occipital'  # region_hemisphere
+chs_id = 'parietal_occipital'  # region_hemisphere
 # ICA / RAW
 use_ica_data = True
-epoch_id = 'tgt_fix'
+epoch_id = 'vs'
 corr_ans = None
 tgt_pres = None
-mss = None
+mss = 1
 reject = None  # 'subject' for subject's default. False for no rejection, dict for specific values. None for default 5e-12 for magnetometers
 n_cycles_div = 2.
 # Power frequency range
-l_freq = 1
-h_freq = 40
+l_freq = 40
+h_freq = 100
 log_bands = False
 
 # Trial durations
@@ -95,7 +95,7 @@ else:
 # Save ids
 save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
 if (epoch_id == 'ms' or epoch_id == 'vs') and trial_dur:
-    save_id += '_tdur{trial_dur}'
+    save_id += f'_tdur{trial_dur}'
 plot_id = f'{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}_cycles{int(n_cycles_div)}/'
 
 # Save data paths
@@ -212,13 +212,13 @@ except:
 
 # Plot Power time-frequency
 fname = f'Power_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-plot_general.tfr_times(tfr=grand_avg_power, chs_id=chs_id, timefreqs_tfr=timefreqs_tfr, baseline=plot_baseline, bline_mode=bline_mode,
+plot_general.tfr_times(tfr=grand_avg_power, chs_id=chs_id, timefreqs_tfr=None, baseline=plot_baseline, bline_mode=bline_mode,
                        plot_xlim=plot_xlim, vlines_times=vlines_times, topo_vmin=topo_vmin, topo_vmax=topo_vmax, subject=None, display_figs=display_figs,
                        save_fig=save_fig, fig_path=trf_fig_path, fname=fname, vmin=vmin_power, vmax=vmax_power, fontsize=16, ticksize=18)
 
 # Plot ITC time-frequency
 fname = f'ITC_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-plot_general.tfr_times(tfr=grand_avg_itc, chs_id=chs_id, timefreqs_tfr=timefreqs_tfr, baseline=plot_baseline, bline_mode=bline_mode,
+plot_general.tfr_times(tfr=grand_avg_itc, chs_id=chs_id, timefreqs_tfr=None, baseline=plot_baseline, bline_mode=bline_mode,
                        plot_xlim=plot_xlim, vlines_times=vlines_times, topo_vmin=topo_vmin, topo_vmax=topo_vmax, subject=None, display_figs=display_figs,
                        save_fig=save_fig, fig_path=trf_fig_path, fname=fname, vmin=vmin_itc, vmax=vmax_itc, fontsize=16, ticksize=18)
 

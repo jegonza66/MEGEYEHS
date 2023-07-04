@@ -189,7 +189,7 @@ def ica_subject(exp_info, subject_code):
 #
 #     return raw
 
-def filtered_data(subject, band_id, use_ica_data=True, preload=False, save_data=False):
+def filtered_data(subject, band_id, trans_bands=(None, None), use_ica_data=True, preload=False, save_data=False):
 
     if use_ica_data:
         filtered_path = paths().filtered_path_ica() + f'{band_id}/{subject.subject_id}/'
@@ -211,13 +211,13 @@ def filtered_data(subject, band_id, use_ica_data=True, preload=False, save_data=
         else:
             meg_data = subject.load_preproc_meg_data(preload=True)
         l_freq, h_freq = functions_general.get_freq_band(band_id)
-        filtered_data = meg_data.filter(l_freq=l_freq, h_freq=h_freq)
+        filtered_data = meg_data.filter(l_freq=l_freq, h_freq=h_freq, l_trans_bandwidth=trans_bands[0], h_trans_bandwidth=trans_bands[1])
 
         if save_data:
             print('Saving filtered data')
             # Save MEG
             os.makedirs(filtered_path, exist_ok=True)
-            filtered_meg_data_fname = f'Subject_{subject.subject_id}_meg.fif'
+            filtered_meg_data_fname = f'Subject_{subject.subject_id}_{trans_bands}_meg.fif'
             filtered_data.save(filtered_path + filtered_meg_data_fname, overwrite=True)
 
     return filtered_data
