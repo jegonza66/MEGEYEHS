@@ -1,5 +1,4 @@
 import setup
-import load
 import save
 import plot_preproc
 import functions_preproc
@@ -9,12 +8,13 @@ from paths import paths
 # Load experiment info
 exp_info = setup.exp_info()
 # Load configuration
-config = load.config(path=paths().config_path(), fname='config.pkl')
+# config = load.config(path=paths().config_path(), fname='config.pkl')
+config = setup.config()
 # Run plots
-plot = False
+plot = True
 
 # Run
-for subject_code in exp_info.subjects_ids:
+for subject_code in exp_info.subjects_ids[13:]:
 
     # ---------------- Load data ----------------#
     # Define subject
@@ -37,8 +37,11 @@ for subject_code in exp_info.subjects_ids:
 
     #---------------- Blinks removal ----------------#
     # Define intervals around blinks to also fill with nan. Due to conversion noise from square signal
-    et_channels_meg = functions_preproc.blinks_to_nan(meg_gazex_data_scaled=meg_gazex_data_scaled, meg_gazey_data_scaled=meg_gazey_data_scaled,
-                                                      meg_pupils_data_raw=meg_pupils_data_raw, config=subject.config.preproc)
+    et_channels_meg = functions_preproc.blinks_to_nan(exp_info=exp_info, subject=subject,
+                                                      meg_gazex_data_scaled=meg_gazex_data_scaled,
+                                                      meg_gazey_data_scaled=meg_gazey_data_scaled,
+                                                      meg_pupils_data_raw=meg_pupils_data_raw,
+                                                      config=subject.config.preproc)
 
     #---------------- Defining response events and trials ----------------#
     if subject.subject_id in exp_info.no_trig_subjects:
@@ -48,7 +51,7 @@ for subject_code in exp_info.subjects_ids:
 
     #---------------- Fixations and saccades detection ----------------#
     fixations, saccades, subject = functions_preproc.fixations_saccades_detection(raw=raw, et_channels_meg=et_channels_meg,
-                                                                                  subject=subject)
+                                                                                  subject=subject, screen_size=exp_info.screen_distance[subject_code])
 
     # ---------------- Saccades classification ----------------#
     saccades, raw, subject = functions_preproc.saccades_classification(subject=subject, saccades=saccades, raw=raw)
@@ -112,8 +115,3 @@ for subject_code in exp_info.subjects_ids:
     del(raw)
     del(filtered_data)
     del(subject)
-
-
-
-# add_bads = ['16191001', '16200001', '16201001', '09991040']
-

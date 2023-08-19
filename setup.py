@@ -43,27 +43,77 @@ class exp_info:
         self.opt_path = paths().opt_path()
 
         # Select subject
-        self.subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001', '16200001',
-                             '16201001', '10925091', '16263002', '16269001']
+        self.subjects_ids = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001',
+                             '16200001', '16201001', '10925091', '16263002', '16269001', '16960001', '16425003',
+                             '16984001', '16990002', '17009001', '17010001', '13229006', '16991002']
 
-        # Subjects bad channels
-        self.subjects_bad_channels = {'15909001': ['MLT52', 'MLT53', 'MLT54'], '15912001': [],
-                                      '15910001': ['MRT52'], '15950001': ['MLT53', 'MRT52', 'MRT53'], '15911001': [], '11535009': [],
-                                      '16191001': ['MRT42', 'MRT51'], '16200001': [], '16201001': [], '16256001': [],
-                                      '09991040': ['MRC12', 'MRC13', 'MRC21', 'MRC22', 'MRC51',
-                                                   'MRC52', 'MRC62', 'MZF01', 'MZF03', 'MRF33',
-                                                   'MRF43', 'MRF52', 'MRF53', 'MRF61', 'MRF62'],
-                                      '10925091': ['MLT44'], '16263002': [], '16269001': ['MLT52']}
+    # Subjects bad channels
+        self.subjects_bad_channels = {'15909001': ['MLT52', 'MLT53', 'MLT54'],
+                                      '15912001': [],
+                                      '15910001': ['MRT52'],
+                                      '15950001': ['MLT53', 'MRT52', 'MRT53'],
+                                      '15911001': [],
+                                      '11535009': [],
+                                      '16191001': ['MRT42', 'MRT51'],
+                                      '16200001': [],
+                                      '16201001': [],
+                                      '16256001': [],
+                                      '09991040': ['MRC12', 'MRC13', 'MRC21', 'MRC22', 'MRC51', 'MRC52', 'MRC62', 'MZF01',
+                                                   'MZF03', 'MRF33','MRF43', 'MRF52', 'MRF53', 'MRF61', 'MRF62'],
+                                      '10925091': ['MLT44'],
+                                      '16263002': [],
+                                      '16269001': ['MLT52'],
+                                      '16960001': [],
+                                      '16425003': [],
+                                      '16984001': [],
+                                      '16990002': [],
+                                      '17009001': [],
+                                      '17010001': [],
+                                      '13229006': [],
+                                      '16991002': []
+                                      }
+
+        # Distance to the screen during the experiment
+        self.screen_distance = {'15909001': 58, '15912001': 58, '15910001': 58, '15950001': 58, '15911001': 58,
+                                '11535009': 58, '16191001': 58, '16200001': 58, '16201001': 58, '16256001': 58,
+                                '09991040': 58, '10925091': 58, '16263002': 58, '16269001': 58, '16960001': 58,
+                                '16425003': 62, '16984001': 59, '16990002': 61, '17009001': 62.5, '17010001': 61,
+                                '13229006': 63, '16991002': 66.5}
+
+        # Screen size
+        self.screen_size = {'15909001': 38, '15912001': 38, '15910001': 38, '15950001': 38, '15911001': 38,
+                            '11535009': 38, '16191001': 38, '16200001': 38, '16201001': 38, '16256001': 38,
+                            '09991040': 38, '10925091': 38, '16263002': 38, '16269001': 38, '16960001': 38,
+                            '16425003': 38, '16984001': 38, '16990002': 38, '17009001': 38, '17010001': 38,
+                            '13229006': 37.5, '16991002': 37.5}
 
         # Subjects groups
         # For some reason participant 6 has the mapping from balanced participants
-        self.subjects_groups = {'15909001': 'Balanced', '15912001': 'Balanced', '15910001': 'Balanced',
-                                '15950001': 'Counterbalanced', '15911001': 'Balanced', '11535009': 'Balanced',
-                                '16191001': 'Balanced', '16200001': 'Balanced', '16201001': 'Balanced',
-                                '16256001': 'Counterbalanced', '09991040': 'Balanced',
-                                '10925091': 'Balanced', '16263002':  'Balanced', '16269001':  'Balanced'}
+        self.subjects_groups = {'15909001': 'Balanced',
+                                '15912001': 'Balanced',
+                                '15910001': 'Balanced',
+                                '15950001': 'Counterbalanced',
+                                '15911001': 'Balanced',
+                                '11535009': 'Counterbalanced',
+                                '16191001': 'Balanced',
+                                '16200001': 'Balanced',
+                                '16201001': 'Balanced',
+                                '16256001': 'Counterbalanced',
+                                '09991040': 'Counterbalanced',
+                                '10925091': 'Counterbalanced',
+                                '16263002': 'Counterbalanced',
+                                '16269001': 'Counterbalanced',
+                                '16960001': 'Counterbalanced',
+                                '16425003': 'Counterbalanced',
+                                '16984001': 'Counterbalanced',
+                                '16990002': 'Balanced',
+                                '17009001': 'Counterbalanced',
+                                '17010001': 'Counterbalanced',
+                                '13229006': 'Counterbalanced',
+                                '16991002': 'Counterbalanced'
+                                }
 
-        # Missing bh subjects
+        # Missing triggers subjects
         self.no_trig_subjects = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001',
                                  '16200001', '16201001']
 
@@ -73,24 +123,60 @@ class exp_info:
         # Define subjects that took the old trials loop experiment
         self.trials_loop_subjects = ['15909001', '15912001']
 
+        # Subjects with no events descriptiion
+        self.no_desc_subjects = ['16960001', '16425003', '16984001', '16990002', '17009001', '17010001', '13229006', '16991002']
+
+        # Subjects with no pupil data
+        self.no_pupil_subjects = ['16960001', '16425003', '16984001', '16990002', '17009001', '17010001', '13229006', '16991002']
+
         # Get et channels by name [Gaze x, Gaze y, Pupils]
         self.et_channel_names = ['UADC001-4123', 'UADC002-4123', 'UADC013-4123']
 
         # Trigger channel name
         self.trig_ch = 'UPPT002'
 
+        # Buttons channel name
+        self.button_ch = 'UPPT001'
+
+        # Buttons values to colors map
+        self.buttons_ch_map = {1: 'blue', 2: 'yellow', 4: 'green', 8: 'red', 'blue': 1, 'yellow': 2, 'green': 4, 'red': 8}
+        self.buttons_pc_map = {1: 'blue', 2: 'yellow', 3: 'green', 4: 'red', 'blue': 1, 'yellow': 2, 'green': 3, 'red': 4}
+        # Participant 15950001 was Counterbalance (Correct answers are taken from CB)
+        # But the instructions during the experiment were for a Balanced participant
+        # We invert the mapping red - blue to compensate this
+        self.buttons_pc_map_15950001 = {1: 'red', 2: 'yellow', 3: 'green', 4: 'blue', 'red': 1, 'yellow': 2, 'green': 3, 'blue': 4}
+
         # DAC delay (in ms)
         self.DAC_delay = 10
 
         # Background noise recordings date ids
-        self.noise_recordings = ['20220530', '20220816', '20220915', '20220916', '20220922', '20220923']
+        self.noise_recordings = ['20220530', '20220816', '20220915', '20220916', '20220922', '20220923', '20230623', '20230629',
+                                 '20230705', '20230706', '20230802']
 
         # Participants associated background noise
-        self.subjects_noise = {'15909001': '20220530', '15912001': '20220530', '15910001': '20220530',
-                               '15950001': '20220530', '15911001': '20220530', '11535009': '20220530',
-                               '16191001': '20220816', '16200001': '20220816', '16201001': '20220816',
-                               '16256001': '20220915', '09991040': '20220916', '10925091': '20220916',
-                               '16263002': '20220922', '16269001':  '20220923'}
+        self.subjects_noise = {'15909001': '20220530',
+                               '15912001': '20220530',
+                               '15910001': '20220530',
+                               '15950001': '20220530',
+                               '15911001': '20220530',
+                               '11535009': '20220530',
+                               '16191001': '20220816',
+                               '16200001': '20220816',
+                               '16201001': '20220816',
+                               '16256001': '20220915',
+                               '09991040': '20220916',
+                               '10925091': '20220916',
+                               '16263002': '20220922',
+                               '16269001': '20220923',
+                               '16960001': '20230623',
+                               '16425003': '20230623',
+                               '16984001': '20230629',
+                               '16990002': '20230630',
+                               '17009001': '20230705',
+                               '17010001': '20230706',
+                               '13229006': '20230802',
+                               '16991002': '20230802'
+                               }
 
         self.line_noise_freqs = (50, 100, 110, 150, 200, 250, 300)
 
@@ -146,12 +232,23 @@ class config:
             # Pupil size threshold to consider missing signal
             self.pupil_thresh = {'15909001': -4.6, '15912001': -4.71, '15910001': -4.113, '15950001': -4.6, '15911001': -4.6,
                                  '11535009': -4.6, '16191001': -4.58, '16200001': -4.56, '16201001': -4.58, '16256001': -4.6,
-                                 '09991040': -4.37, '10925091': -4.565, '16263002': -4.39, '16269001': -4.57}
+                                 '09991040': -4.37, '10925091': -4.565, '16263002': -4.39, '16269001': -4.57, '16960001': 300,
+                                 '16425003': 300, '16984001': 300, '16990002': 300, '17009001': 300, '17010001': 300,
+                                 '13229006': 300, '16991002': 300}
 
             # Distance to the screen during the experiment
             self.screen_distance = {'15909001': 58, '15912001': 58, '15910001': 58, '15950001': 58, '15911001': 58,
                                     '11535009': 58, '16191001': 58, '16200001': 58, '16201001': 58, '16256001': 58,
-                                    '09991040': 58, '10925091': 58, '16263002': 58, '16269001': 58}
+                                    '09991040': 58, '10925091': 58, '16263002': 58, '16269001': 58, '16960001': 58,
+                                    '16425003': 62, '16984001': 59, '16990002': 61, '17009001': 62.5, '17010001': 61,
+                                    '13229006': 63, '16991002': 66.5}
+
+            # Screen size
+            self.screen_size = {'15909001': 38, '15912001': 38, '15910001': 38, '15950001': 38, '15911001': 38,
+                                '11535009': 38, '16191001': 38, '16200001': 38, '16201001': 38, '16256001': 38,
+                                '09991040': 38, '10925091': 38, '16263002': 38, '16269001': 38, '16960001': 38,
+                                '16425003': 38, '16984001': 38, '16990002': 38, '17009001': 38, '17010001': 38,
+                                '13229006': 37.5, '16991002': 37.5}
 
             # Et samples shift for ET-MEG alignment
             self.et_samples_shift = {'15909001': {0: 105194, 1: 142301, 2: 178980, 3: 271317, 4: 308180, 5: 346960, 6: 401542},
@@ -166,21 +263,34 @@ class config:
                                      '09991040': {0: 158146, 1: 211028, 2: 282490, 3: 286743, 4: 335281, 5: 391390, 6: 437725},
                                      '10925091': {0: 112968, 1: 164895, 2: 216394, 3: 281356, 4: 332432, 5: 381577, 6: 429920},
                                      '16263002': {0: 144254, 1: 217256, 2: 266348, 3: 315123, 4: 405812, 5: 454113, 6: 504071},
-                                     '16269001': {0: 128759, 1: 186451, 2: 191845, 3: 242896, 4: 214075, 5: 223144, 6: 247076}}
+                                     '16269001': {0: 128759, 1: 186451, 2: 191845, 3: 242896, 4: 214075, 5: 223144, 6: 247076},
+                                     '16960001': {},
+                                     '16425003': {},
+                                     '16984001': {},
+                                     '16990002': {},
+                                     '17009001': {},
+                                     '17010001': {},
+                                     '13229006': {},
+                                     '16991002': {}
+                                     }
 
-            
+
     class general:
         def __init__(self):
             # Trial reject parameter based on MEG peak to peak amplitude
             self.reject_amp = {'15909001': 1.5e-12, '15912001': 3.5e-12, '15910001': 3e-12, '15950001': 3.5e-12,
                                '15911001': 3.5e-12, '11535009': 3.5e-12, '16191001': 4e-12, '16200001': 2e-12,
                                '16201001': 1.5e-12, '16256001': 3.5e-12, '09991040': 1.2e-12, '10925091': 1.4e-12,
-                               '16263002': 2.5e-12, '16269001': 2e-12}
+                               '16263002': 2.5e-12, '16269001': 2e-12, '16960001': 5e-12, '16425003': 5e-12,
+                               '16984001': 5e-12, '16990002': 5e-12, '17009001': 5e-12, '17010001': 5e-12,
+                               '13229006': 5e-12, '16991002': 5e-12}
 
             # Subjects dev <-> head transformation to use
             self.head_loc_idx = {'15909001': 2, '15912001': 1, '15910001': 3, '15950001': 0, '15911001': 0,
                                  '11535009': 0, '16191001': 2, '16200001': 2, '16201001': 0, '16256001': 0,
-                                 '09991040': 0, '10925091': 0, '16263002': 1, '16269001':  2}
+                                 '09991040': 0, '10925091': 0, '16263002': 1, '16269001':  2, '16960001': 0,
+                                 '16425003': 0, '16984001': 0, '16990002': 0, '17009001': 0, '17010001': 0,
+                                 '13229006': 0, '16991002': 0}
 
 
 class raw_subject:
@@ -227,16 +337,13 @@ class raw_subject:
         # Define subject group and bad channels by matching id index
         self.bad_channels = exp_info.subjects_bad_channels[self.subject_id]
         self.group = exp_info.subjects_groups[self.subject_id]
-
-        # Define mapping between button value and color by group
-        if self.group == 'Balanced':
-            self.map = {'blue': '1', 'red': '4'}
-        elif self.group == 'Counterbalanced':
-            self.map = {'blue': '4', 'red': '1'}
+        self.buttons_pc_map = exp_info.buttons_pc_map
+        # Exception for subject 15950001
+        if subject_code == '15950001':
+            self.buttons_pc_map = exp_info.buttons_pc_map_15950001
 
         # Get run configuration for subject
         self.config = self.subject_config(config=config, subject_id=self.subject_id)
-
 
     # Subject's parameters and configuration
     class subject_config:
@@ -252,7 +359,7 @@ class raw_subject:
                 # Get config.preprocessing attributes and get data for corresponding subject
                 preproc_attributes = config.preprocessing.__dict__.keys()
 
-                # Iterate over attributes and get data for conrresponding subject
+                # Iterate over attributes and get data for corresponding subject
                 for preproc_att in preproc_attributes:
                     att = getattr(config.preprocessing, preproc_att)
                     if type(att) == dict:

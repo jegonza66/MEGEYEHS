@@ -532,7 +532,7 @@ def emap_gaze(raw, subject, et_channels_meg, block_num, display_fig=False, save_
 
         # Plot
         fig = plt.figure(figsize=(15, 5))
-        plt.title(f'Eyemap {emap_trial_name.upper()}')
+        plt.title(f'Eyemap {emap_trial_name.upper()} {block_num}')
 
         # Gazes
         plt.plot(raw.times[trial_start_idx:trial_end_idx], gaze_x[trial_start_idx:trial_end_idx], label='X')
@@ -558,7 +558,7 @@ def emap_gaze(raw, subject, et_channels_meg, block_num, display_fig=False, save_
 
         if save_fig:
             save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + f'/Gaze_Trials/'
-            fname = f'Eyemap_{emap_trial_name}'
+            fname = f'Eyemap_{emap_trial_name}_{block_num}'
             save.fig(fig=fig, path=save_path, fname=fname)
 
 
@@ -589,7 +589,7 @@ def scanpath(raw, subject, et_channels_meg, items_pos, trial_idx,
     vs_end_idx = functions_general.find_nearest(raw.times, subject.vsend[trial_idx])[0]
 
     # Load search image
-    img = mpimg.imread(exp_path + 'cmp_' + subject.trial_imgs[trial_idx] + '.jpg')
+    img = mpimg.imread(exp_path + 'images/cmp_' + subject.trial_imgs[trial_idx] + '.jpg')
 
     # Load targets
     bh_data_trial = subject.bh_data.iloc[trial_idx]

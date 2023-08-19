@@ -226,7 +226,7 @@ def reescale_et_channels(meg_gazex_data_raw, meg_gazey_data_raw, minvoltage=-5, 
     return meg_gazex_data_scaled, meg_gazey_data_scaled
 
 
-def blinks_to_nan(meg_pupils_data_raw, meg_gazex_data_scaled, meg_gazey_data_scaled, config):
+def blinks_to_nan(exp_info, subject, meg_pupils_data_raw, meg_gazex_data_scaled, meg_gazey_data_scaled, config):
     print('Removing blinks')
 
     # Get configuration
@@ -239,8 +239,11 @@ def blinks_to_nan(meg_pupils_data_raw, meg_gazex_data_scaled, meg_gazey_data_sca
     meg_gazey_data_clean = copy.copy(meg_gazey_data_scaled)
     meg_pupils_data_clean = copy.copy(meg_pupils_data_raw)
 
-    # Define missing values as 1 and non missing as 0 instead of True False
-    missing = (meg_pupils_data_clean < pupil_size_thresh).astype(int)
+    # Define missing values as 1 and non-missing as 0 instead of True False
+    if subject.subject_id in exp_info.no_pupil_subjects:
+        missing = (meg_gazex_data_clean < pupil_size_thresh).astype(int)
+    else:
+        missing = (meg_pupils_data_clean < pupil_size_thresh).astype(int)
 
     # Get missing start/end samples and duration
     missing_start = np.where(np.diff(missing) == 1)[0]
@@ -629,9 +632,13 @@ def define_events_trials_trig(raw, subject, config, exp_info):
     block_bounds = np.concatenate((np.array([emap_start_meg[0]]), emap_start_meg[np.where(np.diff(emap_start_meg) > 1e5)[0] + 1], np.array([len(raw.times)])))
 
     # Get events in meg data (only red blue and green)
-    evt_buttons = raw.annotations.description
-    evt_times = raw.annotations.onset[(evt_buttons == 'red') | (evt_buttons == 'blue') | (evt_buttons == 'green')]
-    evt_buttons = evt_buttons[(evt_buttons == 'red') | (evt_buttons == 'blue') | (evt_buttons == 'green')]
+    print('Getting button events and times')
+    if subject.subject_id in exp_info.no_desc_subjects:
+        evt_buttons, evt_times = functions_general.get_buttons_and_times(raw=raw, exp_info=exp_info)
+    else:
+        evt_buttons = raw.annotations.description
+        evt_times = raw.annotations.onset[(evt_buttons == 'red') | (evt_buttons == 'blue') | (evt_buttons == 'green')]
+        evt_buttons = evt_buttons[(evt_buttons == 'red') | (evt_buttons == 'blue') | (evt_buttons == 'green')]
 
     # Define variables to store data
     no_answer = []
@@ -997,7 +1004,7 @@ def saccades_classification(subject, saccades, raw):
     actual_answers = subject.description
     for i, trial in enumerate(response_trials_meg):
         trial_idx = trial-1
-        if int(subject.map[actual_answers[i]]) != corr_answers[trial_idx]: # Check if mapping of button corresponds to correct answer
+        if int(subject.buttons_pc_map[actual_answers[i]]) != corr_answers[trial_idx]: # Check if mapping of button corresponds to correct answer
             corr_ans[trial_idx] = 0
         else:
             corr_ans[trial_idx] = 1
@@ -1984,9 +1991,9 @@ def define_events_trials_BH(raw, subject):
                         time_diff_block.append(time_diff)
 
                         if (meg_evt_block_buttons[idx] == 'blue' and int(responses_block[trial]) != int(
-                                subject.map['blue'])) or (
+                                subject.buttons_pc_map['blue'])) or (
                                 meg_evt_block_buttons[idx] == 'red' and int(responses_block[trial]) != int(
-                            subject.map['red'])):
+                            subject.buttons_pc_map['red'])):
                             print(f'Different answer in MEG and BH data in trial: {trial + 1}\n'
                                   f'Discarding and realingning on following sample\n')
                             raise ValueError(f'Different answer in MEG and BH data in trial: {trial + 1}')
@@ -2116,7 +2123,7 @@ def fixation_classification_BH(subject, bh_data, fixations, raw, meg_pupils_data
         actual_answers = subject.description
         for i, trial in enumerate(response_trials_meg):
             trial_idx = trial-1
-            if int(subject.map[actual_answers[i]]) != corr_answers[trial_idx]: # Check if mapping of button corresponds to correct answer
+            if int(subject.buttons_pc_map[actual_answers[i]]) != corr_answers[trial_idx]: # Check if mapping of button corresponds to correct answer
                 corr_ans[trial_idx] = 0
             else:
                 corr_ans[trial_idx] = 1

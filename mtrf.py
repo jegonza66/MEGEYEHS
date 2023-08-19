@@ -130,14 +130,11 @@ for subject_code in exp_info.subjects_ids:
 
                 # Define events
                 metadata, events, _, _ = functions_analysis.define_events(subject=subject, epoch_id=var_name,  evt_dur=evt_dur,
-                                                                       trials=cond_trials, meg_data=meg_data)
+                                                                          trials=cond_trials, meg_data=meg_data)
                 # Make input arrays as 0
                 input_array = np.zeros(len(meg_data.times))
                 # Get events samples index
                 evt_idxs = events[:, 0]
-                # evt_times = [meg_data.annotations.onset[i] for i, annotation in enumerate(meg_data.annotations.description) if var_name in annotation]
-                # Get target fixations indexes in time array
-                # evt_idxs, meg_times = functions_general.find_nearest(meg_data.times, evt_times)
                 # Set those indexes as 1
                 input_array[evt_idxs] = 1
                 # Exclude bad annotations

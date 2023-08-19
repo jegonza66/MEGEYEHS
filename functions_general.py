@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+import mne
 
 
 def scale_from_interval(signal_to_scale, reference_signal, interval_signal=None, interval_ref=None):
@@ -41,6 +41,35 @@ def remove_missing(x, y, time, missing):
     y = y[(mx + my) != 2]
     time = time[(mx + my) != 2]
     return x, y, time
+
+
+def get_buttons_and_times(raw, exp_info):
+
+    # # Get data from buttons channel
+    # buttons_channel = raw.get_data(picks=exp_info.button_ch).ravel()
+    # # Compute difference
+    # buttons_diff = np.diff(buttons_channel, prepend=buttons_channel[0])
+    # # Get onset from button events
+    # button_evt_idx = np.where(buttons_diff > 0)[0]
+    # # Get values from buttons channel in events
+    # button_values = buttons_channel[button_evt_idx]
+    # # Map from values to colors
+    # button_colors = np.vectorize(exp_info.buttons_ch_map.get)(button_values)
+
+    # Get events from buttons channel
+    button_events = mne.find_events(raw=raw, stim_channel=exp_info.button_ch)
+    # Get events index
+    button_evt_idx = button_events[:, 0]
+    # Get events channel values
+    button_values = button_events[:, 2]
+    # Map channel values to colors
+    button_colors = np.vectorize(exp_info.buttons_ch_map.get)(button_values)
+
+    # Define variables as needed
+    evt_buttons = button_colors
+    evt_times = raw.times[button_evt_idx]
+
+    return evt_buttons, evt_times
 
 
 def find_nearest(array, values):
