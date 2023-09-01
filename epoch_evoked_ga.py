@@ -27,18 +27,18 @@ else:
 
 #----- Parameters -----#
 # ICA vs raw data
-use_ica_data = True
+use_ica_data = False
 # Frequency band
 band_id = None
 # Id
-epoch_id = 'tgt_fix'
+epoch_id = 'fix_vs'
 # Plot channels
 chs_id = 'mag'
 # PLots
-plot_epochs = True
+plot_epochs = False
 plot_gaze = True
-corr_ans = True
-tgt_pres = True
+corr_ans = None
+tgt_pres = None
 mss = None
 reject = None
 
@@ -66,6 +66,7 @@ else:
 
 #----- Run -----#
 evokeds = []
+ga_subjects = []
 for subject_code in exp_info.subjects_ids:
 
     # Define save path and file name for loading and saving epoched, evoked, and GA data
@@ -132,6 +133,7 @@ for subject_code in exp_info.subjects_ids:
     # Define evoked and append for GA
     evoked = epochs.average(picks=['mag', 'misc'])
     evokeds.append(evoked)
+    ga_subjects.append(subject_code)
 
     # Separete MEG and misc channels
     evoked_meg = evoked.copy().pick('mag')
