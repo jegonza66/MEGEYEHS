@@ -13,7 +13,7 @@ preproc_path = paths().preproc_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
-for subject_code in exp_info.subjects_ids:
+for subject_code in exp_info.subjects_ids[14:]:
 
     # --------- Load data ---------#
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)

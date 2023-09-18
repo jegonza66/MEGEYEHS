@@ -26,11 +26,15 @@ else:
 # Select channels
 chs_id = 'temporal'  # region_hemisphere (frontal_L)
 mss = None
-evt_dur = 0.4
+evt_dur = None
 trial_dur = None
+corr_ans = True
+tgt_pres = True
+band_id = None
+
 # ICA / RAW
 use_ica_data = True
-epoch_ids = ['it_fix', 'tgt_fix', 'blue', 'red']
+epoch_ids = ['it_fix_subsampled', 'tgt_fix', 'blue', 'red']
 standarize = True
 
 # Specific run path for saving data and plots
@@ -40,20 +44,20 @@ else:
     data_type = 'RAW'
 
 # TRF parameters
-tmin = -0.2
+tmin = -0.3
 tmax = 0.6
 alpha = None
-baseline = (None, -0.05)
+baseline = (-0.3, -0.05)
 
 # Define Grand average variables
 for var_name in epoch_ids:
     exec(f'{var_name}_ga = []')
 
 plot_edge = 0.1
-fig_path = paths().plots_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
-save_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
+fig_path = paths().plots_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
+save_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
 
-for subject_code in exp_info.subjects_ids:
+for subject_code in exp_info.subjects_ids[:12]:
     trf_path = save_path
     trf_fname = f'TRF_{subject_code}.pkl'
     try:
@@ -85,7 +89,7 @@ for subject_code in exp_info.subjects_ids:
 
         # Get condition trials
         cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss, trial_dur=trial_dur,
-                                                                          corr_ans=None, tgt_pres=None)
+                                                                          corr_ans=corr_ans, tgt_pres=tgt_pres)
 
         # Bad annotations filepath
         subj_path = paths().save_path() + f'TRF/{subject.subject_id}/'
@@ -111,7 +115,7 @@ for subject_code in exp_info.subjects_ids:
             bad_indexes = functions_general.flatten_list(bad_indexes)
             bad_indexes = np.array(bad_indexes)
 
-            # make bad annotations binary array
+            # Make bad annotations binary array
             bad_annotations_array = np.ones(len(meg_data.times))
             bad_annotations_array[bad_indexes] = 0
 
@@ -128,9 +132,25 @@ for subject_code in exp_info.subjects_ids:
             except:
                 print(f'Computing input array for {var_name}...')
 
+                # Exception for subsampled distractor fixations
+                if 'subsampled' in var_name:
+                    # Subsampled epochs path
+                    epochs_save_id = f'{var_name}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
+                    epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + f'/Band_{band_id}/{epochs_save_id}_{tmin}_{tmax}_bline{baseline}/'
+                    epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+
+                    # Load epoched data
+                    epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+
+                    # Get epochs id from metadata
+                    epoch_keys = epochs.metadata['id'].to_list()
+
+                else:
+                    epoch_keys = None
+
                 # Define events
-                metadata, events, _, _ = functions_analysis.define_events(subject=subject, epoch_id=var_name,  evt_dur=evt_dur,
-                                                                          trials=cond_trials, meg_data=meg_data)
+                metadata, events, _, _ = functions_analysis.define_events(subject=subject, epoch_id=var_name, evt_dur=evt_dur,
+                                                                          trials=cond_trials, meg_data=meg_data, epoch_keys=epoch_keys)
                 # Make input arrays as 0
                 input_array = np.zeros(len(meg_data.times))
                 # Get events samples index
@@ -243,6 +263,9 @@ chs_id = 'parietal'  # region_hemisphere (frontal_L)
 mss = None
 evt_dur = None
 trial_dur = None
+corr_ans = None
+tgt_pres = None
+
 # ICA / RAW
 use_ica_data = True
 band_id = 'Alpha'

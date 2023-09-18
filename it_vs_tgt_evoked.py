@@ -13,7 +13,7 @@ plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
 #----- Save data and display figures -----#
-save_fig = True
+save_fig = False
 display_figs = True
 if display_figs:
     plt.ion()
@@ -25,7 +25,7 @@ else:
 use_ica_data = True
 band_id = None
 # Id
-epoch_ids = ['it_fix', 'tgt_fix']
+epoch_ids = ['it_fix_subsampled', 'tgt_fix']
 # Pick MEG chs (Select channels or set picks = 'mag')
 chs_id = 'temporal'
 chs_ids = [f'{chs_id}_L', f'{chs_id}_R']
@@ -36,7 +36,7 @@ tgt_pres = True
 mss = None
 reject = None
 trial_dur = None
-evt_dur = 0.4
+evt_dur = None
 
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
@@ -82,7 +82,7 @@ for i, epoch_id in enumerate(epoch_ids):
         evoked_fig_path = plot_path + f'Evoked_{data_type}/' + run_path
 
         # Iterate over subjects
-        for subject_code in exp_info.subjects_ids:
+        for subject_code in exp_info.subjects_ids[:12]:
 
             if use_ica_data:
                 # Load subject object
@@ -173,7 +173,7 @@ plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
 #----- Save data and display figures -----#
-save_fig = True
+save_fig = False
 display_figs = True
 if display_figs:
     plt.ion()
@@ -186,7 +186,7 @@ use_ica_data = True
 standarize = True
 band_id = None
 # Id
-epoch_ids = ['it_fix', 'tgt_fix', 'blue', 'red']
+epoch_ids = ['it_fix_subsampled', 'tgt_fix', 'blue', 'red']
 # Pick MEG chs (Select channels or set picks = 'mag')
 chs_id = 'temporal'
 chs_ids = [f'{chs_id}_L', f'{chs_id}_R']
@@ -196,7 +196,7 @@ corr_ans = True
 tgt_pres = True
 mss = None
 trial_dur = None
-evt_dur = 0.4
+evt_dur = None
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = -0.2, 0.6, (-0.1, 0.5)
 # Baseline
@@ -246,7 +246,7 @@ for i, epoch_id in enumerate(epoch_ids[:2]):
         evokeds[epoch_id][lat_chs] = []
 
         # Iterate over subjects
-        for subject_code in exp_info.subjects_ids:
+        for subject_code in exp_info.subjects_ids[:12]:
 
             if use_ica_data:
                 # Load subject object

@@ -10,49 +10,25 @@ import load
 import setup
 
 
-def define_events(subject, meg_data, epoch_id, mss=None, trials=None, evt_dur=None, screen=None, tgt=None,
-                  dir=None, evt_from_df=False):
+def define_events(subject, meg_data, epoch_id, trials=None, evt_dur=None, epoch_keys=None):
+    '''
 
+    :param subject:
+    :param meg_data:
+    :param epoch_id:
+    :param trials:
+    :param evt_dur:
+    :param epoch_keys: List of str indicating epoch_ids to epoch data on. Default: None.
+    If not provided, will epoch data based on other parameters. If provided will override all other parameters.
+    :return:
+    '''
     print('Defining events')
 
     metadata_sup = None
+    # Get events from annotations
+    all_events, all_event_id = mne.events_from_annotations(meg_data, verbose=False)
 
-    if evt_from_df:
-        if 'fix' in epoch_id:
-            metadata = subject.fixations
-        elif 'sac' in epoch_id:
-            metadata = subject.saccades
-
-        # Get events from fix/sac Dataframe
-        if screen:
-            metadata = metadata.loc[(metadata['screen'] == screen)]
-        if mss:
-            metadata = metadata.loc[(metadata['mss'] == mss)]
-        if evt_dur:
-            metadata = metadata.loc[(metadata['duration'] >= evt_dur)]
-        if 'fix' in epoch_id:
-            if tgt == 1:
-                metadata = metadata.loc[(metadata['fix_target'] == tgt)]
-            elif tgt == 0:
-                metadata = metadata.loc[(metadata['fix_target'] == tgt)]
-        if 'sac' in epoch_id:
-            if dir:
-                metadata = metadata.loc[(metadata['dir'] == dir)]
-
-        metadata.reset_index(drop=True, inplace=True)
-
-        events_samples, event_times = functions_general.find_nearest(meg_data.times, metadata['onset'])
-
-        events = np.zeros((len(events_samples), 3)).astype(int)
-        events[:, 0] = events_samples
-        events[:, 2] = metadata.index
-
-        events_id = dict(zip(metadata.id, metadata.index))
-
-    else:
-        # Get events from annotations
-        all_events, all_event_id = mne.events_from_annotations(meg_data, verbose=False)
-
+    if epoch_keys is None:
         # Select epochs
         epoch_keys = [key for key in all_event_id.keys() if epoch_id in key]
         if 'sac' not in epoch_id:
@@ -80,15 +56,15 @@ def define_events(subject, meg_data, epoch_id, mss=None, trials=None, evt_dur=No
                 metadata_ids = list(metadata['id'])
                 epoch_keys = [key for key in epoch_keys if key in metadata_ids]
 
-        # Get events and ids matchig selection
-        metadata, events, events_id = mne.epochs.make_metadata(events=all_events, event_id=all_event_id,
-                                                               row_events=epoch_keys, tmin=0, tmax=0,
-                                                               sfreq=meg_data.info['sfreq'])
+    # Get events and ids matchig selection
+    metadata, events, events_id = mne.epochs.make_metadata(events=all_events, event_id=all_event_id,
+                                                           row_events=epoch_keys, tmin=0, tmax=0,
+                                                           sfreq=meg_data.info['sfreq'])
 
-        if 'fix' in epoch_id:
-            metadata_sup = subject.fixations
-        elif 'sac' in epoch_id:
-            metadata_sup = subject.saccades
+    if 'fix' in epoch_id:
+        metadata_sup = subject.fixations
+    elif 'sac' in epoch_id:
+        metadata_sup = subject.saccades
 
     return metadata, events, events_id, metadata_sup
 
