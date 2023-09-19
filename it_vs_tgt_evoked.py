@@ -13,7 +13,7 @@ plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
 #----- Save data and display figures -----#
-save_fig = False
+save_fig = True
 display_figs = True
 if display_figs:
     plt.ion()
@@ -41,7 +41,7 @@ evt_dur = None
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
 # Baseline
-baseline = (-0.3, -0.05)
+baseline = (None, -0.05)
 
 # Data type
 if use_ica_data:
@@ -70,8 +70,8 @@ for i, epoch_id in enumerate(epoch_ids):
         evokeds[epoch_id][chs_id] = []
 
         # Specific run path for saving data and plots
-        save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
-        run_path = f'/Band_{band_id}/{save_id}_{tmin}_{tmax}_bline{baseline}/'
+        save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}'
+        run_path = f'/Band_{band_id}/{save_id}/'
 
         # Save data paths
         epochs_save_path = save_path + f'Epochs_{data_type}/' + run_path
@@ -155,7 +155,7 @@ fig.tight_layout()
 
 if save_fig:
     fig_path = paths().plots_path() + f'Evoked_{data_type}/it_vs_fix/'
-    fname = f'Evoked_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{chs_id}'
+    fname = save_id.replace(epoch_id, 'Evoked')
     save.fig(fig=fig, path=fig_path, fname=fname)
 
 ## it_vs_fix TRF
@@ -173,7 +173,7 @@ plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
 #----- Save data and display figures -----#
-save_fig = False
+save_fig = True
 display_figs = True
 if display_figs:
     plt.ion()
@@ -198,7 +198,7 @@ mss = None
 trial_dur = None
 evt_dur = None
 # Get time windows from epoch_id name
-tmin, tmax, plot_xlim = -0.2, 0.6, (-0.1, 0.5)
+tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
 # Baseline
 baseline = (None, -0.05)
 # TRF hiper-parameter
@@ -219,7 +219,8 @@ stds = {}
 bads = []
 
 # Save path
-save_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
+save_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}' \
+                                  f'_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
 
 # Figure
 matplotlib.rc({'font.size': 20})
@@ -340,7 +341,7 @@ axs[1].set_xlim(left=-0.2, right=0.5)
 fig.tight_layout()
 
 if save_fig:
-    fig_path = paths().plots_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/it_vs_fix/'
+    fig_path = paths().plots_path() + save_path + 'it_vs_fix/'
     if FRF_TRF:
         fname = f'FRF_TRF_{chs_id}'
     else:

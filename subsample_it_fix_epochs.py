@@ -43,13 +43,12 @@ reject = None
 
 
 # Get time windows from epoch_id name
-tmin, tmax, plot_xlim = tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
+tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
 # Baseline
-baseline = (-0.3, -0.05)
+baseline = (None, -0.05)
 
 # Specific run path for saving data and plots
-save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
-run_path = f'/Band_{band_id}/{save_id}_{tmin}_{tmax}_bline{baseline}/'
+run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
 
 # Data type
 if use_ica_data:
@@ -136,6 +135,7 @@ for subject_code in exp_info.subjects_ids[:12]:
         os.makedirs(evoked_it_save_path, exist_ok=True)
         evoked_subsampled.save(evoked_it_save_path + evoked_data_fname, overwrite=True)
 
+## Not working because epochs bads must match
 # Define epochs for GA
 ga_tgt_epochs = mne.concatenate_epochs(epochs_list_tgt)
 ga_it_sub_epochs = mne.concatenate_epochs(epochs_list_it_sub)

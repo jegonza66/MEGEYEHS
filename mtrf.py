@@ -47,15 +47,16 @@ else:
 tmin = -0.3
 tmax = 0.6
 alpha = None
-baseline = (-0.3, -0.05)
+baseline = (None, -0.05)
 
 # Define Grand average variables
 for var_name in epoch_ids:
     exec(f'{var_name}_ga = []')
 
 plot_edge = 0.1
-fig_path = paths().plots_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
-save_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
+fig_path = paths().plots_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}' \
+                                  f'_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
+save_path = fig_path.replace(paths().plots_path(), paths().save_path())
 
 for subject_code in exp_info.subjects_ids[:12]:
     trf_path = save_path
