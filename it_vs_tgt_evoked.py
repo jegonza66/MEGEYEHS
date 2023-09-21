@@ -551,7 +551,7 @@ t_tfce, clusters, p_tfce, H0 = permutation_cluster_test(X=observations, threshol
 
 pval_threshold = 0.5
 # Make clusters mask
-if type(t_tfce) == dict:
+if type(t_thresh) == dict:
     # If TFCE use p-vaues of voxels directly
     p_tfce = p_tfce.reshape(len(evoked.times), len(evoked.ch_names)).T
 
