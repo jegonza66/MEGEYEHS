@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import mne
+import scipy
 
 
 def scale_from_interval(signal_to_scale, reference_signal, interval_signal=None, interval_ref=None):
@@ -673,3 +674,28 @@ def get_condition_trials(subject, mss=None, trial_dur=None, corr_ans=None, tgt_p
     trials = list((bh_data.index + 1).astype(str))  # +1 for 0th index
 
     return trials, bh_data
+
+
+def get_channel_adjacency(info):
+
+    # Compute channel adjacency from montage info
+    ch_adjacency = mne.channels.find_ch_adjacency(info=info, ch_type=None)
+
+    # Default ctf275 info has 275 channels, we are using 271. Check for extra channels
+    extra_chs_idx = [i for i, ch in enumerate(ch_adjacency[1]) if ch not in info.ch_names]
+
+    if len(extra_chs_idx):
+        ch_adjacency_mat = ch_adjacency[0].toarray()
+
+        # Remove extra channels
+        for extra_ch in extra_chs_idx:
+            ch_adjacency_mat = np.delete(ch_adjacency_mat, extra_ch, axis=0)
+            ch_adjacency_mat = np.delete(ch_adjacency_mat, extra_ch, axis=1)
+
+        # Reformat to scipy sparce matrix
+        ch_adjacency_sparse = scipy.sparse.csr_matrix(ch_adjacency_mat)
+
+    else:
+        ch_adjacency_sparse = ch_adjacency[0]
+
+    return ch_adjacency_sparse

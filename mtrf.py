@@ -1,4 +1,3 @@
-import os
 import functions_analysis
 import functions_general
 import load
@@ -7,7 +6,6 @@ import setup
 from paths import paths
 import matplotlib.pyplot as plt
 import numpy as np
-from mne.decoding import ReceptiveField
 import mne
 
 #----- Path -----#
@@ -24,7 +22,9 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'temporal'  # region_hemisphere (frontal_L)
+chs_id = 'mag'  # region_hemisphere (frontal_L)
+all_chs_regions = ['frontal', 'temporal', 'central', 'parietal', 'occipital']
+
 mss = None
 evt_dur = None
 trial_dur = None
@@ -94,45 +94,24 @@ for subject_code in exp_info.subjects_ids[:12]:
 
         # Bad annotations filepath
         subj_path = paths().save_path() + f'TRF/{subject.subject_id}/'
-        fname = f'bad_annot_array.pkl'
+        fname_bad_annot = f'bad_annot_array.pkl'
         try:
-            bad_annotations_array = load.var(subj_path + fname)
+            bad_annotations_array = load.var(subj_path + fname_bad_annot)
             print(f'Loaded bad annotations array')
         except:
             print(f'Computing bad annotations array...')
-            # Get bad annotations times
-            bad_annotations_idx = [i for i, annot in enumerate(meg_data.annotations.description) if
-                                   ('bad' in annot or 'BAD' in annot)]
-            bad_annotations_time = meg_data.annotations.onset[bad_annotations_idx]
-            bad_annotations_duration = meg_data.annotations.duration[bad_annotations_idx]
-            bad_annotations_endtime = bad_annotations_time + bad_annotations_duration
-
-            bad_indexes = []
-            for i in range(len(bad_annotations_time)):
-                bad_annotation_span_idx = np.where(np.logical_and((meg_data.times > bad_annotations_time[i]), (meg_data.times < bad_annotations_endtime[i])))[0]
-                bad_indexes.append(bad_annotation_span_idx)
-
-            # Flatten all indexes and convert to array
-            bad_indexes = functions_general.flatten_list(bad_indexes)
-            bad_indexes = np.array(bad_indexes)
-
-            # Make bad annotations binary array
-            bad_annotations_array = np.ones(len(meg_data.times))
-            bad_annotations_array[bad_indexes] = 0
-
-            # Save arrays
-            save.var(var=bad_annotations_array, path=subj_path, fname=fname)
+            bad_annotations_array = functions_analysis.get_bad_annot_array(meg_data=meg_data, subj_path=subj_path,
+                                                                           fname=fname_bad_annot)
 
         input_arrays = {}
         for var_name in epoch_ids:
             subj_path = paths().save_path() + f'TRF/{subject.subject_id}/'
-            fname = f'{var_name}_mss{mss}_tdur{trial_dur}_evtdur{evt_dur}_array.pkl'
+            fname_var = f'{var_name}_mss{mss}_tdur{trial_dur}_evtdur{evt_dur}_array.pkl'
             try:
-                input_arrays[var_name] = load.var(file_path=subj_path + fname)
+                input_arrays[var_name] = load.var(file_path=subj_path + fname_var)
                 print(f'Loaded input array for {var_name}')
             except:
                 print(f'Computing input array for {var_name}...')
-
                 # Exception for subsampled distractor fixations
                 if 'subsampled' in var_name:
                     # Subsampled epochs path
@@ -149,54 +128,66 @@ for subject_code in exp_info.subjects_ids[:12]:
                 else:
                     epoch_keys = None
 
-                # Define events
-                metadata, events, _, _ = functions_analysis.define_events(subject=subject, epoch_id=var_name, evt_dur=evt_dur,
-                                                                          trials=cond_trials, meg_data=meg_data, epoch_keys=epoch_keys)
-                # Make input arrays as 0
-                input_array = np.zeros(len(meg_data.times))
-                # Get events samples index
-                evt_idxs = events[:, 0]
-                # Set those indexes as 1
-                input_array[evt_idxs] = 1
-                # Exclude bad annotations
-                input_array = input_array * bad_annotations_array
-                # Save to all input arrays dictionary
-                input_arrays[var_name] = input_array
-
-                # Save arrays
-                save.var(var=input_array, path=subj_path, fname=fname)
+                input_arrays = functions_analysis.make_mtrf_input(input_arrays=input_arrays, var_name=var_name,
+                                                                  subject=subject, meg_data=meg_data, evt_dur=evt_dur,
+                                                                  cond_trials=cond_trials, epoch_keys=epoch_keys,
+                                                                  bad_annotations_array=bad_annotations_array,
+                                                                  subj_path=subj_path, fname=fname_var)
 
         # Concatenate input arrays as one
         model_input = np.array([input_arrays[key] for key in input_arrays.keys()]).T
 
-        # Define mTRF model
-        rf = ReceptiveField(tmin, tmax, meg_data.info['sfreq'], estimator=alpha, scoring='corrcoef', verbose=False)
-
-        # Get subset channels data as array
-        picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
-        meg_sub = meg_data.copy().pick(picks)
-        meg_data_array = meg_sub.get_data()
-        if standarize:
-            # Standarize data
-            print('Computing z-score...')
-            meg_data_array = np.expand_dims(meg_data_array, axis=0)  # Need shape (n_epochs, n_channels n_times)
-            meg_data_array = mne.decoding.Scaler(info=meg_sub.info, scalings='mean').fit_transform(meg_data_array)
-            meg_data_array = meg_data_array.squeeze()
-        # Transpose to input the model
-        meg_data_array = meg_data_array.T
-
-        # Fit TRF
-        rf.fit(model_input, meg_data_array)
-
+        # All regions or selected (multiple) regions
+        if chs_id == 'mag' or '_' in chs_id:
+            # rf as a dictionary containing the rf of each region
+            rf = {}
+            # iterate over regions
+            for chs_subset in all_chs_regions:
+                # Use only regions in channels id, or all in case of chs_id == 'mag'
+                if chs_subset in chs_id or chs_id == 'mag':
+                    rf[chs_subset] = functions_analysis.fit_mtrf(meg_data=meg_data, tmin=tmin, tmax=tmax, alpha=alpha,
+                                                                 model_input=model_input, chs_id=chs_subset, n_jobs=4)
+        # One region
+        else:
+            rf = functions_analysis.fit_mtrf(meg_data=meg_data, tmin=tmin, tmax=tmax, alpha=alpha,
+                                             model_input=model_input, chs_id=chs_id, n_jobs=4)
         # Save TRF
         if save_data:
             save.var(var=rf, path=trf_path, fname=trf_fname)
 
     # Get model coeficients as separate responses to target and items
     for i, var_name in enumerate(epoch_ids):
-        exec(f'{var_name}_trf = rf.coef_[:, i, :]')
-        # Define evoked objects from arrays of TRF
-        exec(f'{var_name}_evoked = mne.EvokedArray(data={var_name}_trf, info=meg_sub.info, tmin=tmin, baseline=baseline)')
+
+        # All or multiple regions
+        if chs_id == 'mag' or '_' in chs_id:
+
+            # Define evoked from TRF list to concatenate all
+            exec(f'{var_name}_evoked_list = []')
+
+            # iterate over regions
+            for chs_idx, chs_subset in enumerate(rf.keys()):
+                # Get channels subset info
+                picks = functions_general.pick_chs(chs_id=chs_subset, info=meg_data.info)
+                meg_sub = meg_data.copy().pick(picks)
+
+                # Get TRF coeficients from chs subset
+                exec(f'{var_name}_trf = rf[chs_subset].coef_[:, i, :]')
+
+                if chs_idx == 0:
+                    # Define evoked object from arrays of TRF
+                    exec(f'{var_name}_evoked = mne.EvokedArray(data={var_name}_trf, info=meg_sub.info, tmin=tmin, baseline=baseline)')
+                else:
+                    # Append evoked object from arrays of TRF to list, to concatenate all
+                    exec(f'{var_name}_evoked_list.append(mne.EvokedArray(data={var_name}_trf, info=meg_sub.info, tmin=tmin, baseline=baseline))')
+
+            # Concatenate evoked from al regions
+            exec(f'{var_name}_evoked = {var_name}_evoked.add_channels({var_name}_evoked_list)')
+
+        else:
+            exec(f'{var_name}_trf = rf.coef_[:, i, :]')
+            # Define evoked objects from arrays of TRF
+            exec(f'{var_name}_evoked = mne.EvokedArray(data={var_name}_trf, info=meg_sub.info, tmin=tmin, baseline=baseline)')
+
         # Append for Grand average
         exec(f'{var_name}_ga.append({var_name}_evoked)')
         # Plot
@@ -372,63 +363,47 @@ for subject_code in exp_info.subjects_ids:
 
         # Bad annotations filepath
         subj_path = paths().save_path() + f'TRF/{subject_code}/'
-        fname = f'bad_annot_array.pkl'
+        fname_bad_annot = f'bad_annot_array.pkl'
         try:
-            bad_annotations_array = load.var(subj_path + fname)
+            bad_annotations_array = load.var(subj_path + fname_bad_annot)
             print(f'Loaded bad annotations array')
         except:
             print(f'Computing bad annotations array...')
-            # Get bad annotations times
-            bad_annotations_idx = [i for i, annot in enumerate(meg_env.annotations.description) if
-                                   ('bad' in annot or 'BAD' in annot)]
-            bad_annotations_time = meg_env.annotations.onset[bad_annotations_idx]
-            bad_annotations_duration = meg_env.annotations.duration[bad_annotations_idx]
-            bad_annotations_endtime = bad_annotations_time + bad_annotations_duration
 
-            bad_indexes = []
-            for i in range(len(bad_annotations_time)):
-                bad_annotation_span_idx = np.where(np.logical_and((meg_env.times > bad_annotations_time[i]),
-                                                                  (meg_env.times < bad_annotations_endtime[i])))[0]
-                bad_indexes.append(bad_annotation_span_idx)
-
-            # Flatten all indexes and convert to array
-            bad_indexes = functions_general.flatten_list(bad_indexes)
-            bad_indexes = np.array(bad_indexes)
-
-            # make bad annotations binary array
-            bad_annotations_array = np.ones(len(meg_env.times))
-            bad_annotations_array[bad_indexes] = 0
-
-            # Save arrays
-            save.var(var=bad_annotations_array, path=subj_path, fname=fname)
+            bad_annotations_array = functions_analysis.get_bad_annot_array(meg_data=meg_data, subj_path=subj_path,
+                                                                           fname=fname_bad_annot)
 
         input_arrays = {}
         for var_name in epoch_ids:
             subj_path = paths().save_path() + f'TRF/{subject_code}/'
-            fname = f'{var_name}_mss{mss}_tdur{trial_dur}_evtdur{evt_dur}_array.pkl'
+            fname_var = f'{var_name}_mss{mss}_tdur{trial_dur}_evtdur{evt_dur}_array.pkl'
             try:
-                input_arrays[var_name] = load.var(file_path=subj_path + fname)
+                input_arrays[var_name] = load.var(file_path=subj_path + fname_var)
                 print(f'Loaded input array for {var_name}')
             except:
                 print(f'Computing input array for {var_name}...')
 
-                # Define events
-                metadata, events, _, _ = functions_analysis.define_events(subject=subject, epoch_id=var_name,
-                                                                          evt_dur=evt_dur,
-                                                                          trials=cond_trials, meg_data=meg_env)
-                # Make input arrays as 0
-                input_array = np.zeros(len(meg_env.times))
-                # Get events samples index
-                evt_idxs = events[:, 0]
-                # Set those indexes as 1
-                input_array[evt_idxs] = 1
-                # Exclude bad annotations
-                input_array = input_array * bad_annotations_array
-                # Save to all input arrays dictionary
-                input_arrays[var_name] = input_array
+                # Exception for subsampled distractor fixations
+                if 'subsampled' in var_name:
+                    # Subsampled epochs path
+                    epochs_save_id = f'{var_name}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
+                    epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + f'/Band_{band_id}/{epochs_save_id}_{tmin}_{tmax}_bline{baseline}/'
+                    epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
 
-                # Save arrays
-                save.var(var=input_array, path=subj_path, fname=fname)
+                    # Load epoched data
+                    epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+
+                    # Get epochs id from metadata
+                    epoch_keys = epochs.metadata['id'].to_list()
+
+                else:
+                    epoch_keys = None
+
+                input_arrays = functions_analysis.make_mtrf_input(input_arrays=input_arrays, var_name=var_name,
+                                                                  subject=subject, meg_data=meg_data, evt_dur=evt_dur,
+                                                                  cond_trials=cond_trials, epoch_keys=epoch_keys,
+                                                                  bad_annotations_array=bad_annotations_array,
+                                                                  subj_path=subj_path, fname=fname_var)
 
         # Concatenate input arrays as one
         model_input = np.array([input_arrays[key] for key in input_arrays.keys()]).T

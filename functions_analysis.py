@@ -8,6 +8,7 @@ import time
 import save
 import load
 import setup
+from mne.decoding import ReceptiveField
 
 
 def define_events(subject, meg_data, epoch_id, trials=None, evt_dur=None, epoch_keys=None):
@@ -339,3 +340,80 @@ def noise_cov(exp_info, subject, bads, use_ica_data, reject=dict(mag=4e-12), ran
     noise_cov = mne.compute_raw_covariance(raw_noise, reject=reject, rank=rank)
 
     return noise_cov
+
+
+def get_bad_annot_array(meg_data, subj_path, fname, save=True):
+    # Get bad annotations times
+    bad_annotations_idx = [i for i, annot in enumerate(meg_data.annotations.description) if
+                           ('bad' in annot or 'BAD' in annot)]
+    bad_annotations_time = meg_data.annotations.onset[bad_annotations_idx]
+    bad_annotations_duration = meg_data.annotations.duration[bad_annotations_idx]
+    bad_annotations_endtime = bad_annotations_time + bad_annotations_duration
+
+    bad_indexes = []
+    for i in range(len(bad_annotations_time)):
+        bad_annotation_span_idx = np.where(
+            np.logical_and((meg_data.times > bad_annotations_time[i]), (meg_data.times < bad_annotations_endtime[i])))[
+            0]
+        bad_indexes.append(bad_annotation_span_idx)
+
+    # Flatten all indexes and convert to array
+    bad_indexes = functions_general.flatten_list(bad_indexes)
+    bad_indexes = np.array(bad_indexes)
+
+    # Make bad annotations binary array
+    bad_annotations_array = np.ones(len(meg_data.times))
+    bad_annotations_array[bad_indexes] = 0
+
+    # Save arrays
+    if save:
+        save.var(var=bad_annotations_array, path=subj_path, fname=fname)
+
+    return bad_annotations_array
+
+def make_mtrf_input(input_arrays, var_name, subject, meg_data, evt_dur, cond_trials, epoch_keys, bad_annotations_array,
+                    subj_path, fname, save=True):
+
+    # Define events
+    metadata, events, _, _ = define_events(subject=subject, epoch_id=var_name, evt_dur=evt_dur,
+                                           trials=cond_trials, meg_data=meg_data,  epoch_keys=epoch_keys)
+    # Make input arrays as 0
+    input_array = np.zeros(len(meg_data.times))
+    # Get events samples index
+    evt_idxs = events[:, 0]
+    # Set those indexes as 1
+    input_array[evt_idxs] = 1
+    # Exclude bad annotations
+    input_array = input_array * bad_annotations_array
+    # Save to all input arrays dictionary
+    input_arrays[var_name] = input_array
+
+    # Save arrays
+    if save:
+        save.var(var=input_array, path=subj_path, fname=fname)
+
+    return input_arrays
+
+
+def fit_mtrf(meg_data, tmin, tmax, alpha, model_input, chs_id, standarize=True, n_jobs=1):
+
+    # Define mTRF model
+    rf = ReceptiveField(tmin, tmax, meg_data.info['sfreq'], estimator=alpha, scoring='corrcoef', verbose=False, n_jobs=n_jobs)
+
+    # Get subset channels data as array
+    picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
+    meg_sub = meg_data.copy().pick(picks)
+    meg_data_array = meg_sub.get_data()
+    if standarize:
+        # Standarize data
+        print('Computing z-score...')
+        meg_data_array = np.expand_dims(meg_data_array, axis=0)  # Need shape (n_epochs, n_channels n_times)
+        meg_data_array = mne.decoding.Scaler(info=meg_sub.info, scalings='mean').fit_transform(meg_data_array)
+        meg_data_array = meg_data_array.squeeze()
+    # Transpose to input the model
+    meg_data_array = meg_data_array.T
+
+    # Fit TRF
+    rf.fit(model_input, meg_data_array)
+
+    return rf

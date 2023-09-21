@@ -13,9 +13,9 @@ import matplotlib.pyplot as plt
 exp_info = setup.exp_info()
 
 #----- Save data and display figures -----#
-save_data = True
-save_fig = True
-display_figs = False
+save_data = False
+save_fig = False
+display_figs = True
 if display_figs:
     plt.ion()
 else:
@@ -30,11 +30,12 @@ corr_ans = None
 tgt_pres = None
 mss = None
 epoch_id = 'ms'
-# epoch_id = 'fix_vs'
+
 # Power frequency range
 l_freq = 1
 h_freq = 40
 log_bands = False
+n_cycles = 2
 
 # Baseline method
 bline_mode = 'logratio'
@@ -87,7 +88,7 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
 
     # Save data paths
     save_id = f'{epoch_id}_mss{mssh}-{mssl}_Corr_{corr_ans}_tgt_{tgt_pres}'
-    save_path = f'/{save_id}_{tmin_mssl}_{tmax_mssl}_bline{baseline}/'
+    save_path = f'/{save_id}_{tmin_mssl}_{tmax_mssl}_bline{baseline}_cycles{n_cycles}/'
     trf_diff_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + save_path
 
     # Save figures paths
@@ -314,55 +315,51 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
 
     # Plot Power time-frequency
     # MS
-    fname = f'Power_ms_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr_bands(tfr=grand_avg_power_ms_diff, chs_id=chs_id,
-                     epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
-                     subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname,
-                     vmin=-0.15, vmax=0.15, fontsize=16, ticksize=18)
-    # Cross2
-    fname = f'Power_cross2_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr_bands(tfr=grand_avg_power_cross2_diff, chs_id=chs_id,
-                     epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
-                     subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname,
-                     vmin=-0.15, vmax=0.15, fontsize=16, ticksize=18)
-
-    # Plot ITC time-frequency
-    # MS
-    fname = f'ITC_ms_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr_bands(tfr=grand_avg_itc_ms_diff, chs_id=chs_id, epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur,
-                     mss_duration=mss_duration, cross2_dur=cross2_dur, subject=None, display_figs=display_figs,
-                     save_fig=save_fig, fig_path=trf_fig_path, fname=fname,
-                     vmin=-0.15, vmax=0.15, fontsize=16, ticksize=18)
-    # Cross2
-    fname = f'ITC_cross2_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr_bands(tfr=grand_avg_itc_cross2_diff, chs_id=chs_id,  epoch_id=epoch_id, mss=mss,
-                     cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
-                     subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname,
-                     vmin=-0.15, vmax=0.15, fontsize=16, ticksize=18)
-
-    # Power topoplot
-    # MS
-    fig = grand_avg_power_ms_diff.plot_topo(cmap='jet', show=display_figs)
-    if save_fig:
-        fname = f'GA_Power_ms_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-        save.fig(fig=fig, path=trf_fig_path, fname=fname)
-    # Cross2
-    fig = grand_avg_power_cross2_diff.plot_topo(cmap='jet', show=display_figs)
-    if save_fig:
-        fname = f'GA_Power_cross2_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-        save.fig(fig=fig, path=trf_fig_path, fname=fname)
-
-    # ITC topoplot
-    # MS
-    fig = grand_avg_itc_ms_diff.plot_topo(cmap='jet', show=display_figs, title='Inter-Trial coherence')
-    if save_fig:
-        fname = f'GA_ITC_ms_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-        save.fig(fig=fig, path=trf_fig_path, fname=fname)
-    # Cross2
-    fig = grand_avg_itc_cross2_diff.plot_topo(cmap='jet', show=display_figs, title='Inter-Trial coherence')
-    if save_fig:
-        fname = f'GA_ITC_cross2_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-        save.fig(fig=fig, path=trf_fig_path, fname=fname)
+    # fname = f'Power_ms_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    # plot_general.tfr_bands(tfr=grand_avg_power_ms_diff, chs_id=chs_id,
+    #                  subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname,
+    #                  vmin=-0.15, vmax=0.15, fontsize=16, ticksize=18)
+    # # Cross2
+    # fname = f'Power_cross2_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    # plot_general.tfr_bands(tfr=grand_avg_power_cross2_diff, chs_id=chs_id,
+    #                  subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname,
+    #                  vmin=-0.15, vmax=0.15, fontsize=16, ticksize=18)
+    #
+    # # Plot ITC time-frequency
+    # # MS
+    # fname = f'ITC_ms_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    # plot_general.tfr_bands(tfr=grand_avg_itc_ms_diff, chs_id=chs_id, subject=None, display_figs=display_figs,
+    #                  save_fig=save_fig, fig_path=trf_fig_path, fname=fname,
+    #                  vmin=-0.15, vmax=0.15, fontsize=16, ticksize=18)
+    # # Cross2
+    # fname = f'ITC_cross2_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    # plot_general.tfr_bands(tfr=grand_avg_itc_cross2_diff, chs_id=chs_id,
+    #                  subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname,
+    #                  vmin=-0.15, vmax=0.15, fontsize=16, ticksize=18)
+    #
+    # # Power topoplot
+    # # MS
+    # fig = grand_avg_power_ms_diff.plot_topo(cmap='jet', show=display_figs)
+    # if save_fig:
+    #     fname = f'GA_Power_ms_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    #     save.fig(fig=fig, path=trf_fig_path, fname=fname)
+    # # Cross2
+    # fig = grand_avg_power_cross2_diff.plot_topo(cmap='jet', show=display_figs)
+    # if save_fig:
+    #     fname = f'GA_Power_cross2_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    #     save.fig(fig=fig, path=trf_fig_path, fname=fname)
+    #
+    # # ITC topoplot
+    # # MS
+    # fig = grand_avg_itc_ms_diff.plot_topo(cmap='jet', show=display_figs, title='Inter-Trial coherence')
+    # if save_fig:
+    #     fname = f'GA_ITC_ms_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    #     save.fig(fig=fig, path=trf_fig_path, fname=fname)
+    # # Cross2
+    # fig = grand_avg_itc_cross2_diff.plot_topo(cmap='jet', show=display_figs, title='Inter-Trial coherence')
+    # if save_fig:
+    #     fname = f'GA_ITC_cross2_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    #     save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
 
     # Power Plotjoint MS
@@ -373,7 +370,7 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
     # Power Plotjoint Cross2
     fname = f'GA_Power_cross2_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
     plot_general.tfr_plotjoint_picks(tfr=grand_avg_power_cross2_diff, plot_baseline=None, bline_mode=bline_mode,
-                                     chs_id=chs_id, plot_max=False, plot_min=True,vmin=-0.1, vmax=0.1,
+                                     chs_id=chs_id, plot_max=False, plot_min=True, vmin=-0.1, vmax=0.1,
                                      display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
     # ITC Plotjoint MS
     fname = f'GA_ITC_ms_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
