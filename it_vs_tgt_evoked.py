@@ -358,8 +358,7 @@ n_permutations = 2048
 degrees_of_freedom = len(exp_info.subjects_ids[:12]) - 1
 desired_pval = 0.01
 t_thresh = scipy.stats.t.ppf(1 - desired_pval / 2, df=degrees_of_freedom)
-threshold = dict(start=0, step=0.2)
-threshold = 2
+# t_thresh = dict(start=0, step=0.2)
 
 # Left
 t_tfce_left, clusters_left, p_tfce_left, H0_left = permutation_cluster_test(X=obs_left, threshold=threshold, n_permutations=n_permutations)
@@ -419,7 +418,7 @@ if save_fig:
     save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-## it vs tgt all channels
+## it vs tgt all channels FRF
 import load
 import mne
 import matplotlib.pyplot as plt
@@ -429,7 +428,6 @@ import setup
 from paths import paths
 import functions_general
 import numpy as np
-import scipy.stats
 
 save_path = paths().save_path()
 plot_path = paths().plots_path()
@@ -583,6 +581,196 @@ if save_fig:
     fname = (save_id + f'_{title}').replace(epoch_id, 'tgt_fix')
     save.fig(fig=fig, path=fig_path, fname=fname)
 
+
+## it vs tgt all channels TRF
+import load
+import mne
+import matplotlib.pyplot as plt
+from mne.stats import permutation_cluster_test
+import save
+import setup
+from paths import paths
+import functions_general
+import numpy as np
+
+save_path = paths().save_path()
+plot_path = paths().plots_path()
+exp_info = setup.exp_info()
+
+# ----- Save data and display figures -----#
+save_fig = True
+display_figs = True
+if display_figs:
+    plt.ion()
+else:
+    plt.ioff()
+
+# -----  Select frequency band -----#
+# ICA vs raw data
+use_ica_data = True
+standarize = True
+band_id = None
+# Id
+epoch_ids = ['it_fix_subsampled', 'tgt_fix', 'blue', 'red']
+# Pick MEG chs (Select channels or set picks = 'mag')
+chs_id = 'mag'
+# Trials
+corr_ans = True
+tgt_pres = True
+mss = None
+reject = None
+trial_dur = None
+evt_dur = None
+# TRF hiper-parameter
+alpha = None
+
+# Get time windows from epoch_id name
+tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
+# Baseline
+baseline = (None, -0.05)
+
+# Data type
+if use_ica_data:
+    data_type = 'ICA'
+else:
+    data_type = 'RAW'
+
+# Save path
+save_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}' \
+                                  f'_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
+fig_path = save_path.replace(paths().save_path(), paths().plots_path()) + 'it_vs_tgt/'
+
+# Variable to store data and plot
+evokeds_ga = {}
+evokeds_data = {}
+
+# Define observations array to pass to TFCE
+observations = []
+
+for i, epoch_id in enumerate(epoch_ids[:2]):
+    # list of evoked objects to make GA
+    evokeds_ga[epoch_id] = []
+    # " List of evoked data as array to compute TFCE
+    evokeds_data[epoch_id] = []
+
+    # Iterate over subjects
+    for subject_code in exp_info.subjects_ids[:12]:
+
+        if use_ica_data:
+            # Load subject object
+            subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
+            meg_data = load.ica_data(subject=subject)
+        else:
+            # Load subject object
+            subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
+            meg_data = subject.load_preproc_meg_data()
+
+        # Data filenames
+        trf_path = save_path
+        trf_fname = f'TRF_{subject_code}.pkl'
+
+        # Load rf data
+        rf = load.var(trf_path + trf_fname)
+
+        # Get model coeficients as separate responses to target and items
+        # All or multiple regions
+        if type(rf) == dict:
+            # Define evoked from TRF list to concatenate all
+            evoked_list = []
+
+            # iterate over regions
+            for chs_idx, chs_subset in enumerate(rf.keys()):
+                # Get channels subset info
+                picks = functions_general.pick_chs(chs_id=chs_subset, info=meg_data.info)
+                meg_sub = meg_data.copy().pick(picks)
+
+                # Get TRF coeficients from chs subset
+                trf = rf[chs_subset].coef_[:, i, :]
+
+                if chs_idx == 0:
+                    # Define evoked object from arrays of TRF
+                    evoked = mne.EvokedArray(data=trf, info=meg_sub.info, tmin=tmin, baseline=baseline)
+                else:
+                    # Append evoked object from arrays of TRF to list, to concatenate all
+                    evoked_list.append(mne.EvokedArray(data=trf, info=meg_sub.info, tmin=tmin, baseline=baseline))
+
+            # Concatenate evoked from al regions
+            evoked = evoked.add_channels(evoked_list)
+
+        else:
+            trf = rf.coef_[:, i, :]
+            # Define evoked objects from arrays of TRF
+            evoked = mne.EvokedArray(data=trf, info=meg_sub.info, tmin=tmin, baseline=baseline)
+
+        # Extract evoked data as array to use in TFCE
+        evoked_data = evoked.get_data()
+
+        # Append subject's evoked to list of evokeds of actual condition to compute Ga
+        evokeds_ga[epoch_id].append(evoked)
+
+        # Append subject's evoked to list of evokeds of actual condition to test
+        evokeds_data[epoch_id].append(evoked_data.T)
+
+    # Convert to array
+    evokeds_epoch_id = np.array(evokeds_data[epoch_id])
+
+    # Append to observations list
+    observations.append(evokeds_epoch_id)
+
+# Compute grand average of target fixations
+grand_avg = mne.grand_average(evokeds_ga['tgt_fix'], interpolate_bads=False)
+
+# Permutation cluster test parameters
+n_permutations = 256
+degrees_of_freedom = len(exp_info.subjects_ids[:12]) - 1
+desired_pval = 0.05
+# t_thresh = scipy.stats.t.ppf(1 - desired_pval / 2, df=degrees_of_freedom)
+t_thresh = dict(start=0, step=0.2)
+# Get channel adjacency
+ch_adjacency_sparse = functions_general.get_channel_adjacency(info=evoked.info)
+# Clusters out type
+if type(t_thresh) == dict:
+    out_type = 'indices'
+else:
+    out_type = 'mask'
+
+# Permutations cluster test (TFCE if t_thresh as dict)
+t_tfce, clusters, p_tfce, H0 = permutation_cluster_test(X=observations, threshold=t_thresh,
+                                                        adjacency=ch_adjacency_sparse,
+                                                        n_permutations=n_permutations, out_type=out_type, n_jobs=6)
+
+pval_threshold = 0.5
+# Make clusters mask
+if type(t_thresh) == dict:
+    # If TFCE use p-vaues of voxels directly
+    p_tfce = p_tfce.reshape(len(evoked.times), len(evoked.ch_names)).T
+
+    # Reshape to data's shape
+    clusters_mask = p_tfce < pval_threshold
+else:
+    # Get significant clusters
+    good_clusters_idx = np.where(p_tfce < pval_threshold)[0]
+    significant_clusters = [clusters[idx] for idx in good_clusters_idx]
+
+    # Rehsape to data's shape by adding all clusters into one bool array
+    clusters_mask = np.zeros(clusters[0].shape)
+    for significant_cluster in significant_clusters:
+        clusters_mask += significant_cluster
+    clusters_mask = clusters_mask.astype(bool).T
+
+# Plot
+fig, ax = plt.subplots(figsize=(14, 5))
+if type(t_thresh) == dict:
+    title = f'{chs_id}_tthreshTFCE_pthresh{pval_threshold}'
+else:
+    title = f'{chs_id}_tthresh{round(t_thresh, 2)}_pthresh{pval_threshold}'
+
+fig = grand_avg.plot_image(cmap='jet', mask=clusters_mask, mask_style='mask', mask_alpha=0.5,
+                           titles=title, axes=ax, show=display_figs)
+
+if save_fig:
+    fname = (f'{title}').replace(epoch_id, 'tgt_fix')
+    save.fig(fig=fig, path=fig_path, fname=fname)
 
 ## plot sensors
 
