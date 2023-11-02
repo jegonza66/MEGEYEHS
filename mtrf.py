@@ -35,7 +35,7 @@ band_id = None
 # ICA / RAW
 use_ica_data = True
 epoch_ids = ['it_fix_subsampled', 'tgt_fix', 'blue', 'red']
-standarize = True
+standarize = False
 
 # Specific run path for saving data and plots
 if use_ica_data:
@@ -271,7 +271,6 @@ baseline = (None, -0.05)
 fmin, fmax = functions_general.get_freq_band(band_id=band_id)
 # Plot
 plot_edge = 0.1
-
 
 # Data type to use in paths
 if use_ica_data:

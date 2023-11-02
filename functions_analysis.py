@@ -128,8 +128,8 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
     return epochs, events
 
 
-def time_frequency(epochs, l_freq, h_freq, freqs_type, n_cycles_div=4., return_itc=True, save_data=False, trf_save_path=None,
-                   power_data_fname=None, itc_data_fname=None):
+def time_frequency(epochs, l_freq, h_freq, freqs_type, n_cycles_div=4., average=True, return_itc=True, output='power',
+                   save_data=False, trf_save_path=None, power_data_fname=None, itc_data_fname=None):
 
     # Sanity check to save data
     if save_data and (not trf_save_path or not power_data_fname or not itc_data_fname):
@@ -138,20 +138,31 @@ def time_frequency(epochs, l_freq, h_freq, freqs_type, n_cycles_div=4., return_i
     # Compute power over frequencies
     print('Computing power and ITC')
     if freqs_type == 'log':
-        freqs = np.logspace(*np.log10([l_freq, h_freq]), num=40)
+        freqs = np.logspace(np.log10([l_freq, h_freq]), num=40)
     elif freqs_type == 'lin':
         freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)  # 1 Hz bands
     n_cycles = freqs / n_cycles_div  # different number of cycle per frequency
-    power, itc = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
-                                               return_itc=return_itc, decim=3, n_jobs=None, verbose=True)
+    if return_itc:
+        power, itc = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
+                                                   average=average, output=output,
+                                                   return_itc=return_itc, decim=3, n_jobs=None, verbose=True)
+        if save_data:
+            # Save trf data
+            os.makedirs(trf_save_path, exist_ok=True)
+            power.save(trf_save_path + power_data_fname, overwrite=True)
+            itc.save(trf_save_path + itc_data_fname, overwrite=True)
 
-    if save_data:
-        # Save trf data
-        os.makedirs(trf_save_path, exist_ok=True)
-        power.save(trf_save_path + power_data_fname, overwrite=True)
-        itc.save(trf_save_path + itc_data_fname, overwrite=True)
+        return power, itc
 
-    return power, itc
+    else:
+        power = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True, average=average,
+                                              output=output, return_itc=return_itc, decim=3, n_jobs=None, verbose=True)
+        if save_data:
+            # Save trf data
+            os.makedirs(trf_save_path, exist_ok=True)
+            power.save(trf_save_path + power_data_fname, overwrite=True)
+
+        return power
 
 
 def get_plot_tf(tfr, plot_xlim=(None, None), plot_max=True, plot_min=True):

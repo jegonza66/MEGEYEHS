@@ -440,7 +440,7 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
                        vs={'tmin': -cross1_dur - mss_duration[mss] - cross2_dur, 'tmax': dur,
                            'plot_xlim': (-cross1_dur - mss_duration[mss] - cross2_dur + plot_edge, dur - plot_edge)},
                        sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)},
-                       fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)})
+                       fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.25, 0.55)})
             if 'fix' in epoch_id:
                 tmin = map['fix']['tmin']
                 tmax = map['fix']['tmax']
@@ -676,21 +676,28 @@ def get_condition_trials(subject, mss=None, trial_dur=None, corr_ans=None, tgt_p
     return trials, bh_data
 
 
-def get_channel_adjacency(info):
+def get_channel_adjacency(info, ch_type='mag', picks=None, bads=None):
 
     # Compute channel adjacency from montage info
-    ch_adjacency = mne.channels.find_ch_adjacency(info=info, ch_type=None)
+    ch_adjacency = mne.channels.find_ch_adjacency(info=info, ch_type=ch_type)
+
+    if picks:
+        channels_to_use = picks
+    else:
+        info.ch_names
 
     # Default ctf275 info has 275 channels, we are using 271. Check for extra channels
-    extra_chs_idx = [i for i, ch in enumerate(ch_adjacency[1]) if ch not in info.ch_names]
+    if bads:
+        extra_chs_idx = [i for i, ch in enumerate(ch_adjacency[1]) if ch not in channels_to_use or ch in bads]
+    else:
+        extra_chs_idx = [i for i, ch in enumerate(ch_adjacency[1]) if ch not in channels_to_use]
 
     if len(extra_chs_idx):
         ch_adjacency_mat = ch_adjacency[0].toarray()
 
         # Remove extra channels
-        for extra_ch in extra_chs_idx:
-            ch_adjacency_mat = np.delete(ch_adjacency_mat, extra_ch, axis=0)
-            ch_adjacency_mat = np.delete(ch_adjacency_mat, extra_ch, axis=1)
+        ch_adjacency_mat = np.delete(ch_adjacency_mat, extra_chs_idx, axis=0)
+        ch_adjacency_mat = np.delete(ch_adjacency_mat, extra_chs_idx, axis=1)
 
         # Reformat to scipy sparce matrix
         ch_adjacency_sparse = scipy.sparse.csr_matrix(ch_adjacency_mat)

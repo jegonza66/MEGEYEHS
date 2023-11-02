@@ -9,20 +9,31 @@ import load
 import setup
 import numpy as np
 import plot_general
-
+import matplotlib.pyplot as plt
+from scipy import stats as stats
+from mne.stats import spatio_temporal_cluster_1samp_test, spatio_temporal_cluster_test, summarize_clusters_stc
 
 # --------- Define Parameters ---------#
+
 # Subject and Epochs
 save_fig = True
+display_figs = False
+if display_figs:
+    plt.ion()
+else:
+    plt.ioff()
+
 # Select epochs
-epoch_id = 'sac_vs'
+run_id = 'tgt_fix--it_fix_subsampled'  # use '--' to compute difference between 2 conditions
 # ICA
 use_ica_data = True
 
 # Trials
-corr_ans = None
-tgt_pres = None
+corr_ans = True
+tgt_pres = True
 mss = None
+t_dur = None
+evt_dur = None
 
 # Epochs parameters
 reject = None
@@ -31,10 +42,10 @@ reject = None
 force_fsaverage = False
 # Model
 model_name = 'lcmv'  # ('lcmv', 'dics')
-surf_vol = 'volume'
-ico = 5
+surf_vol = 'surface'
+ico = 4
 spacing = 5.
-pick_ori = 'max-power'  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximices output power
+pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximices output power
 
 # Plot
 initial_time = None
@@ -47,6 +58,7 @@ visualize_alignment = False
 
 
 # --------- Setup ---------#
+
 # Load experiment info
 exp_info = setup.exp_info()
 
@@ -56,17 +68,18 @@ if use_ica_data:
 else:
     data_type = 'RAW'
 
-# Get time windows from epoch_id name
+# Define time windows from epoch_id name
 map_times = dict(sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.05, 0.2)},
-                 fix={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.05, 0.2)})
+                 it_fix_subsampled={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.05, 0.2)},
+                 tgt_fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.05, 0.2)})
 
-# Get times
-tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
+# Get time limits
+tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=run_id, map=map_times)
 
 # Baseline duration
-if 'sac' in epoch_id:
+if 'sac' in run_id:
     baseline = (tmin, 0)
-elif 'fix' in epoch_id or 'fix' in epoch_id:
+elif 'fix' in run_id or 'fix' in run_id:
     baseline = (tmin, -0.05)
 else:
     baseline = (tmin, 0)
@@ -77,145 +90,183 @@ if pick_ori == 'max-power':
 else:
     clim = dict(kind='percent', lims=cbar_percent_lims)
 
-# --------- Paths ---------#
-run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_{tmin}_{tmax}_bline{baseline}/'
 
-# Source plots paths
-fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}/'
-
-# Data paths
-epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path
-evoked_save_path = paths().save_path() + f'Evoked_{data_type}/' + run_path
+# --------- Freesurfer Path ---------#
 
 # Define Subjects_dir as Freesurfer output folder
 subjects_dir = os.path.join(paths().mri_path(), 'FreeSurfer_out')
 os.environ["SUBJECTS_DIR"] = subjects_dir
 
-stcs_fs = []
 
 # --------- Run ---------#
-for subject_code in exp_info.subjects_ids:
-    # Load subject
-    if use_ica_data:
-        subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
-    else:
-        subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
 
-    # Data filenames
-    epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
-    evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
+# Save source estimates time courses on FreeSurfer
+stcs_fs_dict = {}
 
-    # --------- Coord systems alignment ---------#
-    if force_fsaverage:
-        subject_code = 'fsaverage'
-        dig = False
-    else:
-        # Check if subject has MRI data
-        try:
-            fs_subj_path = os.path.join(subjects_dir, subject.subject_id)
-            os.listdir(fs_subj_path)
-            dig = True
-        except:
+# Run on separate events based on epochs ids to compute difference
+epoch_ids = run_id.split('--')
+
+# Iterate over epoch ids (if applies)
+for epoch_id in epoch_ids:
+    # Data and plots paths
+    run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{t_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
+
+    # Data paths
+    epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path
+    evoked_save_path = paths().save_path() + f'Evoked_{data_type}/' + run_path
+
+    # Source plots paths
+    fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}/'
+
+    # Save source estimates time courses on FreeSurfer
+    stcs_fs_dict[epoch_id] = []
+
+    # Iterate over participants
+    for subject_code in exp_info.subjects_ids:
+        # Load subject
+        if use_ica_data:
+            subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
+        else:
+            subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
+
+        # Data filenames
+        epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+        evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
+
+        # --------- Coord systems alignment ---------#
+        if force_fsaverage:
             subject_code = 'fsaverage'
             dig = False
-
-    if visualize_alignment:
-        plot_general.mri_meg_alignment(subject=subject, subject_code=subject_code, dig=dig, subjects_dir=subjects_dir)
-
-    try:
-        # Load data
-        epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
-        evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
-    except:
-        if use_ica_data:
-            meg_data = load.ica_data(subject=subject)
         else:
-            meg_data = subject.load_preproc_meg_data()
+            # Check if subject has MRI data
+            try:
+                fs_subj_path = os.path.join(subjects_dir, subject.subject_id)
+                os.listdir(fs_subj_path)
+                dig = True
+            except:
+                subject_code = 'fsaverage'
+                dig = False
+        
+        # Plot alignment visualization (if True)
+        if visualize_alignment:
+            plot_general.mri_meg_alignment(subject=subject, subject_code=subject_code, dig=dig, subjects_dir=subjects_dir)
 
+        # Get epochs and evoked
         try:
+            # Load data
             epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+            evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
         except:
-            # Epoch data
-            epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
-                                                           epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, tmax=tmax, reject=reject,
-                                                           save_data=True, epochs_save_path=epochs_save_path, baseline=baseline,
-                                                           epochs_data_fname=epochs_data_fname)
-        # Define evoked from epochs
-        evoked = epochs.average()
+            # Compute
+            if use_ica_data:
+                meg_data = load.ica_data(subject=subject)
+            else:
+                meg_data = subject.load_preproc_meg_data()
 
-        # Save evoked data
-        os.makedirs(evoked_save_path, exist_ok=True)
-        evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
+            try:
+                epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+            except:
+                # Epoch data
+                epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
+                                                               epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, tmax=tmax, reject=reject,
+                                                               save_data=True, epochs_save_path=epochs_save_path, baseline=baseline,
+                                                               epochs_data_fname=epochs_data_fname)
+            # Define evoked from epochs
+            evoked = epochs.average()
 
-    # Pick meg channels for source modeling
-    evoked.pick('meg')
-    epochs.pick('meg')
+            # Save evoked data
+            os.makedirs(evoked_save_path, exist_ok=True)
+            evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
 
-    # --------- Source estimation ---------#
-    # Source data path
-    sources_path_subject = paths().sources_path() + subject.subject_id
+        # Pick meg channels for source modeling
+        evoked.pick('meg')
+        epochs.pick('meg')
 
-    # Load forward model
-    if surf_vol == 'volume':
-        fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
-    elif surf_vol == 'surface':
-        fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
-    elif surf_vol == 'mixed':
-        fname_fwd = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}-fwd.fif'
-    fwd = mne.read_forward_solution(fname_fwd)
-    src = fwd['src']
+        # --------- Source estimation ---------#
+        # Source data path
+        sources_path_subject = paths().sources_path() + subject.subject_id
 
-    # Load filter
-    if surf_vol == 'volume':
-        fname_filter = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
-    elif surf_vol == 'surface':
-        fname_filter = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-{model_name}.fif'
-    elif surf_vol == 'mixed':
-        fname_filter = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
-    filters = mne.beamformer.read_beamformer(fname_filter)
-
-    # Apply filter and get source estimates
-    stc = beamformer.apply_lcmv(evoked=evoked, filters=filters)
-
-    # Morph to fsaverage
-    if subject_code != 'fsaverage':
-        # Get Source space for fsaverage
+        # Load forward model
         if surf_vol == 'volume':
-            fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_volume_ico{ico}_{int(spacing)}-src.fif'
+            fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
         elif surf_vol == 'surface':
-            fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_surface_ico{ico}-src.fif'
+            fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
         elif surf_vol == 'mixed':
-            fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_mixed_ico{ico}_{int(spacing)}-src.fif'
+            fname_fwd = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}-fwd.fif'
+        fwd = mne.read_forward_solution(fname_fwd)
+        src = fwd['src']
 
-        src_fs = mne.read_source_spaces(fname_src)
+        # Load filter
+        if surf_vol == 'volume':
+            fname_filter = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
+        elif surf_vol == 'surface':
+            fname_filter = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-{model_name}.fif'
+        elif surf_vol == 'mixed':
+            fname_filter = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
+        filters = mne.beamformer.read_beamformer(fname_filter)
 
-        # Define morph function
-        morph = mne.compute_source_morph(src=src, subject_from=subject.subject_id, subject_to='fsaverage',
-                                         src_to=src_fs, subjects_dir=subjects_dir)
-        # Morph
-        stc_fs = morph.apply(stc)
+        # Apply filter and get source estimates
+        stc = beamformer.apply_lcmv(evoked=evoked, filters=filters)
 
-        # Append to fs_stcs to make GA
-        stcs_fs.append(stc_fs)
+        # Morph to fsaverage
+        if subject_code != 'fsaverage':
+            # Get Source space for fsaverage
+            if surf_vol == 'volume':
+                fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_volume_ico{ico}_{int(spacing)}-src.fif'
+            elif surf_vol == 'surface':
+                fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_surface_ico{ico}-src.fif'
+            elif surf_vol == 'mixed':
+                fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_mixed_ico{ico}_{int(spacing)}-src.fif'
 
-    else:
-        # Append to fs_stcs to make GA
-        stcs_fs.append(stc)
+            src_fs = mne.read_source_spaces(fname_src)
 
-    # Plot
-    fig = stc.plot(src, subject=subject_code, subjects_dir=subjects_dir, initial_time=initial_time,
-                   clim=clim)
+            # Define morph function
+            morph = mne.compute_source_morph(src=src, subject_from=subject.subject_id, subject_to='fsaverage',
+                                             src_to=src_fs, subjects_dir=subjects_dir)
+            # Morph
+            stc_fs = morph.apply(stc)
 
-    if save_fig:
-        fname = f'{subject.subject_id}'
-        if subject_code == 'fsaverage':
-            fname += '_fsaverage'
-        save.fig(fig=fig, path=fig_path, fname=fname)
+            # Append to fs_stcs to make GA
+            stcs_fs_dict[epoch_id].append(stc_fs)
 
-    # 3D Plot
-    # stc.plot_3d(src=fwd['src'], subject=subject_code, subjects_dir=subjects_dir, hemi='both', surface='white',
-    #             initial_time=initial_time, time_unit='s', smoothing_steps=7)
+        else:
+            # Append to fs_stcs to make GA
+            stcs_fs_dict[epoch_id].append(stc)
 
+        # Plot
+        if surf_vol == 'volume':
+            fig = stc.plot(src=src, subject=subject_code, subjects_dir=subjects_dir, initial_time=initial_time,
+                           clim=clim)
+
+            # Save figure
+            if save_fig :
+                fname = f'{subject.subject_id}'
+                if subject_code == 'fsaverage':
+                    fname += '_fsaverage'
+                save.fig(fig=fig, path=fig_path, fname=fname)
+
+# Take difference of conditions if applies
+if len(stcs_fs_dict.keys()) > 1:
+    print(f'Taking difference between conditions: {epoch_ids[0]} - {epoch_ids[1]}')
+    stcs_fs = []
+    for i in range(len(stcs_fs_dict[epoch_id])):
+        stcs_fs.append(stcs_fs_dict[list(stcs_fs_dict.keys())[0]][i] - stcs_fs_dict[list(stcs_fs_dict.keys())[1]][i])
+        # stcs_fs.append(stcs_fs_dict[list(stcs_fs_dict.keys())[0]][i])
+
+    # Variable for 2 conditions test
+    print(f'Getting data from conditions: {epoch_ids[0]}, {epoch_ids[1]}')
+    stcs_2samp = []
+    for epoch_id in epoch_ids:
+        source_data_fs = np.zeros(tuple([len(stcs_fs_dict[epoch_id])] + [size for size in stcs_fs_dict[epoch_id][0].data.shape[::-1]]))
+        for i in range(len(stcs_fs_dict[epoch_id])):
+            source_data_fs[i] = stcs_fs_dict[epoch_id][i].data.T
+        stcs_2samp.append(source_data_fs)
+
+    # Redefine figure save path
+    fig_path = fig_path.replace(epoch_id, run_id)
+
+else:
+    stcs_fs = stcs_fs_dict[epoch_id]
 
 # Average evoked stcs
 source_data_fs = np.zeros(tuple([len(stcs_fs)]+[size for size in stcs_fs[0].data.shape]))
@@ -233,7 +284,7 @@ except:
 GA_stc.data = GA_stc_data
 GA_stc.subject = 'fsaverage'
 
-# Read fsaverage surface
+# Load fsaverage source space
 if surf_vol == 'volume':
     fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_volume_ico{ico}_{int(spacing)}-src.fif'
 elif surf_vol == 'surface':
@@ -241,50 +292,74 @@ elif surf_vol == 'surface':
 elif surf_vol == 'mixed':
     fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_mixed_ico{ico}_{int(spacing)}-src.fif'
 src_fs = mne.read_source_spaces(fname_src)
-
-# Plot
-fig = GA_stc.plot(src_fs, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0.11,
-                  clim='auto')
-
-if save_fig:
-    fname = 'GA'
-    if force_fsaverage:
-        fname += '_fsaverage'
-    save.fig(fig=fig, path=fig_path, fname=fname)
+fsave_vertices = [s["vertno"] for s in src_fs]
 
 
-## --------- Morph to fsaverage ---------#
+# --------- Cluster permutations test ---------#
 
-src = fwd['src']
+# Compute source space adjacency matrix
+print("Computing adjacency matrix")
+adjacency_matrix = mne.spatial_src_adjacency(src_fs)
 
-if surf_vol == 'volume':
-    # Load fsaverage volume Source Space
-    fname_fsaverage_src = subjects_dir + '/fsaverage/bem/fsaverage-vol-5-src.fif'
-    src_fs = mne.read_source_spaces(fname_fsaverage_src)
-else:
-    src_fs = None
+# Transpose source_fs_data from shape (subjects x space x time) to shape (subjects x time x space)
+source_data_fs = source_data_fs.swapaxes(1, 2)
 
-morph = mne.compute_source_morph(src=src, subject_from=subject.subject_id, subject_to='fsaverage', src_to=src_fs, subjects_dir=subjects_dir)
-stc_fs = morph.apply(stc)
+# Define the t-value threshold for cluster formation
+desired_pval = 0.001
+df = len(exp_info.subjects_ids) - 1  # degrees of freedom for the test
+t_thresh = stats.distributions.t.ppf(1 - desired_pval / 2, df=df)
 
-# Plot in fsaverage space
-if surf_vol == 'surface':
-    if pick_ori == 'vector':
-        brain = stc_fs.plot(subjects_dir=subjects_dir, subject='fsaverage', time_viewer=False, hemi='both',
-                            initial_time=initial_time, time_unit='s')
-    else:
-        brain = stc_fs.plot(subjects_dir=subjects_dir, subject='fsaverage', surface='flat', time_viewer=False,
-                            hemi='both', initial_time=initial_time, time_unit='s')
-        brain.add_annotation('HCPMMP1_combined', borders=2)
+# Run permutations
+T_obs, clusters, cluster_p_values, H0 = clu = spatio_temporal_cluster_1samp_test(X=source_data_fs,
+                                                                                 n_permutations=256,
+                                                                                 adjacency=adjacency_matrix,
+                                                                                 n_jobs=4,
+                                                                                 threshold=t_thresh)
 
-elif surf_vol == 'volume':
-    clims = (stc_fs.data.max()*0.66, stc_fs.data.max()*0.75, stc_fs.data.max())
-    fig = stc_fs.plot(src_fs, subject='fsaverage', subjects_dir=subjects_dir, initial_time=initial_time, clim=dict(kind='value', lims=clims))
-    if save_fig:
-        fname = f'{subject.subject_id}_morph_fsaverage'
+# Select the clusters that are statistically significant at p
+p_threshold = 0.05
+good_clusters_idx = np.where(cluster_p_values < p_threshold)[0]
+good_clusters = [clusters[idx] for idx in good_clusters_idx]
+[cluster_p_values[idx] for idx in good_clusters_idx]
+
+# Select clusters for visualization
+stc_all_cluster_vis = summarize_clusters_stc(clu=clu, p_thresh=p_threshold, tstep=GA_stc.tstep, vertices=fsave_vertices,
+                                             subject="fsaverage")
+
+# 3D Plot
+if surf_vol == 'volume' or surf_vol == 'mixed':
+    stc_all_cluster_vis.plot_3d(src=src_fs, subject='fsaverage', subjects_dir=subjects_dir, hemi='both', surface='white',
+                                initial_time=initial_time, time_unit='s', smoothing_steps=7)
+    # Nutmeg Plot
+    fig = stc_all_cluster_vis.plot(src=src_fs, subject='fsaverage', subjects_dir=subjects_dir, initial_time=initial_time,
+                                   clim=clim)
+
+    if save_fig and surf_vol == 'volume':
+        fname = f'Clus_t{t_thresh}_p{p_threshold}'
+        if force_fsaverage:
+            fname += '_fsaverage'
         save.fig(fig=fig, path=fig_path, fname=fname)
 
-    stc_fs.plot_3d(src=src, subject=subject.subject_id, subjects_dir=subjects_dir, hemi='both', surface='white',
-                initial_time=initial_time, time_unit='s', smoothing_steps=7)
+else:
+    stc_all_cluster_vis.plot(src=src_fs, subject='fsaverage', subjects_dir=subjects_dir, hemi='both', surface='white',
+                             alpha=0.35, spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', smoothing_steps=7)
 
+##
+if surf_vol == 'volume' or surf_vol == 'mixed':
+    # Nutmeg Plot
+    fig = GA_stc.plot(src=src_fs, subject='fsaverage', subjects_dir=subjects_dir, initial_time=initial_time,
+                      clim=clim)
+    if save_fig and surf_vol == 'volume':
+        fname = 'GA'
+        if force_fsaverage:
+            fname += '_fsaverage'
+        save.fig(fig=fig, path=fig_path, fname=fname)
 
+    # 3D Plot
+    GA_stc.plot_3d(src=src_fs, subject='fsaverage', subjects_dir=subjects_dir, hemi='both', surface='white',
+                   initial_time=0, time_unit='s', smoothing_steps=7)
+else:
+    # 3D Plot
+    GA_stc.plot(src=src_fs, subject='fsaverage', subjects_dir=subjects_dir, hemi='both', surface='white',
+                alpha=0.35, spacing=f'ico{ico}', initial_time=initial_time, time_unit='s',
+                smoothing_steps=7)

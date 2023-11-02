@@ -500,7 +500,7 @@ def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, Non
         save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
 
-def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None,
+def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, image_args=None,
                         plot_max=True, plot_min=True, vmin=None, vmax=None, chs_id='mag', vlines_times=None,
                         display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
@@ -535,8 +535,8 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
         f'{bline_mode}'
 
     # Plot tf plot joint
-    fig = tfr_plotjoint.plot_joint(timefreqs=timefreqs, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet',
-                                   title=title, show=display_figs)
+    fig = tfr_plotjoint.plot_joint(timefreqs=timefreqs, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet', image_args=image_args,
+                                   title=title, show=display_figs, vmin=vmin, vmax=vmax)
 
     # Plot vertical lines
     tf_ax = fig.axes[0]

@@ -25,6 +25,7 @@ else:
 #-----  Select frequency band -----#
 # ICA vs raw data
 use_ica_data = True
+run_tfce = False
 band_id = None
 # Id
 epoch_ids = ['it_fix_subsampled', 'tgt_fix']
@@ -52,6 +53,7 @@ else:
     data_type = 'RAW'
 
 # Variable to store data and plot
+ga_dict = {}
 evokeds = {}
 means = {}
 stds = {}
@@ -63,12 +65,15 @@ mins = {}
 fig, axs = plt.subplots(ncols=len(chs_ids), figsize=(17, 5))
 
 for i, epoch_id in enumerate(epoch_ids):
+    ga_dict[epoch_id] = {}
     evokeds[epoch_id] = {}
     means[epoch_id] = {}
     stds[epoch_id] = {}
     maxs[epoch_id] = {}
     mins[epoch_id] = {}
     for j, lat_chs in enumerate(chs_ids):
+
+        ga_dict[epoch_id][lat_chs] = []
         evokeds[epoch_id][lat_chs] = []
 
         # Specific run path for saving data and plots
@@ -84,7 +89,7 @@ for i, epoch_id in enumerate(epoch_ids):
         evoked_fig_path = plot_path + f'Evoked_{data_type}/' + run_path
 
         # Iterate over subjects
-        for subject_code in exp_info.subjects_ids[:12]:
+        for subject_code in exp_info.subjects_ids:
 
             if use_ica_data:
                 # Load subject object
@@ -98,6 +103,10 @@ for i, epoch_id in enumerate(epoch_ids):
 
             # Load evoked data
             evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
+
+            # Append evoked averaged over all channels
+            ga_evoked = evoked.copy()
+            ga_dict[epoch_id][lat_chs].append(ga_evoked)
 
             # Subsample to selected region
             picks = functions_general.pick_chs(chs_id=lat_chs, info=evoked.info)
@@ -129,38 +138,38 @@ for i, epoch_id in enumerate(epoch_ids):
                             y2=means[epoch_id][lat_chs]+stds[epoch_id][lat_chs], alpha=0.5, color=f'C{i}', edgecolor=None)
         axs[j].set_xlim(evoked.times[0], evoked.times[-1])
 
+if run_tfce:
+    # Get subjects trf from both clases split in left and right
+    obs_left = [evokeds[epoch_ids[0]][chs_ids[0]], evokeds[epoch_ids[1]][chs_ids[0]]]
+    obs_right = [evokeds[epoch_ids[0]][chs_ids[1]], evokeds[epoch_ids[1]][chs_ids[1]]]
 
-# Get subjects trf from both clases split in left and right
-obs_left = [evokeds[epoch_ids[0]][lat_chs[0]], evokeds[epoch_ids[1]][lat_chs[0]]]
-obs_right = [evokeds[epoch_ids[0]][lat_chs[1]], evokeds[epoch_ids[1]][lat_chs[1]]]
+    # Permutation cluster test
+    n_permutations = 256
+    degrees_of_freedom = len(exp_info.subjects_ids[:12]) - 1
+    desired_pval = 0.01
+    t_thresh = scipy.stats.t.ppf(1 - desired_pval / 2, df=degrees_of_freedom)
+    # t_thresh = dict(start=0, step=0.2)
 
-# Permutation cluster test
-n_permutations = 2048
-degrees_of_freedom = len(exp_info.subjects_ids[:12]) - 1
-desired_pval = 0.01
-t_thresh = scipy.stats.t.ppf(1 - desired_pval / 2, df=degrees_of_freedom)
-threshold = dict(start=0, step=0.2)
-
-# Left
-t_tfce_left, clusters_left, p_tfce_left, H0_left = permutation_cluster_test(X=obs_left, threshold=t_thresh,
-                                                                            n_permutations=n_permutations)
-
-good_clusters_left_idx = np.where(p_tfce_left < 0.05)[0]
-significant_clusters_left = np.take(clusters_left, good_clusters_left_idx).tolist()
-# Plot significant clusters
-if len(significant_clusters_left):
-    for cluster in significant_clusters_left:
-        axs[0].axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], color='green', alpha=0.5, label='Signif.')
-
-# Right
-t_tfce_right, clusters_right, p_tfce_right, H0_right = permutation_cluster_test(X=obs_right, threshold=t_thresh,
+    # Left
+    t_tfce_left, clusters_left, p_tfce_left, H0_left = permutation_cluster_test(X=obs_left, threshold=t_thresh,
                                                                                 n_permutations=n_permutations)
-good_clusters_right_idx = np.where(p_tfce_right < 0.05)[0]
-significant_clusters_right = np.take(clusters_right, good_clusters_right_idx).tolist()
-# Plot significant clusters
-if len(significant_clusters_right):
-    for cluster in significant_clusters_right:
-        axs[1].axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], color='green', alpha=0.5, label='Signif.')
+
+    good_clusters_left_idx = np.where(p_tfce_left < 0.05)[0]
+    significant_clusters_left = np.take(clusters_left, good_clusters_left_idx).tolist()
+    # Plot significant clusters
+    if len(significant_clusters_left):
+        for cluster in significant_clusters_left:
+            axs[0].axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], color='green', alpha=0.5, label='Signif.')
+
+    # Right
+    t_tfce_right, clusters_right, p_tfce_right, H0_right = permutation_cluster_test(X=obs_right, threshold=t_thresh,
+                                                                                    n_permutations=n_permutations)
+    good_clusters_right_idx = np.where(p_tfce_right < 0.05)[0]
+    significant_clusters_right = np.take(clusters_right, good_clusters_right_idx).tolist()
+    # Plot significant clusters
+    if len(significant_clusters_right):
+        for cluster in significant_clusters_right:
+            axs[1].axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], color='green', alpha=0.3, label='Signif.')
 
 
 # Put legend to 2nd ax
@@ -194,8 +203,21 @@ if save_fig:
     fname = (save_id + f'_{chs_id}').replace(epoch_id, 'Evoked')
     save.fig(fig=fig, path=fig_path, fname=fname)
 
+# Plot topographies
+topo_times = [0.1, 0.35]
+topo_times_span = [0.005, 0.05]
+grand_average = mne.grand_average(ga_dict['tgt_fix'][lat_chs], interpolate_bads=False)
+fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='jet', show=display_figs, vlim=(-60, 60))
+
+if save_fig:
+    fig_path = paths().plots_path() + f'Evoked_{data_type}/it_vs_tgt/'
+    fname = (save_id + f'_{chs_id}_topomaps').replace(epoch_id, 'Evoked')
+    save.fig(fig=fig_topo, path=fig_path, fname=fname)
+
+
 ## it_vs_fix TRF
 import load
+import save
 import mne
 import matplotlib.pyplot as plt
 import setup
@@ -204,6 +226,7 @@ import functions_general
 import numpy as np
 import matplotlib
 import scipy.stats
+from mne.stats import permutation_cluster_test
 
 save_path = paths().save_path()
 plot_path = paths().plots_path()
@@ -220,12 +243,13 @@ else:
 #-----  Parameters -----#
 # ICA vs raw data
 use_ica_data = True
+run_tfce = True
 standarize = True
 band_id = None
 # Id
 epoch_ids = ['it_fix_subsampled', 'tgt_fix', 'blue', 'red']
 # Pick MEG chs (Select channels or set picks = 'mag')
-chs_id = 'temporal'
+chs_id = 'mag'
 chs_ids = [f'{chs_id}_L', f'{chs_id}_R']
 labels = ['TRF Distractor', 'TRF Target']
 # Trials
@@ -241,7 +265,7 @@ baseline = (None, -0.05)
 # TRF hiper-parameter
 alpha = None
 # Reescale and plot with FRF
-FRF_TRF = True
+FRF_TRF = False
 
 # Data type
 if use_ica_data:
@@ -250,6 +274,7 @@ else:
     data_type = 'RAW'
 
 # Variable to store data and plot
+ga_dict = {}
 evokeds = {}
 means = {}
 stds = {}
@@ -278,14 +303,16 @@ else:
     fig, axs = plt.subplots(ncols=2, figsize=(17, 5))
 
 for i, epoch_id in enumerate(epoch_ids[:2]):
+    ga_dict[epoch_id] = {}
     evokeds[epoch_id] = {}
     means[epoch_id] = {}
     stds[epoch_id] = {}
     for j, lat_chs in enumerate(chs_ids):
+        ga_dict[epoch_id][lat_chs] = []
         evokeds[epoch_id][lat_chs] = []
 
         # Iterate over subjects
-        for subject_code in exp_info.subjects_ids[:12]:
+        for subject_code in exp_info.subjects_ids:
 
             if use_ica_data:
                 # Load subject object
@@ -302,18 +329,48 @@ for i, epoch_id in enumerate(epoch_ids[:2]):
 
             # Load rf data
             rf = load.var(trf_path + trf_fname)
-            picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
-            meg_sub = meg_data.copy().pick(picks)
             print('Loaded Receptive Field')
 
-            # Get correspoding trf
-            trf = rf.coef_[:, i, :]
-            # Define evoked objects from arrays of TRF
-            evoked = mne.EvokedArray(data=trf, info=meg_sub.info, tmin=tmin, baseline=baseline)
-            # Subsample channels
-            picks = functions_general.pick_chs(chs_id=lat_chs, info=evoked.info)
-            evoked_sub = evoked.pick(picks)
-            evoked_data = evoked_sub.get_data()
+            # Get model coeficients as separate responses to target and items
+            # All or multiple regions
+            if type(rf) == dict:
+                # Define evoked from TRF list to concatenate all
+                evoked_list = []
+
+                # iterate over regions
+                for chs_idx, chs_subset in enumerate(rf.keys()):
+
+                    # Get TRF coefficients from chs subset
+                    trf = rf[chs_subset].coef_[:, i, :]
+
+                    picks = functions_general.pick_chs(chs_id=chs_subset, info=meg_data.info)
+                    meg_sub = meg_data.copy().pick(picks)
+
+                    if chs_idx == 0:
+                        # Define evoked object from arrays of TRF
+                        evoked = mne.EvokedArray(data=trf, info=meg_sub.info, tmin=tmin, baseline=baseline)
+                    else:
+                        # Append evoked object from arrays of TRF to list, to concatenate all
+                        evoked_list.append(mne.EvokedArray(data=trf, info=meg_sub.info, tmin=tmin, baseline=baseline))
+
+                # Concatenate evoked from al regions
+                evoked = evoked.add_channels(evoked_list)
+
+            else:
+                trf = rf.coef_[:, i, :]
+                # Define evoked objects from arrays of TRF
+                evoked = mne.EvokedArray(data=trf, info=meg_sub.info, tmin=tmin, baseline=baseline)
+
+            evoked_ga = evoked.copy()
+            ga_dict[epoch_id][lat_chs].append(evoked_ga)
+
+            if chs_id != 'mag':
+                # Subsample channels
+                picks = functions_general.pick_chs(chs_id=lat_chs, info=evoked.info)
+                evoked_sub = evoked.pick(picks)
+                evoked_data = evoked_sub.get_data()
+            else:
+                evoked_data = evoked.get_data()
 
             # Exclude subjects bad channels
             bad_ch_idx = [i for i, ch_name in enumerate(evoked.info['ch_names']) if ch_name in evoked.info['bads']]
@@ -338,16 +395,14 @@ for i, epoch_id in enumerate(epoch_ids[:2]):
             means[epoch_id][lat_chs] *= (maxs[epoch_id][lat_chs] - mins[epoch_id][lat_chs])
             means[epoch_id][lat_chs] += mins[epoch_id][lat_chs]
 
-        # Plot
-        colors = ['slateblue', 'tomato']
-        if FRF_TRF:
+            # Plot
+            colors = ['slateblue', 'tomato']
             axs[j].plot(evoked.times, means[epoch_id][lat_chs], color=colors[i], label=labels[i])
         else:
             axs[j].plot(evoked.times, means[epoch_id][lat_chs], color=f'C{i}', label=labels[i])
             axs[j].fill_between(evoked.times, y1=means[epoch_id][lat_chs]-stds[epoch_id][lat_chs],
                                 y2=means[epoch_id][lat_chs]+stds[epoch_id][lat_chs], alpha=0.5, color=f'C{i}', edgecolor=None)
             axs[j].set_xlim(evoked.times[0], evoked.times[-1])
-
 
 # Get subjects trf from both classes split in left and right
 obs_left = [evokeds[epoch_ids[0]][chs_ids[0]], evokeds[epoch_ids[1]][chs_ids[0]]]
@@ -360,27 +415,40 @@ desired_pval = 0.01
 t_thresh = scipy.stats.t.ppf(1 - desired_pval / 2, df=degrees_of_freedom)
 # t_thresh = dict(start=0, step=0.2)
 
+pval_thresh = 0.05
 # Left
-t_tfce_left, clusters_left, p_tfce_left, H0_left = permutation_cluster_test(X=obs_left, threshold=threshold, n_permutations=n_permutations)
-good_clusters_left_idx = np.where(p_tfce_left < 0.05)[0]
+t_tfce_left, clusters_left, p_tfce_left, H0_left = permutation_cluster_test(X=obs_left, threshold=t_thresh, n_permutations=n_permutations)
+good_clusters_left_idx = np.where(p_tfce_left < pval_thresh)[0]
 significant_clusters_left = np.take(clusters_left, good_clusters_left_idx).tolist()
+
 # Plot significant clusters
+bar_height = axs[0].get_ylim()[1]
 if len(significant_clusters_left):
     for cluster in significant_clusters_left:
-        axs[0].axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], color='c', alpha=0.5, label='Signif.')
+        # axs[0].axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], color='green', alpha=0.3, label='Signif.')
+        axs[0].hlines(y=bar_height, xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], color='gray', alpha=0.7, label='Signif.')
 
 # Right
-t_tfce_right, clusters_right, p_tfce_right, H0_right = permutation_cluster_test(X=obs_right, threshold=threshold, n_permutations=n_permutations)
-good_clusters_right_idx = np.where(p_tfce_right < 0.05)[0]
+t_tfce_right, clusters_right, p_tfce_right, H0_right = permutation_cluster_test(X=obs_right, threshold=t_thresh, n_permutations=n_permutations)
+good_clusters_right_idx = np.where(p_tfce_right < pval_thresh)[0]
 significant_clusters_right = np.take(clusters_right, good_clusters_right_idx).tolist()
 # Plot significant clusters
 if len(significant_clusters_right):
     for cluster in significant_clusters_right:
-        axs[1].axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], color='green', alpha=0.5, label='Signif.')
+        # axs[1].axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], color='green', alpha=0.3, label='Signif.')
+        axs[1].hlines(y=bar_height, xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]],
+                      color='gray', alpha=0.7, label='Signif.')
+
+# Drop duplicate labels
+for ax, loc in zip([axs[0], axs[1]], ['lower right', 'upper right']):
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    ax.legend(by_label.values(), by_label.keys(), fontsize=15, loc=loc)
 
 # Put legend to 2nd ax
-axs[0].legend(loc='lower right')
-axs[1].legend(loc='upper right')
+# axs[0].legend(loc='lower right')
+# axs[1].legend(loc='upper right')
+
 # Plot vertical lines
 if not FRF_TRF:
     axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='gray')
@@ -416,6 +484,33 @@ if save_fig:
     else:
         fname = f'TRF_{chs_id}'
     save.fig(fig=fig, path=fig_path, fname=fname)
+
+# Plot topographies
+topo_times = [0.1, 0.4]
+topo_times_span = [0.01, 0.2]
+grand_average = mne.grand_average(ga_dict['tgt_fix'][lat_chs], interpolate_bads=False)
+
+
+# Mascara en temporales
+# picks = functions_general.pick_chs(chs_id='temporal', info=meg_data.info)
+# mask = np.zeros(grand_average.data.shape)
+# for ch in picks:
+#     try:
+#         mask[grand_average.ch_names.index(ch), :] = 1
+#     except:
+#         pass
+# mask = mask.astype(bool)
+# mask_params = dict(markersize=10, markerfacecolor="g", alpha=0.65)
+# fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='jet', show=display_figs,
+#                                       mask=mask, mask_params=mask_params, units='a.u.', scalings=1)
+
+
+fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='jet', show=display_figs,
+                                      units='a.u.', scalings=1)
+
+if save_fig:
+    fname = f'TRF_{chs_id}_topomaps'
+    save.fig(fig=fig_topo, path=fig_path, fname=fname)
 
 
 ## it vs tgt all channels FRF
@@ -592,6 +687,7 @@ import setup
 from paths import paths
 import functions_general
 import numpy as np
+import scipy
 
 save_path = paths().save_path()
 plot_path = paths().plots_path()
@@ -608,7 +704,7 @@ else:
 # -----  Select frequency band -----#
 # ICA vs raw data
 use_ica_data = True
-standarize = True
+standarize = False
 band_id = None
 # Id
 epoch_ids = ['it_fix_subsampled', 'tgt_fix', 'blue', 'red']
@@ -622,7 +718,7 @@ reject = None
 trial_dur = None
 evt_dur = None
 # TRF hiper-parameter
-alpha = None
+alpha = 1000
 
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
@@ -654,7 +750,7 @@ for i, epoch_id in enumerate(epoch_ids[:2]):
     evokeds_data[epoch_id] = []
 
     # Iterate over subjects
-    for subject_code in exp_info.subjects_ids[:12]:
+    for subject_code in exp_info.subjects_ids:
 
         if use_ica_data:
             # Load subject object
@@ -721,11 +817,11 @@ for i, epoch_id in enumerate(epoch_ids[:2]):
 grand_avg = mne.grand_average(evokeds_ga['tgt_fix'], interpolate_bads=False)
 
 # Permutation cluster test parameters
-n_permutations = 256
-degrees_of_freedom = len(exp_info.subjects_ids[:12]) - 1
+n_permutations = 1024
+degrees_of_freedom = len(exp_info.subjects_ids) - 1
 desired_pval = 0.05
-# t_thresh = scipy.stats.t.ppf(1 - desired_pval / 2, df=degrees_of_freedom)
-t_thresh = dict(start=0, step=0.2)
+t_thresh = scipy.stats.t.ppf(1 - desired_pval / 2, df=degrees_of_freedom)
+# t_thresh = dict(start=0, step=0.2)
 # Get channel adjacency
 ch_adjacency_sparse = functions_general.get_channel_adjacency(info=evoked.info)
 # Clusters out type
@@ -739,7 +835,7 @@ t_tfce, clusters, p_tfce, H0 = permutation_cluster_test(X=observations, threshol
                                                         adjacency=ch_adjacency_sparse,
                                                         n_permutations=n_permutations, out_type=out_type, n_jobs=6)
 
-pval_threshold = 0.5
+pval_threshold = 0.05
 # Make clusters mask
 if type(t_thresh) == dict:
     # If TFCE use p-vaues of voxels directly

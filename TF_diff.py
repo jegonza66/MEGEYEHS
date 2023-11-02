@@ -5,17 +5,21 @@ import mne
 import os
 import plot_general
 import save
+import pandas as pd
 import setup
 from paths import paths
 import matplotlib.pyplot as plt
+import numpy as np
+import scipy
+from mne.stats import permutation_cluster_1samp_test
 
 #----- Path -----#
 exp_info = setup.exp_info()
 
 #----- Save data and display figures -----#
 save_data = False
-save_fig = False
-display_figs = True
+save_fig = True
+display_figs = False
 if display_figs:
     plt.ion()
 else:
@@ -23,7 +27,7 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'parietal_occipital_temporal'
+chs_id = 'parietal_occipital'
 # ICA / RAW
 use_ica_data = True
 corr_ans = None
@@ -31,11 +35,12 @@ tgt_pres = None
 mss = None
 epoch_id = 'ms'
 
-# Power frequency range
+# Time frequency params
 l_freq = 1
 h_freq = 40
 log_bands = False
-n_cycles = 2
+n_cycles = 2.
+return_itc = False
 
 # Baseline method
 bline_mode = 'logratio'
@@ -92,7 +97,7 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
     trf_diff_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + save_path
 
     # Save figures paths
-    plot_path = f'/{save_id}_bline{baseline}/'
+    plot_path = f'/{save_id}_bline{baseline}_cycles{n_cycles}/'
     trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + plot_path + f'{chs_id}/'
 
     # Grand average data variable
@@ -101,218 +106,388 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
     grand_avg_power_cross2_fname = f'Grand_Average_power_cross2_{l_freq}_{h_freq}_tfr.h5'
     grand_avg_itc_cross2_fname = f'Grand_Average_itc_cross2_{l_freq}_{h_freq}_tfr.h5'
 
-    # Grand Average
-    try:
-        # Load previous power data
-        grand_avg_power_ms_diff = mne.time_frequency.read_tfrs(trf_diff_save_path + grand_avg_power_ms_fname)[0]
-        grand_avg_power_cross2_diff = mne.time_frequency.read_tfrs(trf_diff_save_path + grand_avg_power_cross2_fname)[0]
-        # Load previous itc data
-        grand_avg_itc_ms_diff = mne.time_frequency.read_tfrs(trf_diff_save_path + grand_avg_itc_ms_fname)[0]
-        grand_avg_itc_cross2_diff = mne.time_frequency.read_tfrs(trf_diff_save_path + grand_avg_itc_cross2_fname)[0]
+    # # Grand Average
+    # try:
+    #     # Load previous power data
+    #     grand_avg_power_ms_diff = mne.time_frequency.read_tfrs(trf_diff_save_path + grand_avg_power_ms_fname)[0]
+    #     grand_avg_power_cross2_diff = mne.time_frequency.read_tfrs(trf_diff_save_path + grand_avg_power_cross2_fname)[0]
+    #     # Load previous itc data
+    #     grand_avg_itc_ms_diff = mne.time_frequency.read_tfrs(trf_diff_save_path + grand_avg_itc_ms_fname)[0]
+    #     grand_avg_itc_cross2_diff = mne.time_frequency.read_tfrs(trf_diff_save_path + grand_avg_itc_cross2_fname)[0]
+    #
+    #     # Pick plot channels
+    #     picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg_power_ms_diff.info)
+    #
+    # except:
 
-        # Pick plot channels
-        picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg_power_ms_diff.info)
+    averages_power_ms_diff = []
+    averages_itc_ms_diff = []
+    averages_power_cross2_diff = []
+    averages_itc_cross2_diff = []
 
-    except:
+    # Variables to store data as array for TFCE
+    data_power_ms_diff = []
+    data_power_cross2_diff = []
 
-        averages_power_ms_diff = []
-        averages_itc_ms_diff = []
-        averages_power_cross2_diff = []
-        averages_itc_cross2_diff = []
+    all_bads = []
 
-        for subject_code in exp_info.subjects_ids:
-            # Define save path and file name for loading and saving epoched, evoked, and GA data
-            if use_ica_data:
-                # Load subject object
-                subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
-            else:
-                # Load subject object
-                subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
+    for subject_code in exp_info.subjects_ids:
+        # Define save path and file name for loading and saving epoched, evoked, and GA data
+        if use_ica_data:
+            # Load subject object
+            subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
+        else:
+            # Load subject object
+            subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
 
-            # Load data filenames
-            power_data_fname = f'Power_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
-            itc_data_fname = f'ITC_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
-            epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+        # Load data filenames
+        power_data_fname = f'Power_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
+        itc_data_fname = f'ITC_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
+        epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
 
-            # Subject plots path
-            trf_fig_path_subj = trf_fig_path + f'{subject.subject_id}/'
+        # Subject plots path
+        trf_fig_path_subj = trf_fig_path + f'{subject.subject_id}/'
 
+        try:
+            # Load difference data
+            power_diff_ms = mne.time_frequency.read_tfrs(trf_diff_save_path + 'ms_' + power_data_fname, condition=0)
+            itc_diff_ms = mne.time_frequency.read_tfrs(trf_diff_save_path + 'ms_' + itc_data_fname, condition=0)
+            power_diff_cross2 = mne.time_frequency.read_tfrs(trf_diff_save_path + 'cross2_' + power_data_fname, condition=0)
+            itc_diff_cross2 = mne.time_frequency.read_tfrs(trf_diff_save_path + 'cross2_' + itc_data_fname, condition=0)
+        except:
+            # Compute difference
             try:
-                # Load difference data
-                power_diff_ms = mne.time_frequency.read_tfrs(trf_diff_save_path + 'ms_' + power_data_fname, condition=0)
-                itc_diff_ms = mne.time_frequency.read_tfrs(trf_diff_save_path + 'ms_' + itc_data_fname, condition=0)
-                power_diff_cross2 = mne.time_frequency.read_tfrs(trf_diff_save_path + 'cross2_' + power_data_fname, condition=0)
-                itc_diff_cross2 = mne.time_frequency.read_tfrs(trf_diff_save_path + 'cross2_' + itc_data_fname, condition=0)
+                # Load previous data
+                power_mssl = mne.time_frequency.read_tfrs(trf_load_path_mssl + power_data_fname, condition=0)
+                power_mssh = mne.time_frequency.read_tfrs(trf_load_path_mssh + power_data_fname, condition=0)
+                itc_mssl = mne.time_frequency.read_tfrs(trf_load_path_mssl + itc_data_fname, condition=0)
+                itc_mssh = mne.time_frequency.read_tfrs(trf_load_path_mssh + itc_data_fname, condition=0)
             except:
-                # Compute difference
                 try:
-                    # Load previous data
-                    power_mssl = mne.time_frequency.read_tfrs(trf_load_path_mssl + power_data_fname, condition=0)
-                    power_mssh = mne.time_frequency.read_tfrs(trf_load_path_mssh + power_data_fname, condition=0)
-                    itc_mssl = mne.time_frequency.read_tfrs(trf_load_path_mssl + itc_data_fname, condition=0)
-                    itc_mssh = mne.time_frequency.read_tfrs(trf_load_path_mssh + itc_data_fname, condition=0)
+                    # Compute power using saved epoched data
+                    for mss, tmin, tmax, epochs_load_path, trf_save_path in zip((mssl, mssh), (tmin_mssl, tmin_mssh),
+                                                                                (tmax_mssl, tmax_mssh),
+                                                                                (epochs_load_path_mssl,
+                                                                                 epochs_load_path_mssh),
+                                                                                (trf_load_path_mssl,
+                                                                                 trf_load_path_mssh)):
+                        # Load epoched data
+                        epochs = mne.read_epochs(epochs_load_path + epochs_data_fname)
+                        # Compute power and PLI over frequencies
+                        power_epochs = functions_analysis.time_frequency(epochs=epochs, l_freq=l_freq, h_freq=h_freq,
+                                                                         freqs_type=freqs_type, average=False,
+                                                                         return_itc=return_itc, output='complex',
+                                                                         n_cycles_div=n_cycles, save_data=save_data,
+                                                                         trf_save_path=trf_save_path,
+                                                                         power_data_fname=power_data_fname,
+                                                                         itc_data_fname=itc_data_fname)
+
+                        if return_itc:
+                            power_epochs, itc_epochs = power_epochs
+
                 except:
-                    try:
-                        # Compute power using saved epoched data
-                        for mss, tmin, tmax, epochs_load_path, trf_save_path in zip((mssl, mssh), (tmin_mssl, tmin_mssh),
-                                                                                    (tmax_mssl, tmax_mssh),
-                                                                                    (epochs_load_path_mssl,
-                                                                                     epochs_load_path_mssh),
-                                                                                    (trf_load_path_mssl,
-                                                                                     trf_load_path_mssh)):
-                            # Load epoched data
-                            epochs = mne.read_epochs(epochs_load_path + epochs_data_fname)
-                            # Compute power and PLI over frequencies
-                            power, itc = functions_analysis.time_frequency(epochs=epochs, l_freq=l_freq, h_freq=h_freq,
-                                                                           freqs_type=freqs_type,
-                                                                           n_cycles_div=2., save_data=save_data,
-                                                                           trf_save_path=trf_save_path,
-                                                                           power_data_fname=power_data_fname,
-                                                                           itc_data_fname=itc_data_fname)
-                    except:
-                        if use_ica_data:
-                            # Load meg data
-                            meg_data = load.ica_data(subject=subject)
-                        else:
-                            # Load meg data
-                            meg_data = subject.load_preproc_meg_data()
-                        for mss, tmin, tmax, epochs_save_path, trf_save_path in zip((mssl, mssh), (tmin_mssl, tmin_mssh),
-                                                                                    (tmax_mssl, tmax_mssh),
-                                                                                    (epochs_load_path_mssl,
-                                                                                     epochs_load_path_mssh),
-                                                                                    (trf_load_path_mssl,
-                                                                                     trf_load_path_mssh)):
-                            # Epoch data
-                            epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans,
-                                                                           tgt_pres=tgt_pres, epoch_id=epoch_id, meg_data=meg_data,
-                                                                           tmin=tmin, tmax=tmax, reject=dict(mag=1),
-                                                                           save_data=save_data, epochs_save_path=epochs_save_path,
-                                                                           epochs_data_fname=epochs_data_fname)
+                    if use_ica_data:
+                        # Load meg data
+                        meg_data = load.ica_data(subject=subject)
+                    else:
+                        # Load meg data
+                        meg_data = subject.load_preproc_meg_data()
+                    for mss, tmin, tmax, epochs_save_path, trf_save_path in zip((mssl, mssh), (tmin_mssl, tmin_mssh),
+                                                                                (tmax_mssl, tmax_mssh),
+                                                                                (epochs_load_path_mssl,
+                                                                                 epochs_load_path_mssh),
+                                                                                (trf_load_path_mssl,
+                                                                                 trf_load_path_mssh)):
+                        # Epoch data
+                        epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans,
+                                                                       tgt_pres=tgt_pres, epoch_id=epoch_id, meg_data=meg_data,
+                                                                       tmin=tmin, tmax=tmax, reject=dict(mag=1),
+                                                                       save_data=save_data, epochs_save_path=epochs_save_path,
+                                                                       epochs_data_fname=epochs_data_fname)
 
-                            # Compute power and PLI over frequencies
-                            power, itc = functions_analysis.time_frequency(epochs=epochs, l_freq=l_freq, h_freq=h_freq,
-                                                                           freqs_type=freqs_type,
-                                                                           n_cycles_div=2., save_data=save_data,
-                                                                           trf_save_path=trf_save_path,
-                                                                           power_data_fname=power_data_fname,
-                                                                           itc_data_fname=itc_data_fname)
+                        # Compute power and PLI over frequencies
+                        power_epochs = functions_analysis.time_frequency(epochs=epochs, l_freq=l_freq, h_freq=h_freq,
+                                                                         freqs_type=freqs_type, n_cycles_div=n_cycles,
+                                                                         average=False, return_itc=return_itc, output='complex',
+                                                                         save_data=save_data, trf_save_path=trf_save_path,
+                                                                         power_data_fname=power_data_fname,
+                                                                         itc_data_fname=itc_data_fname)
 
-                    # Load previous data
-                    power_mssl = mne.time_frequency.read_tfrs(trf_load_path_mssl + power_data_fname, condition=0)
-                    power_mssh = mne.time_frequency.read_tfrs(trf_load_path_mssh + power_data_fname, condition=0)
-                    itc_mssl = mne.time_frequency.read_tfrs(trf_load_path_mssl + itc_data_fname, condition=0)
-                    itc_mssh = mne.time_frequency.read_tfrs(trf_load_path_mssh + itc_data_fname, condition=0)
+                        if return_itc:
+                            power_epochs, itc_epochs = power_epochs
 
-                # Apply baseline to power and itc
-                power_mssl.apply_baseline(baseline=baseline, mode=bline_mode)
-                power_mssh.apply_baseline(baseline=baseline, mode=bline_mode)
-                itc_mssl.apply_baseline(baseline=baseline, mode=bline_mode)
-                itc_mssh.apply_baseline(baseline=baseline, mode=bline_mode)
+                # Load previous data
+                power_mssl = mne.time_frequency.read_tfrs(trf_load_path_mssl + power_data_fname, condition=0)
+                power_mssh = mne.time_frequency.read_tfrs(trf_load_path_mssh + power_data_fname, condition=0)
+                itc_mssl = mne.time_frequency.read_tfrs(trf_load_path_mssl + itc_data_fname, condition=0)
+                itc_mssh = mne.time_frequency.read_tfrs(trf_load_path_mssh + itc_data_fname, condition=0)
 
-                # Get time windows to compare
-                # mssl
-                mssl_ms_window_times = (-cross1_dur, mss_duration[mssl])
-                mssl_cross2_window_times = (mss_duration[mssl], mss_duration[mssl] + cross2_dur)
-                power_mssl_ms = power_mssl.copy().crop(tmin=mssl_ms_window_times[0], tmax=mssl_ms_window_times[1])
-                itc_mssl_ms = itc_mssl.copy().crop(tmin=mssl_ms_window_times[0], tmax=mssl_ms_window_times[1])
-                power_mssl_cross2 = power_mssl.copy().crop(tmin=mssl_cross2_window_times[0], tmax=mssl_cross2_window_times[1])
-                itc_mssl_cross2 = itc_mssl.copy().crop(tmin=mssl_cross2_window_times[0], tmax=mssl_cross2_window_times[1])
-                # mssh
-                mssh_cross2_window_times = (mss_duration[mssh], mss_duration[mssh] + cross2_dur)
-                power_mssh_ms = power_mssh.copy().crop(tmin=mssl_ms_window_times[0], tmax=mssl_ms_window_times[1])
-                itc_mssh_ms = itc_mssh.copy().crop(tmin=mssl_ms_window_times[0], tmax=mssl_ms_window_times[1])
-                # Force matching times by copying variable and changin data
-                power_mssh_cross2 = power_mssl_cross2.copy()
-                power_mssh_cross2.data = power_mssh.copy().crop(tmin=mssh_cross2_window_times[0], tmax=mssh_cross2_window_times[1]).data
-                itc_mssh_cross2 = itc_mssl_cross2.copy()
-                itc_mssh_cross2.data = itc_mssh.copy().crop(tmin=mssh_cross2_window_times[0], tmax=mssh_cross2_window_times[1]).data
 
-                # Condition difference
-                # MS
-                power_diff_ms = power_mssh_ms - power_mssl_ms
-                itc_diff_ms = itc_mssh_ms - itc_mssl_ms
-                # Cross2
-                power_diff_cross2 = power_mssh_cross2 - power_mssl_cross2
-                itc_diff_cross2 = itc_mssh_cross2 - itc_mssl_cross2
+            # Extra Sources
+            # csd = mne.time_frequency.csd_tfr(power_epochs, tmin=0, tmax=None)
+            # csd_baseline = mne.time_frequency.csd_tfr(power_epochs, tmin=None, tmax=0)
+            h_freq = 12
+            l_freq = 8
+            freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)
+            freqs = [10]
+            csd = mne.time_frequency.csd_morlet(epochs, freqs, tmin=0, decim=20, n_jobs=4)
+            csd_baseline = mne.time_frequency.csd_morlet(epochs, freqs, tmax=0, decim=20, n_jobs=4)
 
-                # Save data
-                if save_data:
-                    # Save epoched data
-                    os.makedirs(trf_diff_save_path, exist_ok=True)
-                    power_diff_ms.save(trf_diff_save_path + 'ms_' + power_data_fname, overwrite=True)
-                    itc_diff_ms.save(trf_diff_save_path + 'ms_' + itc_data_fname, overwrite=True)
-                    power_diff_cross2.save(trf_diff_save_path + 'cross2_' + power_data_fname, overwrite=True)
-                    itc_diff_cross2.save(trf_diff_save_path + 'cross2_' + itc_data_fname, overwrite=True)
+            sources_path_subject = paths().sources_path() + subject.subject_id
+            ico = 5
+            spacing = 5
+            fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
 
-            # Append data for GA
+            fwd = mne.read_forward_solution(fname_fwd)
+
+            # rank
+            rank = sum([ch_type == 'mag' for ch_type in epochs.get_channel_types()]) - len(epochs.info['bads'])
+            if use_ica_data:
+                rank -= len(subject.ex_components)
+
+            # compute scalar DICS beamfomer
+            filters = mne.beamformer.make_dics(
+                epochs.info,
+                fwd,
+                csd,
+                noise_csd=csd_baseline,
+                pick_ori=None,
+                rank=dict(mag=rank),
+                real_filter=True,
+            )
+
+            # project the TFR for each epoch to source space
+            epochs_stcs = mne.beamformer.apply_dics_epochs(epochs, filters, return_generator=False)
+            # epochs_stcs = mne.beamformer.apply_dics_csd(csd, filters)
+
+            # average across frequencies and epochs
+            data = np.zeros((fwd["nsource"], epochs.times.size))
+            for epoch_stcs in epochs_stcs:
+                for stc in epoch_stcs:
+                    data += (stc.data * np.conj(stc.data)).real
+
+            stc.data = data / len(epochs) / len(freqs)
+
+            # apply a baseline correction
+            epochs_stcs.apply_baseline(baseline=baseline, mode=bline_mode)
+
+            subjects_dir = os.path.join(paths().mri_path(), 'FreeSurfer_out')
+            fmax = 4500
+            brain = epochs_stcs.plot(
+                subjects_dir=subjects_dir,
+                hemi="both",
+                views="dorsal",
+                initial_time=0.55,
+                brain_kwargs=dict(show=False),
+                add_data_kwargs=dict(
+                    fmin=fmax / 10,
+                    fmid=fmax / 2,
+                    fmax=fmax,
+                    scale_factor=0.0001,
+                    colorbar_kwargs=dict(label_font_size=10),
+                ),
+            )
+
+
+            # Apply baseline to power and itc
+            power_mssl.apply_baseline(baseline=baseline, mode=bline_mode)
+            power_mssh.apply_baseline(baseline=baseline, mode=bline_mode)
+            itc_mssl.apply_baseline(baseline=baseline, mode=bline_mode)
+            itc_mssh.apply_baseline(baseline=baseline, mode=bline_mode)
+
+            # Get time windows to compare
+            # mssl
+            mssl_ms_window_times = (-cross1_dur, mss_duration[mssl])
+            mssl_cross2_window_times = (mss_duration[mssl], mss_duration[mssl] + cross2_dur)
+            power_mssl_ms = power_mssl.copy().crop(tmin=mssl_ms_window_times[0], tmax=mssl_ms_window_times[1])
+            itc_mssl_ms = itc_mssl.copy().crop(tmin=mssl_ms_window_times[0], tmax=mssl_ms_window_times[1])
+            power_mssl_cross2 = power_mssl.copy().crop(tmin=mssl_cross2_window_times[0], tmax=mssl_cross2_window_times[1])
+            itc_mssl_cross2 = itc_mssl.copy().crop(tmin=mssl_cross2_window_times[0], tmax=mssl_cross2_window_times[1])
+            # mssh
+            mssh_cross2_window_times = (mss_duration[mssh], mss_duration[mssh] + cross2_dur)
+            power_mssh_ms = power_mssh.copy().crop(tmin=mssl_ms_window_times[0], tmax=mssl_ms_window_times[1])
+            itc_mssh_ms = itc_mssh.copy().crop(tmin=mssl_ms_window_times[0], tmax=mssl_ms_window_times[1])
+            # Force matching times by copying variable and changin data
+            power_mssh_cross2 = power_mssl_cross2.copy()
+            power_mssh_cross2.data = power_mssh.copy().crop(tmin=mssh_cross2_window_times[0], tmax=mssh_cross2_window_times[1]).data
+            itc_mssh_cross2 = itc_mssl_cross2.copy()
+            itc_mssh_cross2.data = itc_mssh.copy().crop(tmin=mssh_cross2_window_times[0], tmax=mssh_cross2_window_times[1]).data
+
+            # Condition difference
             # MS
-            averages_power_ms_diff.append(power_diff_ms)
-            averages_itc_ms_diff.append(itc_diff_ms)
+            power_diff_ms = power_mssh_ms - power_mssl_ms
+            itc_diff_ms = itc_mssh_ms - itc_mssl_ms
             # Cross2
-            averages_power_cross2_diff.append(power_diff_cross2)
-            averages_itc_cross2_diff.append(itc_diff_cross2)
+            power_diff_cross2 = power_mssh_cross2 - power_mssl_cross2
+            itc_diff_cross2 = itc_mssh_cross2 - itc_mssl_cross2
 
-            # Plot power time-frequency
-            # MS
-            fname = f'Power_ms_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-            plot_general.tfr_bands(subject=subject, tfr=power_diff_ms, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
-                             cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
-                             display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
-            # Cross2
-            fname = f'Power_cross2_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-            plot_general.tfr_bands(subject=subject, tfr=power_diff_cross2, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
-                             cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
-                             display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
+            # Save data
+            if save_data:
+                # Save epoched data
+                os.makedirs(trf_diff_save_path, exist_ok=True)
+                power_diff_ms.save(trf_diff_save_path + 'ms_' + power_data_fname, overwrite=True)
+                itc_diff_ms.save(trf_diff_save_path + 'ms_' + itc_data_fname, overwrite=True)
+                power_diff_cross2.save(trf_diff_save_path + 'cross2_' + power_data_fname, overwrite=True)
+                itc_diff_cross2.save(trf_diff_save_path + 'cross2_' + itc_data_fname, overwrite=True)
 
-            # Plot ITC time-frequency
-            # MS
-            fname = f'ITC_ms_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-            plot_general.tfr_bands(subject=subject, tfr=itc_diff_ms, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
-                             cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
-                             display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
-            # Cross2
-            fname = f'ITC_cross2_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-            plot_general.tfr_bands(subject=subject, tfr=itc_diff_cross2, chs_id=chs_id, epoch_id=epoch_id, mss=mss,
-                             cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur,
-                             display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
+        # Append data for GA
+        # MS
+        averages_power_ms_diff.append(power_diff_ms)
+        averages_itc_ms_diff.append(itc_diff_ms)
+        # Cross2
+        averages_power_cross2_diff.append(power_diff_cross2)
+        averages_itc_cross2_diff.append(itc_diff_cross2)
 
-            # Power topoplot
-            # MS
-            fig = power_diff_ms.plot_topo(cmap='jet', show=display_figs, title='Power', baseline=baseline, mode=bline_mode)
-            if save_fig:
-                fname = f'Power_ms_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-                save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
-            # Cross2
-            fig = power_diff_ms.plot_topo(cmap='jet', show=display_figs, title='Power')
-            if save_fig:
-                fname = f'Power_itc_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-                save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
+        # Append subjects bad channels to all bad channels list
+        meg_data = load.ica_data(subject=subject)
+        all_bads.append(meg_data.info['bads'])
 
-            # ITC topoplot
-            # MS
-            fig = itc_diff_ms.plot_topo(cmap='jet', show=display_figs, title='Inter-Trial coherence', baseline=baseline, mode=bline_mode)
-            if save_fig:
-                fname = f'ITC_ms_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-                save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
-            # Cross2
-            fig = itc_diff_cross2.plot_topo(cmap='jet', show=display_figs, title='Inter-Trial coherence')
-            if save_fig:
-                fname = f'ITC_cross2_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-                save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
+        # Append subjects trf data to list as dataframe
+        data_power_ms_diff.append(power_diff_ms.to_data_frame())
+        data_power_cross2_diff.append(power_diff_cross2.to_data_frame())
 
-        # Compute grand average
-        grand_avg_power_ms_diff = mne.grand_average(averages_power_ms_diff)
-        grand_avg_itc_ms_diff = mne.grand_average(averages_itc_ms_diff)
-        grand_avg_power_cross2_diff = mne.grand_average(averages_power_cross2_diff)
-        grand_avg_itc_cross2_diff = mne.grand_average(averages_itc_cross2_diff)
 
-        if save_data:
-            # Save trf data
-            grand_avg_power_ms_diff.save(trf_diff_save_path + grand_avg_power_ms_fname, overwrite=True)
-            grand_avg_power_cross2_diff.save(trf_diff_save_path + grand_avg_power_cross2_fname, overwrite=True)
-            grand_avg_itc_ms_diff.save(trf_diff_save_path + grand_avg_itc_ms_fname, overwrite=True)
-            grand_avg_itc_cross2_diff.save(trf_diff_save_path + grand_avg_itc_cross2_fname, overwrite=True)
+        # # Plot power time-frequency
+        # # MS
+        # fname = f'Power_ms_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        # plot_general.tfr_bands(subject=subject, tfr=power_diff_ms, chs_id=chs_id,
+        #                  display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
+        # # Cross2
+        # fname = f'Power_cross2_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        # plot_general.tfr_bands(subject=subject, tfr=power_diff_cross2, chs_id=chs_id,
+        #                  display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
+        #
+        # # Plot ITC time-frequency
+        # # MS
+        # fname = f'ITC_ms_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        # plot_general.tfr_bands(subject=subject, tfr=itc_diff_ms, chs_id=chs_id,
+        #                  display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
+        # # Cross2
+        # fname = f'ITC_cross2_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        # plot_general.tfr_bands(subject=subject, tfr=itc_diff_cross2, chs_id=chs_id,
+        #                  display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
+        #
+        # # Power topoplot
+        # # MS
+        # fig = power_diff_ms.plot_topo(cmap='jet', show=display_figs, title='Power', baseline=baseline, mode=bline_mode)
+        # if save_fig:
+        #     fname = f'Power_ms_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        #     save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
+        # # Cross2
+        # fig = power_diff_ms.plot_topo(cmap='jet', show=display_figs, title='Power')
+        # if save_fig:
+        #     fname = f'Power_itc_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        #     save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
+        #
+        # # ITC topoplot
+        # # MS
+        # fig = itc_diff_ms.plot_topo(cmap='jet', show=display_figs, title='Inter-Trial coherence', baseline=baseline, mode=bline_mode)
+        # if save_fig:
+        #     fname = f'ITC_ms_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        #     save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
+        # # Cross2
+        # fig = itc_diff_cross2.plot_topo(cmap='jet', show=display_figs, title='Inter-Trial coherence')
+        # if save_fig:
+        #     fname = f'ITC_cross2_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        #     save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
 
+    # Compute grand average
+    grand_avg_power_ms_diff = mne.grand_average(averages_power_ms_diff)
+    grand_avg_itc_ms_diff = mne.grand_average(averages_itc_ms_diff)
+    grand_avg_power_cross2_diff = mne.grand_average(averages_power_cross2_diff)
+    grand_avg_itc_cross2_diff = mne.grand_average(averages_itc_cross2_diff)
+
+    if save_data:
+        # Save trf data
+        grand_avg_power_ms_diff.save(trf_diff_save_path + grand_avg_power_ms_fname, overwrite=True)
+        grand_avg_power_cross2_diff.save(trf_diff_save_path + grand_avg_power_cross2_fname, overwrite=True)
+        grand_avg_itc_ms_diff.save(trf_diff_save_path + grand_avg_itc_ms_fname, overwrite=True)
+        grand_avg_itc_cross2_diff.save(trf_diff_save_path + grand_avg_itc_cross2_fname, overwrite=True)
+
+    # Make subjects difference data to array to implement in TFCE
+    picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg_power_ms_diff.info)
+
+    # Get unique bad channels
+    all_bads_set = [bad for bads_subject in all_bads for bad in bads_subject]
+    all_bads_set = list(set(all_bads_set))
+
+    data_power_ms_diff_array = []
+    data_power_cross2_diff_array = []
+
+    print('Deletting bad channels columns from data...')
+    for i in range(len(data_power_ms_diff)):
+        # Drop bad channels from data
+        data_power_ms_diff[i].drop(all_bads_set, axis='columns', errors='ignore', inplace=True)
+        data_power_cross2_diff[i].drop(all_bads_set, axis='columns', errors='ignore', inplace=True)
+
+        # Keep selected channels
+        data_power_ms_diff[i] = data_power_ms_diff[i][data_power_ms_diff[i].columns & picks+[]]
+        data_power_cross2_diff[i] = data_power_cross2_diff[i][data_power_cross2_diff[i].columns & picks]
+
+        # Convert to array and drop times and frequencies
+        data_power_ms_diff_array.append(data_power_ms_diff[i].to_numpy().reshape(len(power_diff_ms.freqs),
+                                                                                 len(power_diff_ms.times),
+                                                                                 data_power_ms_diff[i].to_numpy().shape[-1]).mean(-1))
+        data_power_cross2_diff_array.append(data_power_cross2_diff[i].to_numpy().reshape(len(power_diff_cross2.freqs), len(power_diff_cross2.times),
+                                                     data_power_cross2_diff[i].to_numpy().shape[-1]).mean(-1))
+
+    # Make array of all subjects
+    data_power_ms_diff_array = np.stack(data_power_ms_diff_array, axis=-1)
+    data_power_cross2_diff_array = np.stack(data_power_cross2_diff_array, axis=-1)
+
+    data_power_ms_diff_array = np.moveaxis(data_power_ms_diff_array, [-1], [0])
+    data_power_cross2_diff_array = np.moveaxis(data_power_cross2_diff_array, [-1], [0])
+
+    for data, ga, title in zip([data_power_ms_diff_array], [grand_avg_power_ms_diff], ['ms']):
+
+        # Permutation cluster test parameters
+        n_permutations = 1024
+        degrees_of_freedom = len(exp_info.subjects_ids) - 1
+        desired_pval = 0.01
+        # t_thresh = scipy.stats.t.ppf(1 - desired_pval / 2, df=degrees_of_freedom)
+        t_thresh = dict(start=0, step=0.2)
+        # Get channel adjacency
+        ch_adjacency_sparse = functions_general.get_channel_adjacency(info=meg_data.info, ch_type='mag', picks=picks, bads=all_bads_set)
+        # Clusters out type
+        if type(t_thresh) == dict:
+            out_type = 'indices'
+        else:
+            out_type = 'mask'
+
+        # Permutations cluster test (TFCE if t_thresh as dict)
+        t_tfce, clusters, p_tfce, H0 = permutation_cluster_1samp_test(X=data, threshold=t_thresh,
+                                                                      n_permutations=n_permutations, out_type=out_type)
+
+        pval_threshold = 0.05
+        # Make clusters mask
+        if type(t_thresh) == dict:
+            # If TFCE use p-vaues of voxels directly
+            p_tfce = p_tfce.reshape(data.shape[-2:])
+
+            # Reshape to data's shape
+            clusters_mask = p_tfce < pval_threshold
+            clusters_mask = clusters_mask
+        else:
+            # Get significant clusters
+            good_clusters_idx = np.where(p_tfce < pval_threshold)[0]
+            significant_clusters = [clusters[idx] for idx in good_clusters_idx]
+
+            # Rehsape to data's shape by adding all clusters into one bool array
+            clusters_mask = np.zeros(clusters[0].shape)
+            for significant_cluster in significant_clusters:
+                clusters_mask += significant_cluster
+            # clusters_mask = clusters_mask.sum(axis=-1)
+            clusters_mask = clusters_mask.astype(bool)
+
+        image_args = {'mask': clusters_mask, 'mask_style': 'contour'}
+
+        # Power Plotjoint Cross2
+        fname = f'GA_Power_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_TFCE_pval_{pval_threshold}'
+        plot_general.tfr_plotjoint_picks(tfr=ga, plot_baseline=None, bline_mode=bline_mode,
+                                         image_args=image_args, chs_id=chs_id, plot_max=False, plot_min=True, vmin=-0.2,
+                                         vmax=0.2, display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path,
+                                         fname=fname)
+##
     # Plot Power time-frequency
     # MS
     # fname = f'Power_ms_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
@@ -361,15 +536,14 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
     #     fname = f'GA_ITC_cross2_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
     #     save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
-
     # Power Plotjoint MS
     fname = f'GA_Power_ms_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr_plotjoint_picks(tfr=grand_avg_power_ms_diff, plot_baseline=None, bline_mode=bline_mode,
+    plot_general.tfr_plotjoint_picks(tfr=grand_avg_power_ms_diff, plot_baseline=None, bline_mode=bline_mode, image_args=image_args,
                                      chs_id=chs_id, plot_max=False, plot_min=True, vmin=-0.1, vmax=0.1,
                                      display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
     # Power Plotjoint Cross2
-    fname = f'GA_Power_cross2_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr_plotjoint_picks(tfr=grand_avg_power_cross2_diff, plot_baseline=None, bline_mode=bline_mode,
+    fname = f'GA_Power_cross2_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_TFCE_signif_{pval_threshold}'
+    plot_general.tfr_plotjoint_picks(tfr=grand_avg_power_cross2_diff, plot_baseline=None, bline_mode=bline_mode, image_args=image_args,
                                      chs_id=chs_id, plot_max=False, plot_min=True, vmin=-0.1, vmax=0.1,
                                      display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
     # ITC Plotjoint MS

@@ -12,17 +12,11 @@ import mne.beamformer as beamformer
 exp_info = setup.exp_info()
 
 # --------- Setup ---------#
-subjects_mri = ['15909001', '15910001', '15950001', '15911001', '16191001', '16263002']
-
-subjects = ['15909001', '15912001', '15910001', '15950001', '15911001', '11535009', '16191001', '16200001',
-            '16201001', '10925091', '16263002', '16269001']
-
-# subjects = ['15910001', '15950001', '15911001', '16191001', '16263002']
 
 # Define surface or volume source space
 surf_vol = 'surface'
 use_ica_data = True
-force_fsaverage = False
+force_fsaverage = True
 ico = 4
 spacing = 10.
 pick_ori = None
@@ -37,7 +31,7 @@ dig_path = paths().opt_path()
 
 # --------- Coregistration ---------#
 # Iterate over subjects
-for subject_code in subjects:
+for subject_code in exp_info.subjects_ids:
 
     if use_ica_data:
         # Load subject and meg clean data
@@ -186,7 +180,7 @@ for subject_code in subjects:
     elif surf_vol == 'surface':
         # Surface
         # Source model
-        fname_src = sources_path_subject + f'/{subject_code}_surface_ico{ico}-src.fif'
+        fname_src = sources_path + subject_code + f'/{subject_code}_surface_ico{ico}-src.fif'
         try:
             # Load
             src = mne.read_source_spaces(fname_src)
@@ -216,14 +210,14 @@ for subject_code in subjects:
         filters.save(fname=fname_lmcv, overwrite=True)
 
     elif surf_vol == 'mixed':
-        fname_src_mix = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}-src.fif'
+        fname_src_mix = sources_path + subject_code + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}-src.fif'
         try:
             # Load
             src_surf = mne.read_source_spaces(fname_src_surf)
         except:
             # Mixed
             # Surface source model
-            fname_src_surf = sources_path_subject + f'/{subject_code}_surface_ico{ico}-src.fif'
+            fname_src_surf = sources_path + subject_code + f'/{subject_code}_surface_ico{ico}-src.fif'
             try:
                 # Load
                 src_surf = mne.read_source_spaces(fname_src_surf)
