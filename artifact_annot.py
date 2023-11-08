@@ -13,14 +13,13 @@ preproc_path = paths().preproc_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
-for subject_code in exp_info.subjects_ids[14:]:
-# for subject_code in subject_ids:
+for subject_code in exp_info.subjects_ids:
 
-    # --------- Load data ---------#
+    #--------- Load data ---------#
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
     meg_data = subject.load_preproc_meg_data()
 
-    # --------- Visual annotation ---------#
+    #--------- Visual annotation ---------#
     meg_data_visual = meg_data.copy()
     fig = meg_data_visual.pick_types(meg=True).plot(duration=25, n_channels=271, scalings=dict(mag=0.6e-12))
     fig.fake_keypress('a')
@@ -33,16 +32,17 @@ for subject_code in exp_info.subjects_ids[14:]:
     annotations_muscle, scores_muscle = annotate_muscle_zscore(meg_data, ch_type="mag", threshold=threshold_muscle,
                                                                min_length_good=0.2, filter_freq=[110, 140])
 
-    # Include annotations in data by getting bad annotations, muscle anotations and adding them to the meg_data annotations
+    # Include bad annotations, muscle annotations and bad channels in data
     annotations_bad = meg_data_visual.annotations
     annotations_bad.delete(np.where(annotations_bad.description != 'bad')[0])
     meg_data.set_annotations(meg_data.annotations + annotations_muscle + annotations_bad)
+    meg_data.info['bads'] = meg_data_visual.info['bads']
 
     # Plot new PSD from annotated data
-    fig = meg_data.plot_psd(picks='mag', show=True)
+    fig_psd = meg_data.plot_psd(picks='mag', show=True)
     fig_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
     fig_name = 'Annot_PSD'
-    save.fig(fig=fig, path=fig_path, fname=fig_name)
+    save.fig(fig=fig_psd, path=fig_path, fname=fig_name)
 
     # Save MEG with new annotations and muscle nans
     preproc_save_path = preproc_path + subject.subject_id + '/'
