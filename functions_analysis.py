@@ -206,27 +206,14 @@ def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', fi
     :return: ocular_components
     '''
 
-    # Screen
-    screen = functions_general.get_screen(epoch_id=sac_id)
-    # MSS
-    mss = functions_general.get_mss(epoch_id=sac_id)
-    # Item
-    tgt = functions_general.get_item(epoch_id=sac_id)
-    # Saccades direction
-    dir = functions_general.get_dir(epoch_id=sac_id)
-
-    # ica_sources_meg_data = ica.get_sources(meg_downsampled)
-
     # Define events
     print('Saccades')
     sac_metadata, sac_events, sac_events_id, sac_metadata_sup = \
-        define_events(subject=subject, epoch_id=sac_id, screen=screen, mss=mss, dur=None,
-                                         tgt=tgt, dir=dir, meg_data=meg_downsampled)
+        define_events(subject=subject, epoch_id=sac_id, meg_data=meg_downsampled)
 
     print('Fixations')
     fix_metadata, fix_events, fix_events_id, fix_metadata_sup = \
-        define_events(subject=subject, epoch_id=fix_id, screen=screen, mss=mss, dur=None,
-                                         tgt=tgt, dir=dir, meg_data=meg_downsampled)
+        define_events(subject=subject, epoch_id=fix_id, meg_data=meg_downsampled)
 
     # Get time windows from epoch_id name
     sac_tmin = -0.005  # Add previous 5 ms

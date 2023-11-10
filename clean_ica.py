@@ -19,7 +19,7 @@ plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
 
-for subject_code in exp_info.subjects_ids:
+for subject_code in exp_info.subjects_ids[12:]:
 
     # Load data
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
@@ -74,9 +74,9 @@ for subject_code in exp_info.subjects_ids:
     # ID
     epoch_id = 'l_sac'
     # Get time windows from epoch_id name
-    tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
+    tmin, tmax = -0.05, 0.1
     # Specific run path for loading evoked data
-    run_path = f'/None/{epoch_id}_{tmin}_{tmax}/'
+    run_path = f'/Band_None/{epoch_id}_mssNone_Corr_None_tgt_None_{tmin}_{tmax}_bline({tmin}, 0)/'
     # load evoked data path
     epochs_save_path = paths().save_path() + f'Epochs_RAW/' + run_path
     evoked_save_path = paths().save_path() + f'Evoked_RAW/' + run_path
@@ -130,10 +130,11 @@ for subject_code in exp_info.subjects_ids:
         plt.close(fig)
 
     # Visual inspection of sources for further artefactual components identification
-    ica.plot_sources(meg_downsampled, title='ICA', block=True)
+    ica.plot_sources(meg_downsampled, title='ICA')
 
     # Select bad components by variable
     ex_components = []
+    before_after = ica.plot_overlay(inst=sac_evoked, exclude=ex_components, show=True)
 
     # Select bad components by input
     if not len(ex_components):

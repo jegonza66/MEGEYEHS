@@ -11,10 +11,10 @@ exp_info = setup.exp_info()
 # config = load.config(path=paths().config_path(), fname='config.pkl')
 config = setup.config()
 # Run plots
-plot = True
+plot = False
 
 # Run
-for subject_code in exp_info.subjects_ids[13:]:
+for subject_code in exp_info.subjects_ids[12:]:
 
     # ---------------- Load data ----------------#
     # Define subject
@@ -88,16 +88,17 @@ for subject_code in exp_info.subjects_ids[13:]:
     functions_preproc.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=exp_info.et_channel_names)
 
     # ---------------- Filter line noise ----------------#
-    filtered_data = functions_preproc.filter_line_noise(subject=subject, raw=raw, freqs=exp_info.line_noise_freqs)
+    filtered_data = functions_preproc.filter_line_noise(subject=subject, raw=raw,
+                                                        freqs=(50, 57, 100, 109, 150, 200, 250, 300))
 
     # Extra Add clean annotations to meg data
-    # import mne
-    #
-    # preproc_data_path = paths().preproc_path()
-    # preproc_save_path = preproc_data_path + subject.subject_id + '/'
-    # file_path = preproc_save_path + 'clean_annotations.csv'
-    # clean_annotations = mne.read_annotations(fname=file_path)
-    # filtered_data.set_annotations(clean_annotations)
+    import mne
+
+    preproc_data_path = paths().preproc_path()
+    preproc_save_path = preproc_data_path + subject.subject_id + '/'
+    file_path = preproc_save_path + 'clean_annotations.csv'
+    clean_annotations = mne.read_annotations(fname=file_path)
+    filtered_data.set_annotations(clean_annotations)
 
     # Add bad channels
     filtered_data.info['bads'] = subject.bad_channels

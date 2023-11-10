@@ -31,11 +31,11 @@ use_ica_data = False
 # Frequency band
 band_id = None
 # Id
-epoch_id = 'fix_vs'
+epoch_id = 'l_sac'
 # Plot channels
 chs_id = 'mag'
 # PLots
-plot_epochs = False
+plot_epochs = True
 plot_gaze = True
 corr_ans = None
 tgt_pres = None
@@ -43,7 +43,7 @@ mss = None
 reject = None
 
 # Get time windows from epoch_id name
-map_times = dict(sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)},
+map_times = dict(l_sac={'tmin': -0.05, 'tmax': 0.1, 'plot_xlim': (-0.05, 0.05)},
                  fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.2, 0.5)})
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
 # Baseline

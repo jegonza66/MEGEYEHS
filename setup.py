@@ -72,7 +72,7 @@ class exp_info:
                                       '17009001': ['MLT12', 'MRF45', 'MRF25', 'MLT22', 'MLT23', 'MLT13', 'MLT11'],
                                       '17010001': ['MRF25', 'MRF45'],
                                       '13229006': ['MRF45'],
-                                      '16991002': ['MRF45']
+                                      '16991002': ['MRF45', 'MLT33']
                                       }
 
         # Distance to the screen during the experiment
