@@ -40,7 +40,7 @@ for subject_code in exp_info.subjects_ids:
         data_type = 'ICA'
     else:
         subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-        meg_data_orig = subject.load_preproc_meg_data()
+        meg_data = subject.load_preproc_meg_data()
         data_type = 'RAW'
 
     if force_fsaverage:
