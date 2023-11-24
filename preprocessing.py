@@ -1,5 +1,4 @@
 import os.path
-
 import setup
 import save
 import plot_preproc
@@ -17,7 +16,7 @@ config = setup.config()
 plot = False
 
 # Run
-for subject_code in exp_info.subjects_ids[12:]:
+for subject_code in exp_info.subjects_ids:
 
     # ---------------- Load data ----------------#
     # Define subject
@@ -92,7 +91,7 @@ for subject_code in exp_info.subjects_ids[12:]:
 
     #---------------- Filter line noise ----------------#
     filtered_data = functions_preproc.filter_line_noise(subject=subject, raw=raw,
-                                                        freqs=(50, 57, 100, 109, 150, 200, 250, 300))
+                                                        freqs=subject.config.preproc.line_noise_freqs)
 
     #---------------- Add clean annotations to meg data if already annotated ----------------#
     preproc_data_path = paths().preproc_path()
