@@ -1724,6 +1724,32 @@ def filter_line_noise(subject, raw, freqs=(50, 100, 110, 150, 200, 250, 300), di
     return filtered_data
 
 
+def set_digitlization(subject, meg_data):
+
+    # Load digitalization file
+    dig_path = paths().opt_path()
+    dig_path_subject = dig_path + subject.subject_id
+    dig_filepath = dig_path_subject + '/Model_Mesh_5m_headers.pos'
+    pos = pd.read_table(dig_filepath, index_col=0)
+
+    # Get fiducials from dig
+    nasion = pos.loc[pos.index == 'nasion ']
+    lpa = pos.loc[pos.index == 'left ']
+    rpa = pos.loc[pos.index == 'right ']
+
+    # Get head points
+    pos.drop(['nasion ', 'left ', 'right '], inplace=True)
+    pos_array = pos.to_numpy()
+
+    # Make montage
+    dig_montage = mne.channels.make_dig_montage(nasion=nasion.values.ravel(), lpa=lpa.values.ravel(),
+                                                rpa=rpa.values.ravel(), hsp=pos_array, coord_frame='unknown')
+
+    # Make info object
+    meg_data.info.set_montage(montage=dig_montage)
+
+    return meg_data
+
 
 ## OLD out of use
 

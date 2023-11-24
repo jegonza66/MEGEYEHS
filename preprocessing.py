@@ -1,8 +1,11 @@
+import os.path
+
 import setup
 import save
 import plot_preproc
 import functions_preproc
 from paths import paths
+import mne
 
 
 # Load experiment info
@@ -85,34 +88,41 @@ for subject_code in exp_info.subjects_ids[12:]:
             plot_preproc.emap_gaze(raw=raw, subject=subject, et_channels_meg=et_channels_meg, block_num=block_num)
 
     #---------------- Add scaled data to meg data ----------------#
-    functions_preproc.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=exp_info.et_channel_names)
+    raw = functions_preproc.add_et_channels(raw=raw, et_channels_meg=et_channels_meg, et_channel_names=exp_info.et_channel_names)
 
-    # ---------------- Filter line noise ----------------#
+    #---------------- Filter line noise ----------------#
     filtered_data = functions_preproc.filter_line_noise(subject=subject, raw=raw,
                                                         freqs=(50, 57, 100, 109, 150, 200, 250, 300))
 
-    # Extra Add clean annotations to meg data
-    import mne
-
+    #---------------- Add clean annotations to meg data if already annotated ----------------#
     preproc_data_path = paths().preproc_path()
     preproc_save_path = preproc_data_path + subject.subject_id + '/'
     file_path = preproc_save_path + 'clean_annotations.csv'
-    clean_annotations = mne.read_annotations(fname=file_path)
-    filtered_data.set_annotations(clean_annotations)
+    if os.path.exists(file_path):
+        clean_annotations = mne.read_annotations(fname=file_path)
+        filtered_data.set_annotations(clean_annotations)
 
-    # Add bad channels
+    #---------------- Add bad channels ----------------#
     filtered_data.info['bads'] = subject.bad_channels
 
-    # Plot new PSD from annotated data
+    #---------------- Plot new PSD from annotated data ----------------#
     fig = filtered_data.plot_psd(picks='mag')
     fig_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
     fig_name = 'Annot_PSD'
     save.fig(fig=fig, path=fig_path, fname=fig_name)
 
+    #---------------- Interpolate bads if any ----------------#
+    if len(filtered_data.info['bads']) > 0:
+        # Set digitalization info in meg_data
+        filtered_data = functions_preproc.set_digitlization(subject=subject, meg_data=filtered_data)
+
+        # Interpolate channels
+        filtered_data.interpolate_bads()
+
     #---------------- Save preprocesed data ----------------#
     save.preprocessed_data(raw=filtered_data, et_data_scaled=et_channels_meg, subject=subject, config=config)
 
-    # Free up memory
+    #---------------- Free up memory ----------------#
     del(raw)
     del(filtered_data)
     del(subject)
