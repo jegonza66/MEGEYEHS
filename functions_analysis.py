@@ -71,7 +71,7 @@ def define_events(subject, meg_data, epoch_id, trials=None, evt_dur=None, epoch_
 
 
 def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax, trial_dur=None, evt_dur=None,
-               baseline=(None, 0), reject=dict(mag=5e-12), save_data=False, epochs_save_path=None, epochs_data_fname=None):
+               baseline=(None, 0), reject=None, save_data=False, epochs_save_path=None, epochs_data_fname=None):
     '''
     :param subject:
     :param mss:
@@ -108,6 +108,8 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
         reject = None
     elif reject == 'subject':
         reject = dict(mag=subject.config.general.reject_amp)
+    elif reject == None:
+        reject = dict(mag=5e-12)
 
     # Epoch data
     epochs = mne.Epochs(raw=meg_data, events=events, event_id=events_id, tmin=tmin, tmax=tmax, reject=reject,
@@ -129,7 +131,7 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
 
 
 def time_frequency(epochs, l_freq, h_freq, freqs_type, n_cycles_div=4., average=True, return_itc=True, output='power',
-                   save_data=False, trf_save_path=None, power_data_fname=None, itc_data_fname=None):
+                   save_data=False, trf_save_path=None, power_data_fname=None, itc_data_fname=None, n_jobs=None):
 
     # Sanity check to save data
     if save_data and (not trf_save_path or not power_data_fname or not itc_data_fname):
@@ -145,7 +147,7 @@ def time_frequency(epochs, l_freq, h_freq, freqs_type, n_cycles_div=4., average=
     if return_itc:
         power, itc = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
                                                    average=average, output=output,
-                                                   return_itc=return_itc, decim=3, n_jobs=None, verbose=True)
+                                                   return_itc=return_itc, decim=3, n_jobs=n_jobs, verbose=True)
         if save_data:
             # Save trf data
             os.makedirs(trf_save_path, exist_ok=True)
@@ -156,7 +158,7 @@ def time_frequency(epochs, l_freq, h_freq, freqs_type, n_cycles_div=4., average=
 
     else:
         power = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True, average=average,
-                                              output=output, return_itc=return_itc, decim=3, n_jobs=None, verbose=True)
+                                              output=output, return_itc=return_itc, decim=3, n_jobs=n_jobs, verbose=True)
         if save_data:
             # Save trf data
             os.makedirs(trf_save_path, exist_ok=True)
@@ -194,7 +196,7 @@ def get_plot_tf(tfr, plot_xlim=(None, None), plot_max=True, plot_min=True):
     return timefreqs
 
 
-def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', fix_id='fix_emap' , threshold=1.1,
+def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', fix_id='fix_emap' , reject={'mag': 5e-12}, threshold=1.1,
                             plot_distributions=True):
     '''
     Ploch's algorithm for saccadic artifacts detection by variance comparison
@@ -223,10 +225,10 @@ def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', fi
 
     # Epoch data
     sac_epochs = mne.Epochs(raw=meg_downsampled, events=sac_events, event_id=sac_events_id, tmin=sac_tmin,
-                            tmax=sac_tmax, reject=None,
+                            tmax=sac_tmax, reject=reject,
                             event_repeated='drop', metadata=sac_metadata, preload=True, baseline=(0, 0))
     fix_epochs = mne.Epochs(raw=meg_downsampled, events=fix_events, event_id=fix_events_id, tmin=fix_tmin,
-                            tmax=fix_tmax, reject=None,
+                            tmax=fix_tmax, reject=reject,
                             event_repeated='drop', metadata=fix_metadata, preload=True, baseline=(0, 0))
 
     # Append saccades df as epochs metadata

@@ -552,12 +552,14 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
     # Get min and max from all topoplots
     if vmin == None and vmax == None:
         maxs = []
+        mins = []
         for timefreq in timefreqs:
             tfr_crop = tfr_topo.copy().crop(tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1])
             data = tfr_crop.data.ravel()
             maxs.append(data.max())
+            mins.append(data.min())
         vmax = np.max(maxs)
-        vmin = -vmax
+        vmin = np.min(mins)
 
     # Get topo axes and overwrite
     topo_axes = fig.axes[1:-1]

@@ -27,20 +27,20 @@ else:
 
 #----- Parameters -----#
 # ICA vs raw data
-use_ica_data = False
+use_ica_data = True
 # Frequency band
 band_id = None
 # Id
-epoch_id = 'l_sac'
+epoch_id = 'it_fix'
 # Plot channels
 chs_id = 'mag'
 # PLots
 plot_epochs = True
 plot_gaze = True
-corr_ans = None
-tgt_pres = None
+corr_ans = True
+tgt_pres = True
 mss = None
-reject = None
+reject = None  # None to use defalt {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
 
 # Get time windows from epoch_id name
 map_times = dict(l_sac={'tmin': -0.05, 'tmax': 0.1, 'plot_xlim': (-0.05, 0.05)},
@@ -52,6 +52,8 @@ if 'sac' in epoch_id:
     baseline = (tmin, 0)
 elif 'fix' in epoch_id or 'fix' in epoch_id:
     baseline = (tmin, -0.05)
+else:
+    baseline = (None, 0)
 
 # Specific run path for saving data and plots
 save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
