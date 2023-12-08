@@ -35,6 +35,7 @@ reject = None  # 'subject' for subject's default. False for no rejection, dict f
 vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
 plot_edge = 0.15
 trial_dur = vs_dur[mss]  # Edit this to determine the minimum visual search duration for the trial selection (this will also affect ms trials)
+evt_dur = None
 
 # Power time frequency params
 n_cycles_div = 2.
@@ -98,9 +99,7 @@ else:
     data_type = 'RAW'
 
 # Save ids
-save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
-if (epoch_id == 'ms' or epoch_id == 'vs') and trial_dur:
-    save_id += f'_tdur{trial_dur}'
+save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
 plot_id = f'{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}_cycles{int(n_cycles_div)}/'
 
 # Save data paths

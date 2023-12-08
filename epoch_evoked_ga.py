@@ -41,6 +41,8 @@ corr_ans = True
 tgt_pres = True
 mss = None
 reject = None  # None to use defalt {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
+trial_dur = None
+evt_dur = None
 
 # Get time windows from epoch_id name
 map_times = dict(l_sac={'tmin': -0.05, 'tmax': 0.1, 'plot_xlim': (-0.05, 0.05)},
@@ -53,11 +55,10 @@ if 'sac' in epoch_id:
 elif 'fix' in epoch_id or 'fix' in epoch_id:
     baseline = (tmin, -0.05)
 else:
-    baseline = (None, 0)
+    baseline = (tmin, 0)
 
 # Specific run path for saving data and plots
-save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
-run_path = f'/Band_{band_id}/{save_id}_{tmin}_{tmax}_bline{baseline}/'
+run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
 
 # Data type
 if use_ica_data:

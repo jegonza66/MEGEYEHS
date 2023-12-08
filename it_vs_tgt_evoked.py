@@ -25,7 +25,7 @@ else:
 #-----  Select frequency band -----#
 # ICA vs raw data
 use_ica_data = True
-run_tfce = False
+run_tfce = True
 band_id = None
 # Id
 epoch_ids = ['it_fix_subsampled', 'tgt_fix']
@@ -44,7 +44,7 @@ evt_dur = None
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
 # Baseline
-baseline = (None, -0.05)
+baseline = (tmin, -0.05)
 
 # Data type
 if use_ica_data:
@@ -155,17 +155,17 @@ if run_tfce:
                                                                                 n_permutations=n_permutations)
 
     good_clusters_left_idx = np.where(p_tfce_left < 0.05)[0]
-    significant_clusters_left = np.take(clusters_left, good_clusters_left_idx).tolist()
+    significant_clusters_left = [clusters_left[i][0] for i in good_clusters_left_idx]
     # Plot significant clusters
     if len(significant_clusters_left):
         for cluster in significant_clusters_left:
-            axs[0].axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], color='green', alpha=0.5, label='Signif.')
+            axs[0].axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], color='green', alpha=0.3, label='Signif.')
 
     # Right
     t_tfce_right, clusters_right, p_tfce_right, H0_right = permutation_cluster_test(X=obs_right, threshold=t_thresh,
                                                                                     n_permutations=n_permutations)
     good_clusters_right_idx = np.where(p_tfce_right < 0.05)[0]
-    significant_clusters_right = np.take(clusters_right, good_clusters_right_idx).tolist()
+    significant_clusters_right = [clusters_right[i][0] for i in good_clusters_right_idx]
     # Plot significant clusters
     if len(significant_clusters_right):
         for cluster in significant_clusters_right:
@@ -182,7 +182,10 @@ axs[0].set_xlabel('time (s)')
 axs[1].set_xlabel('time (s)')
 axs[0].set_ylabel('FRF (fT)')
 axs[1].set_ylabel('FRF (fT)')
-fig.suptitle(f'Target vs. Distractor FRF {chs_id} (t_threshold: {t_thresh} - Significance threshold: {0.05})')
+if run_tfce:
+    fig.suptitle(f'Target vs. Distractor FRF {chs_id} (t_threshold: {t_thresh} - Significance threshold: {0.05})')
+else:
+    fig.suptitle(f'Target vs. Distractor FRF {chs_id}')
 
 axs[0].xaxis.label.set_fontsize(18)
 axs[0].yaxis.label.set_fontsize(18)
@@ -206,7 +209,7 @@ if save_fig:
 # Plot topographies
 topo_times = [0.1, 0.35]
 topo_times_span = [0.005, 0.05]
-grand_average = mne.grand_average(ga_dict['tgt_fix'][lat_chs], interpolate_bads=False)
+grand_average = mne.grand_average(ga_dict['tgt_fix'][lat_chs], interpolate_bads=True)
 fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='jet', show=display_figs, vlim=(-60, 60))
 
 if save_fig:
@@ -243,13 +246,13 @@ else:
 #-----  Parameters -----#
 # ICA vs raw data
 use_ica_data = True
-run_tfce = True
-standarize = True
+run_tfce = False
+standarize = False
 band_id = None
 # Id
 epoch_ids = ['it_fix_subsampled', 'tgt_fix', 'blue', 'red']
 # Pick MEG chs (Select channels or set picks = 'mag')
-chs_id = 'mag'
+chs_id = 'temporal'
 chs_ids = [f'{chs_id}_L', f'{chs_id}_R']
 labels = ['TRF Distractor', 'TRF Target']
 # Trials
@@ -261,11 +264,11 @@ evt_dur = None
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
 # Baseline
-baseline = (None, -0.05)
+baseline = (tmin, -0.05)
 # TRF hiper-parameter
 alpha = None
 # Reescale and plot with FRF
-FRF_TRF = False
+FRF_TRF = True
 
 # Data type
 if use_ica_data:
@@ -281,8 +284,8 @@ stds = {}
 bads = []
 
 # Save path
-save_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}' \
-                                  f'_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
+load_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}' \
+                                  f'_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/mag/'
 fig_path = save_path.replace(paths().save_path(), paths().plots_path())
 
 # Figure
@@ -324,7 +327,7 @@ for i, epoch_id in enumerate(epoch_ids[:2]):
                 meg_data = subject.load_preproc_meg_data()
 
             # Data filenames
-            trf_path = save_path
+            trf_path = load_path
             trf_fname = f'TRF_{subject_code}.pkl'
 
             # Load rf data
@@ -419,7 +422,7 @@ pval_thresh = 0.05
 # Left
 t_tfce_left, clusters_left, p_tfce_left, H0_left = permutation_cluster_test(X=obs_left, threshold=t_thresh, n_permutations=n_permutations)
 good_clusters_left_idx = np.where(p_tfce_left < pval_thresh)[0]
-significant_clusters_left = np.take(clusters_left, good_clusters_left_idx).tolist()
+significant_clusters_left = [clusters_left[i][0] for i in good_clusters_left_idx]
 
 # Plot significant clusters
 bar_height = axs[0].get_ylim()[1]
@@ -431,7 +434,7 @@ if len(significant_clusters_left):
 # Right
 t_tfce_right, clusters_right, p_tfce_right, H0_right = permutation_cluster_test(X=obs_right, threshold=t_thresh, n_permutations=n_permutations)
 good_clusters_right_idx = np.where(p_tfce_right < pval_thresh)[0]
-significant_clusters_right = np.take(clusters_right, good_clusters_right_idx).tolist()
+significant_clusters_right = [clusters_right[i][0] for i in good_clusters_right_idx]
 # Plot significant clusters
 if len(significant_clusters_right):
     for cluster in significant_clusters_right:
@@ -488,7 +491,7 @@ if save_fig:
 # Plot topographies
 topo_times = [0.1, 0.4]
 topo_times_span = [0.01, 0.2]
-grand_average = mne.grand_average(ga_dict['tgt_fix'][lat_chs], interpolate_bads=False)
+grand_average = mne.grand_average(ga_dict['tgt_fix'][lat_chs], interpolate_bads=True)
 
 
 # Mascara en temporales
@@ -555,7 +558,7 @@ evt_dur = None
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
 # Baseline
-baseline = (None, -0.05)
+baseline = (tmin, -0.05)
 
 # Data type
 if use_ica_data:
@@ -622,7 +625,7 @@ for i, epoch_id in enumerate(epoch_ids):
     observations.append(evokeds_epoch_id)
 
 # Compute grand average of target fixations
-grand_avg = mne.grand_average(evokeds_ga['tgt_fix'], interpolate_bads=False)
+grand_avg = mne.grand_average(evokeds_ga['tgt_fix'], interpolate_bads=True)
 
 # Permutation cluster test parameters
 n_permutations = 256
@@ -723,7 +726,7 @@ alpha = 1000
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
 # Baseline
-baseline = (None, -0.05)
+baseline = (tmin, -0.05)
 
 # Data type
 if use_ica_data:
@@ -814,7 +817,7 @@ for i, epoch_id in enumerate(epoch_ids[:2]):
     observations.append(evokeds_epoch_id)
 
 # Compute grand average of target fixations
-grand_avg = mne.grand_average(evokeds_ga['tgt_fix'], interpolate_bads=False)
+grand_avg = mne.grand_average(evokeds_ga['tgt_fix'], interpolate_bads=True)
 
 # Permutation cluster test parameters
 n_permutations = 1024

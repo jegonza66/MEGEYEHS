@@ -45,7 +45,7 @@ reject = None
 # Get time windows from epoch_id name
 tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
 # Baseline
-baseline = (None, -0.05)
+baseline = (tmin, -0.05)
 
 # Specific run path for saving data and plots
 run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
@@ -61,7 +61,7 @@ epochs_list_it_sub = []
 epochs_list_tgt = []
 evokeds = []
 ga_subjects = []
-for subject_code in exp_info.subjects_ids[:12]:
+for subject_code in exp_info.subjects_ids:
 
     # Define save path and file name for loading and saving epoched, evoked, and GA data
     if use_ica_data:
@@ -76,7 +76,7 @@ for subject_code in exp_info.subjects_ids[:12]:
     epochs_it_load_path = save_path + f'Epochs_{data_type}/' + run_path
 
     # Save data paths
-    epochs_it_save_path = epochs_it_load_path.replace('it_fix', 'it_fix_downsampled')
+    epochs_it_save_path = epochs_it_load_path.replace('it_fix', 'it_fix_subsampled')
     evoked_it_save_path = save_path + f'Evoked_{data_type}/' + run_path.replace('it_fix', 'it_fix_subsampled')
 
     # Save figures paths
@@ -155,7 +155,7 @@ if save_fig:
     save.fig(fig=fig, path=epochs_fig_path, fname='GA_fixation_duration_distribution')
 
 # Compute grand average
-grand_avg = mne.grand_average(evokeds, interpolate_bads=False)
+grand_avg = mne.grand_average(evokeds, interpolate_bads=True)
 
 # Save grand average
 if save_data:

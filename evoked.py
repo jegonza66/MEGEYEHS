@@ -147,7 +147,7 @@ for subject_code in exp_info.subjects_ids:
 
 
 # Compute grand average
-grand_avg = mne.grand_average(evokeds, interpolate_bads=False)
+grand_avg = mne.grand_average(evokeds, interpolate_bads=True)
 
 # Save grand average
 if save_data:

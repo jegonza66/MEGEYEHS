@@ -342,7 +342,7 @@ def noise_cov(exp_info, subject, bads, use_ica_data, reject=dict(mag=4e-12), ran
     return noise_cov
 
 
-def get_bad_annot_array(meg_data, subj_path, fname, save=True):
+def get_bad_annot_array(meg_data, subj_path, fname, save_var=True):
     # Get bad annotations times
     bad_annotations_idx = [i for i, annot in enumerate(meg_data.annotations.description) if
                            ('bad' in annot or 'BAD' in annot)]
@@ -366,13 +366,13 @@ def get_bad_annot_array(meg_data, subj_path, fname, save=True):
     bad_annotations_array[bad_indexes] = 0
 
     # Save arrays
-    if save:
+    if save_var:
         save.var(var=bad_annotations_array, path=subj_path, fname=fname)
 
     return bad_annotations_array
 
 def make_mtrf_input(input_arrays, var_name, subject, meg_data, evt_dur, cond_trials, epoch_keys, bad_annotations_array,
-                    subj_path, fname, save=True):
+                    subj_path, fname, save_var=True):
 
     # Define events
     metadata, events, _, _ = define_events(subject=subject, epoch_id=var_name, evt_dur=evt_dur,
@@ -389,7 +389,7 @@ def make_mtrf_input(input_arrays, var_name, subject, meg_data, evt_dur, cond_tri
     input_arrays[var_name] = input_array
 
     # Save arrays
-    if save:
+    if save_var:
         save.var(var=input_array, path=subj_path, fname=fname)
 
     return input_arrays

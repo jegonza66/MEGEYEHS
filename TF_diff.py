@@ -34,6 +34,8 @@ corr_ans = None
 tgt_pres = None
 mss = None
 epoch_id = 'ms'
+trial_dur = None
+evt_dur = None
 
 # Time frequency params
 l_freq = 1
@@ -87,28 +89,27 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
     tmax_mssh = mss_duration[mssh] + cross2_dur + vs_dur
     baseline = (tmin_mssl, 0)
 
-    # Specific run path for loading data
-    run_path_mssl = f'/{epoch_id}_mss{mssl}_Corr_{corr_ans}_tgt_{tgt_pres}_{tmin_mssl}_{tmax_mssl}_bline{baseline}/'
-    run_path_mssh = f'/{epoch_id}_mss{mssh}_Corr_{corr_ans}_tgt_{tgt_pres}_{tmin_mssh}_{tmax_mssh}_bline{baseline}/'
+    # Specific run path for loading and saving data
+    mss_diff_name = f'{mssh}-{mssl}'
+    run_path_mssl = f'/{epoch_id}_mss{mssl}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin_mssl}_{tmax_mssl}_bline{baseline}'
+    run_path_mssh = f'/{epoch_id}_mss{mssh}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin_mssh}_{tmax_mssh}_bline{baseline}'
+    run_path_diff = f'/{epoch_id}_mss{mss_diff_name}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin_mssl}_{tmax_mssl}_bline{baseline}'
 
-    # Load data paths
+    # Data paths for TFR
     if return_average_tfr:
         main_path = paths().save_path() + f'Time_Frequency_{data_type}/'
     else:
         main_path = paths().save_path() + f'Time_Frequency_Epochs_{data_type}/'
-    trf_epochs_path_mssl = f'{freqs_type}_freqs/' + run_path_mssl
-    trf_epochs_path_mssh = f'{freqs_type}_freqs/' + run_path_mssh
-    epochs_path_mssl = paths().save_path() + f'Epochs_{data_type}/Band_None/' + run_path_mssl
-    epochs_path_mssh = paths().save_path() + f'Epochs_{data_type}/Band_None/' + run_path_mssh
+    trf_path_mssl = main_path + f'{freqs_type}_freqs/' + run_path_mssl + f'_cycles{int(n_cycles)}/'
+    trf_path_mssh = main_path + f'{freqs_type}_freqs/' + run_path_mssh + f'_cycles{int(n_cycles)}/'
+    trf_diff_save_path = main_path + f'{freqs_type}_freqs/' + run_path_diff + f'_cycles{int(n_cycles)}/'
 
-    # Save data paths
-    save_id = f'{epoch_id}_mss{mssh}-{mssl}_Corr_{corr_ans}_tgt_{tgt_pres}'
-    save_path = f'/{save_id}_{tmin_mssl}_{tmax_mssl}_bline{baseline}_cycles{n_cycles}/'
-    trf_diff_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + save_path
+    # Data paths for epochs
+    epochs_path_mssl = paths().save_path() + f'Epochs_{data_type}/Band_None/' + run_path_mssl + '/'
+    epochs_path_mssh = paths().save_path() + f'Epochs_{data_type}/Band_None/' + run_path_mssh + '/'
 
     # Save figures paths
-    plot_path = f'/{save_id}_bline{baseline}_cycles{n_cycles}/'
-    trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + plot_path + f'{chs_id}/'
+    trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + run_path_diff + f'_cycles{int(n_cycles)}/{chs_id}/'
 
     # Grand average data variable
     grand_avg_power_ms_fname = f'Grand_Average_power_ms_{l_freq}_{h_freq}_tfr.h5'
@@ -118,6 +119,7 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
 
     # Grand Average
     try:
+        raise(ValueError)
         # Load previous power data
         grand_avg_power_ms_diff = mne.time_frequency.read_tfrs(trf_diff_save_path + grand_avg_power_ms_fname)[0]
         grand_avg_power_cross2_diff = mne.time_frequency.read_tfrs(trf_diff_save_path + grand_avg_power_cross2_fname)[0]
@@ -163,25 +165,27 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
             try:
                 # Load difference data
                 power_diff_ms = mne.time_frequency.read_tfrs(trf_diff_save_path + 'ms_' + power_data_fname, condition=0)
-                itc_diff_ms = mne.time_frequency.read_tfrs(trf_diff_save_path + 'ms_' + itc_data_fname, condition=0)
                 power_diff_cross2 = mne.time_frequency.read_tfrs(trf_diff_save_path + 'cross2_' + power_data_fname, condition=0)
-                itc_diff_cross2 = mne.time_frequency.read_tfrs(trf_diff_save_path + 'cross2_' + itc_data_fname, condition=0)
+                if run_itc:
+                    itc_diff_ms = mne.time_frequency.read_tfrs(trf_diff_save_path + 'ms_' + itc_data_fname, condition=0)
+                    itc_diff_cross2 = mne.time_frequency.read_tfrs(trf_diff_save_path + 'cross2_' + itc_data_fname, condition=0)
             except:
                 # Compute difference
                 try:
                     # Load previous data
-                    power_mssl = mne.time_frequency.read_tfrs(trf_epochs_path_mssl + power_data_fname, condition=0)
-                    power_mssh = mne.time_frequency.read_tfrs(trf_epochs_path_mssl + power_data_fname, condition=0)
-                    itc_mssl = mne.time_frequency.read_tfrs(trf_epochs_path_mssl + itc_data_fname, condition=0)
-                    itc_mssh = mne.time_frequency.read_tfrs(trf_epochs_path_mssh + itc_data_fname, condition=0)
+                    power_mssl = mne.time_frequency.read_tfrs(trf_path_mssl + power_data_fname, condition=0)
+                    power_mssh = mne.time_frequency.read_tfrs(trf_path_mssl + power_data_fname, condition=0)
+                    if run_itc:
+                        itc_mssl = mne.time_frequency.read_tfrs(trf_path_mssl + itc_data_fname, condition=0)
+                        itc_mssh = mne.time_frequency.read_tfrs(trf_path_mssh + itc_data_fname, condition=0)
                 except:
                     # Compute power using from epoched data
                     for mss, tmin, tmax, epochs_path, trf_save_path in zip((mssl, mssh), (tmin_mssl, tmin_mssh),
                                                                                 (tmax_mssl, tmax_mssh),
                                                                                 (epochs_path_mssl,
                                                                                  epochs_path_mssh),
-                                                                                (trf_epochs_path_mssl,
-                                                                                 trf_epochs_path_mssh)):
+                                                                                (trf_path_mssl,
+                                                                                 trf_path_mssh)):
                         try:
                             # Load epoched data
                             epochs = mne.read_epochs(epochs_path + epochs_data_fname)
@@ -214,11 +218,11 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
                             power, itc = power
 
                     # Load previous data
-                    power_mssl = mne.time_frequency.read_tfrs(trf_epochs_path_mssl + power_data_fname, condition=0)
-                    power_mssh = mne.time_frequency.read_tfrs(trf_epochs_path_mssh + power_data_fname, condition=0)
+                    power_mssl = mne.time_frequency.read_tfrs(trf_path_mssl + power_data_fname, condition=0)
+                    power_mssh = mne.time_frequency.read_tfrs(trf_path_mssh + power_data_fname, condition=0)
                     if run_itc:
-                        itc_mssl = mne.time_frequency.read_tfrs(trf_epochs_path_mssl + itc_data_fname, condition=0)
-                        itc_mssh = mne.time_frequency.read_tfrs(trf_epochs_path_mssh + itc_data_fname, condition=0)
+                        itc_mssl = mne.time_frequency.read_tfrs(trf_path_mssl + itc_data_fname, condition=0)
+                        itc_mssh = mne.time_frequency.read_tfrs(trf_path_mssh + itc_data_fname, condition=0)
 
                     # -------------- Extra Sources ---------------#
                     # # csd = mne.time_frequency.csd_tfr(power_epochs, tmin=0, tmax=None)
@@ -371,13 +375,13 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
             fname = f'GA_Power_ms_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
             plot_general.tfr_plotjoint_picks(tfr=power_diff_ms, plot_baseline=None, bline_mode=bline_mode,
                                              chs_id=chs_id, plot_max=True, plot_min=True,
-                                             display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path,
+                                             display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path_subj,
                                              fname=fname)
             # Power Plotjoint Cross2
             fname = f'GA_Power_cross2_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
             plot_general.tfr_plotjoint_picks(tfr=power_diff_cross2, plot_baseline=None, bline_mode=bline_mode,
                                              chs_id=chs_id, plot_max=True, plot_min=True,
-                                             display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path,
+                                             display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path_subj,
                                              fname=fname)
 
             if run_itc:
@@ -387,14 +391,14 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
                 plot_general.tfr_plotjoint_picks(tfr=itc_diff_ms, plot_baseline=None, bline_mode=bline_mode,
                                                  chs_id=chs_id, plot_max=True, plot_min=True,
                                                  display_figs=display_figs, save_fig=save_fig,
-                                                 trf_fig_path=trf_fig_path, fname=fname)
+                                                 trf_fig_path=trf_fig_path_subj, fname=fname)
                 # ITC Plot joint
                 fname = f'GA_ITC_cross2_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
                 plot_general.tfr_plotjoint_picks(tfr=itc_diff_cross2, plot_baseline=None,
                                                  bline_mode=bline_mode,
                                                  chs_id=chs_id, plot_max=True, plot_min=True,
                                                  display_figs=display_figs, save_fig=save_fig,
-                                                 trf_fig_path=trf_fig_path, fname=fname)
+                                                 trf_fig_path=trf_fig_path_subj, fname=fname)
 
         # Compute grand average
         grand_avg_power_ms_diff = mne.grand_average(averages_power_ms_diff)
@@ -499,32 +503,17 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
                                          vmax=0.2, display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path,
                                          fname=fname)
 
-    # Plot Power time-frequency
-    # # Power Plotjoint MS
-    # fname = f'GA_Power_ms_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    # plot_general.tfr_plotjoint_picks(tfr=grand_avg_power_ms_diff, plot_baseline=None, bline_mode=bline_mode,
-    #                                  image_args=image_args,
-    #                                  chs_id=chs_id, plot_max=False, plot_min=True, vmin=-0.1, vmax=0.1,
-    #                                  display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path,
-    #                                  fname=fname)
-    # # Power Plotjoint Cross2
-    # fname = f'GA_Power_cross2_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_TFCE_signif_{pval_threshold}'
-    # plot_general.tfr_plotjoint_picks(tfr=grand_avg_power_cross2_diff, plot_baseline=None, bline_mode=bline_mode,
-    #                                  image_args=image_args,
-    #                                  chs_id=chs_id, plot_max=False, plot_min=True, vmin=-0.1, vmax=0.1,
-    #                                  display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path,
-    #                                  fname=fname)
     if run_itc:
         # Plot ITC time-frequency
         # ITC Plotjoint MS
         fname = f'GA_ITC_ms_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
         plot_general.tfr_plotjoint_picks(tfr=grand_avg_itc_ms_diff, plot_baseline=None, bline_mode=bline_mode,
-                                         chs_id=chs_id, plot_max=False, plot_min=True, vmin=-0.1, vmax=0.1,
+                                         chs_id=chs_id, plot_max=True, plot_min=True, vmin=-0.1, vmax=0.1,
                                          display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
         # ITC Plot joint
         fname = f'GA_ITC_cross2_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
         plot_general.tfr_plotjoint_picks(tfr=grand_avg_itc_cross2_diff, plot_baseline=None, bline_mode=bline_mode,
-                                         chs_id=chs_id, plot_max=False, plot_min=True, vmin=-0.1, vmax=0.1,
+                                         chs_id=chs_id, plot_max=True, plot_min=True, vmin=-0.1, vmax=0.1,
                                          display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
 
 ## Correct vs incorrect
