@@ -95,7 +95,7 @@ else:
     data_type = 'RAW'
 
 # Load data paths
-run_path_data = f'Band_None/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
+run_path_data = f'Band_None/{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}'
 if (epoch_id == 'ms' or epoch_id == 'vs') and trial_dur:
     run_path_data += f'_tdur{trial_dur}'
 

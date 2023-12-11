@@ -91,25 +91,25 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
 
     # Specific run path for loading and saving data
     mss_diff_name = f'{mssh}-{mssl}'
-    run_path_mssl = f'/{epoch_id}_mss{mssl}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin_mssl}_{tmax_mssl}_bline{baseline}'
-    run_path_mssh = f'/{epoch_id}_mss{mssh}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin_mssh}_{tmax_mssh}_bline{baseline}'
-    run_path_diff = f'/{epoch_id}_mss{mss_diff_name}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin_mssl}_{tmax_mssl}_bline{baseline}'
+    run_path_mssl = f'/{epoch_id}_mss{mssl}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin_mssl}_{tmax_mssl}_bline{baseline}'
+    run_path_mssh = f'/{epoch_id}_mss{mssh}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin_mssh}_{tmax_mssh}_bline{baseline}'
+    run_path_diff = f'/{epoch_id}_mss{mss_diff_name}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin_mssl}_{tmax_mssl}_bline{baseline}'
 
     # Data paths for TFR
     if return_average_tfr:
         main_path = paths().save_path() + f'Time_Frequency_{data_type}/'
     else:
         main_path = paths().save_path() + f'Time_Frequency_Epochs_{data_type}/'
-    trf_path_mssl = main_path + f'{freqs_type}_freqs/' + run_path_mssl + f'_cycles{int(n_cycles)}/'
-    trf_path_mssh = main_path + f'{freqs_type}_freqs/' + run_path_mssh + f'_cycles{int(n_cycles)}/'
-    trf_diff_save_path = main_path + f'{freqs_type}_freqs/' + run_path_diff + f'_cycles{int(n_cycles)}/'
+    trf_path_mssl = main_path + f'' + run_path_mssl + f'_cyc{int(n_cycles)}/'
+    trf_path_mssh = main_path + f'' + run_path_mssh + f'_cyc{int(n_cycles)}/'
+    trf_diff_save_path = main_path + f'' + run_path_diff + f'_cyc{int(n_cycles)}/'
 
     # Data paths for epochs
     epochs_path_mssl = paths().save_path() + f'Epochs_{data_type}/Band_None/' + run_path_mssl + '/'
     epochs_path_mssh = paths().save_path() + f'Epochs_{data_type}/Band_None/' + run_path_mssh + '/'
 
     # Save figures paths
-    trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + run_path_diff + f'_cycles{int(n_cycles)}/{chs_id}/'
+    trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + run_path_diff + f'_cyc{int(n_cycles)}/{chs_id}/'
 
     # Grand average data variable
     grand_avg_power_ms_fname = f'Grand_Average_power_ms_{l_freq}_{h_freq}_tfr.h5'
@@ -611,14 +611,14 @@ for subject_code in exp_info.subjects_ids:
         subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
 
     # Specific run path for loading data
-    load_id_corr = f'{epoch_id}_mss{mss}_Corr_True_tgt_{tgt_pres}'
-    load_id_inc = f'{epoch_id}_mss{mss}_Corr_False_tgt_{tgt_pres}'
+    load_id_corr = f'{epoch_id}_mss{mss}_Corr_True_tgt{tgt_pres}'
+    load_id_inc = f'{epoch_id}_mss{mss}_Corr_False_tgt{tgt_pres}'
     load_path_corr = f'/{load_id_corr}_{tmin}_{tmax}_bline{baseline}/'
     load_path_inc = f'/{load_id_inc}_{tmin}_{tmax}_bline{baseline}/'
 
     # Load data paths
-    trf_load_path_corr = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + load_path_corr
-    trf_load_path_inc = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + load_path_inc
+    trf_load_path_corr = paths().save_path() + f'Time_Frequency_{data_type}/' + load_path_corr
+    trf_load_path_inc = paths().save_path() + f'Time_Frequency_{data_type}/' + load_path_inc
     epochs_load_path_corr = paths().save_path() + f'Epochs_{data_type}/Band_None/' + load_path_corr
     epochs_load_path_itc = paths().save_path() + f'Epochs_{data_type}/Band_None/' + load_path_inc
 
@@ -628,13 +628,13 @@ for subject_code in exp_info.subjects_ids:
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
 
     # Save data paths
-    save_id = f'{epoch_id}_mss{mss}_Corr_True-False_tgt_{tgt_pres}'
+    save_id = f'{epoch_id}_mss{mss}_Corr_True-False_tgt{tgt_pres}'
     save_path = f'/{save_id}_{tmin}_{tmax}_bline{baseline}/'
-    trf_diff_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + save_path
+    trf_diff_save_path = paths().save_path() + f'Time_Frequency_{data_type}/' + save_path
 
     # Save figures paths
     plot_path = f'/{save_id}_bline{baseline}/'
-    trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + plot_path + f'{chs_id}/'
+    trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + plot_path + f'{chs_id}/'
     # Subject plots path
     trf_fig_path_subj = trf_fig_path + f'{subject.subject_id}/'
 
@@ -905,14 +905,14 @@ for mss in [1, 2, 4]:
             subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
 
         # Specific run path for loading data
-        load_id_corr = f'{epoch_id}_mss{mss}_Corr_True_tgt_{tgt_pres}'
-        load_id_inc = f'{epoch_id}_mss{mss}_Corr_False_tgt_{tgt_pres}'
+        load_id_corr = f'{epoch_id}_mss{mss}_Corr_True_tgt{tgt_pres}'
+        load_id_inc = f'{epoch_id}_mss{mss}_Corr_False_tgt{tgt_pres}'
         load_path_corr = f'/{load_id_corr}_{tmin}_{tmax}_bline{baseline}/'
         load_path_inc = f'/{load_id_inc}_{tmin}_{tmax}_bline{baseline}/'
 
         # Load data paths
-        trf_load_path_corr = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + load_path_corr
-        trf_load_path_inc = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + load_path_inc
+        trf_load_path_corr = paths().save_path() + f'Time_Frequency_{data_type}/' + load_path_corr
+        trf_load_path_inc = paths().save_path() + f'Time_Frequency_{data_type}/' + load_path_inc
         epochs_load_path_corr = paths().save_path() + f'Epochs_{data_type}/Band_None/' + load_path_corr
         epochs_load_path_itc = paths().save_path() + f'Epochs_{data_type}/Band_None/' + load_path_inc
 
@@ -922,13 +922,13 @@ for mss in [1, 2, 4]:
         epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
 
         # Save data paths
-        save_id = f'{epoch_id}_mss{mss}_Corr_True-False_tgt_{tgt_pres}'
+        save_id = f'{epoch_id}_mss{mss}_Corr_True-False_tgt{tgt_pres}'
         save_path = f'/{save_id}_{tmin}_{tmax}_bline{baseline}/'
-        trf_diff_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + save_path
+        trf_diff_save_path = paths().save_path() + f'Time_Frequency_{data_type}/' + save_path
 
         # Save figures paths
         plot_path = f'/{save_id}_bline{baseline}/'
-        trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + plot_path + f'{chs_id}/'
+        trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + plot_path + f'{chs_id}/'
         # Subject plots path
         trf_fig_path_subj = trf_fig_path + f'{subject.subject_id}/'
 

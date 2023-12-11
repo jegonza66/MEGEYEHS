@@ -77,7 +77,7 @@ for i, epoch_id in enumerate(epoch_ids):
         evokeds[epoch_id][lat_chs] = []
 
         # Specific run path for saving data and plots
-        save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}'
+        save_id = f'{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}'
         run_path = f'/Band_{band_id}/{save_id}/'
 
         # Save data paths
@@ -284,9 +284,9 @@ stds = {}
 bads = []
 
 # Save path
-load_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}' \
+load_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}' \
                                   f'_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/mag/'
-fig_path = save_path.replace(paths().save_path(), paths().plots_path())
+fig_path = load_path.replace(paths().save_path(), paths().plots_path())
 
 # Figure
 matplotlib.rc({'font.size': 20})
@@ -580,7 +580,7 @@ for i, epoch_id in enumerate(epoch_ids):
     evokeds_data[epoch_id] = []
 
     # Specific run path for saving data and plots
-    save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}'
+    save_id = f'{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}'
     run_path = f'/Band_{band_id}/{save_id}/'
 
     # Save data paths
@@ -735,7 +735,7 @@ else:
     data_type = 'RAW'
 
 # Save path
-save_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}' \
+save_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}' \
                                   f'_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
 fig_path = save_path.replace(paths().save_path(), paths().plots_path()) + 'it_vs_tgt/'
 

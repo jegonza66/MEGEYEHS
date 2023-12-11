@@ -109,7 +109,7 @@ epoch_ids = run_id.split('--')
 # Iterate over epoch ids (if applies)
 for epoch_id in epoch_ids:
     # Data and plots paths
-    run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{t_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
+    run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{t_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
 
     # Data paths
     epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path

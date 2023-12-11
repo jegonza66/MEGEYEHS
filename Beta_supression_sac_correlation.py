@@ -100,7 +100,7 @@ for mss in [1, 2, 4]:
         baseline = (tmin, 0)
 
     # Specific run path for saving data and plots
-    save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
+    save_id = f'{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}'
     save_path = f'/{save_id}_{tmin}_{tmax}_bline{baseline}/'
     plot_path = f'/{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}/'
     if use_ica_data:
@@ -109,7 +109,7 @@ for mss in [1, 2, 4]:
         data_type = 'RAW'
 
     # Save data paths
-    trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + save_path
+    trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/' + save_path
     epochs_save_path = paths().save_path() + f'Epochs_{data_type}/Band_None/' + save_path
 
     averages_power = []
@@ -321,7 +321,7 @@ for mss in [1, 2, 4]:
         baseline = (tmin, 0)
 
     # Specific run path for saving data and plots
-    save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}'
+    save_id = f'{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}'
     save_path = f'/{save_id}_{tmin}_{tmax}_bline{baseline}/'
     plot_path = f'/{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}/'
     if use_ica_data:
@@ -330,7 +330,7 @@ for mss in [1, 2, 4]:
         data_type = 'RAW'
 
     # Save data paths
-    trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + save_path
+    trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/' + save_path
     epochs_save_path = paths().save_path() + f'Epochs_{data_type}/Band_None/' + save_path
 
     averages_power = []

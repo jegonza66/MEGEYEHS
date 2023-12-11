@@ -99,17 +99,17 @@ else:
     data_type = 'RAW'
 
 # Save ids
-save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
-plot_id = f'{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}_cycles{int(n_cycles_div)}/'
+save_id = f'{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
+plot_id = f'{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}_cyc{int(n_cycles_div)}/'
 
 # Save data paths
 if return_average_tfr:
-    trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/{save_id}_{tmin}_{tmax}_bline{baseline}_cycles{int(n_cycles_div)}/'
+    trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{save_id}_{tmin}_{tmax}_bline{baseline}_cyc{int(n_cycles_div)}/'
 else:
-    trf_save_path = paths().save_path() + f'Time_Frequency_Epochs_{data_type}/{freqs_type}_freqs/{save_id}_{tmin}_{tmax}_bline{baseline}_cycles{int(n_cycles_div)}/'
+    trf_save_path = paths().save_path() + f'Time_Frequency_Epochs_{data_type}/{save_id}_{tmin}_{tmax}_bline{baseline}_cyc{int(n_cycles_div)}/'
 epochs_save_path = paths().save_path() + f'Epochs_{data_type}/Band_None/{save_id}_{tmin}_{tmax}_bline{baseline}/'
 # Save figures paths
-trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/{freqs_type}_freqs/' + plot_id + f'{chs_id}/'
+trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + plot_id + f'{chs_id}/'
 
 # Grand average data variable
 grand_avg_power_fname = f'Grand_Average_power_{l_freq}_{h_freq}_tfr.h5'

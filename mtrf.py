@@ -54,7 +54,7 @@ for var_name in epoch_ids:
     exec(f'{var_name}_ga = []')
 
 plot_edge = 0.1
-fig_path = paths().plots_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}' \
+fig_path = paths().plots_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}' \
                                   f'_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
 save_path = fig_path.replace(paths().plots_path(), paths().save_path())
 
@@ -115,7 +115,7 @@ for subject_code in exp_info.subjects_ids:
                 # Exception for subsampled distractor fixations
                 if 'subsampled' in var_name:
                     # Subsampled epochs path
-                    epochs_save_id = f'{var_name}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
+                    epochs_save_id = f'{var_name}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
                     epochs_save_path = paths().save_path() + f'Epochs_{data_type}' + f'/Band_{band_id}/{epochs_save_id}_{tmin}_{tmax}_bline{baseline}/'
                     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
 
@@ -385,7 +385,7 @@ for subject_code in exp_info.subjects_ids:
                 # Exception for subsampled distractor fixations
                 if 'subsampled' in var_name:
                     # Subsampled epochs path
-                    epochs_save_id = f'{var_name}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
+                    epochs_save_id = f'{var_name}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
                     epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + f'/Band_{band_id}/{epochs_save_id}_{tmin}_{tmax}_bline{baseline}/'
                     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
 

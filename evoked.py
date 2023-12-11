@@ -50,7 +50,7 @@ else:
     data_type = 'RAW'
 
 # Specific run path for saving data and plots
-save_id = f'{epoch_id}_mss{mss}_Corr_{corr_ans}_tgt_{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
+save_id = f'{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
 run_path = f'/Band_{band_id}/{save_id}_{tmin}_{tmax}_bline{baseline}/'
 
 # Save data paths
