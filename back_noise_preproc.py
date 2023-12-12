@@ -30,7 +30,7 @@ for noise_date_id in exp_info.noise_recordings:
     meg_picks = mne.pick_types(raw_noise.info, meg=True)
 
     # Filter
-    filtered_data = raw_noise.copy().notch_filter(freqs=exp_info.line_noise_freqs[:-1], picks=meg_picks)
+    filtered_data = raw_noise.copy().notch_filter(freqs=exp_info.background_line_noise_freqs[noise_date_id], picks=meg_picks)
 
     # Plot
     fig_path = paths().plots_path() + 'Preprocessing/' + f'{noise.bkg_noise_dir}/'
