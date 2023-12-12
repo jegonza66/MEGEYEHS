@@ -207,8 +207,8 @@ if save_fig:
     save.fig(fig=fig, path=fig_path, fname=fname)
 
 # Plot topographies
-topo_times = [0.1, 0.35]
-topo_times_span = [0.005, 0.05]
+topo_times = [0.1, 0.3]
+topo_times_span = [0.005, 0.1]
 grand_average = mne.grand_average(ga_dict['tgt_fix'][lat_chs], interpolate_bads=True)
 fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='jet', show=display_figs, vlim=(-60, 60))
 
