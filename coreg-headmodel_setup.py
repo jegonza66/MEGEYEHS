@@ -11,12 +11,13 @@ import mne.beamformer as beamformer
 # Load experiment info
 exp_info = setup.exp_info()
 
+
 # --------- Setup ---------#
 
 # Define surface or volume source space
 surf_vol = 'surface'
 use_ica_data = True
-force_fsaverage = True
+force_fsaverage = False
 ico = 4
 spacing = 10.
 pick_ori = None
@@ -29,9 +30,11 @@ os.environ["SUBJECTS_DIR"] = subjects_dir
 # Digitalization data path
 dig_path = paths().opt_path()
 
+
 # --------- Coregistration ---------#
+
 # Iterate over subjects
-for subject_code in exp_info.subjects_ids:
+for subject_code in exp_info.subjects_ids[9:]:
 
     if use_ica_data:
         # Load subject and meg clean data
