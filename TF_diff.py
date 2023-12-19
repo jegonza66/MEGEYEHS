@@ -4,13 +4,10 @@ import load
 import mne
 import os
 import plot_general
-import save
-import pandas as pd
 import setup
 from paths import paths
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy
 from mne.stats import permutation_cluster_1samp_test
 
 #----- Path -----#
@@ -19,7 +16,7 @@ exp_info = setup.exp_info()
 #----- Save data and display figures -----#
 save_data = True
 save_fig = True
-display_figs = False
+display_figs = True
 if display_figs:
     plt.ion()
 else:
@@ -41,22 +38,18 @@ evt_dur = None
 l_freq = 1
 h_freq = 40
 log_bands = False
-n_cycles = 2.
+n_cycles_div = 2.
 run_itc = False
-estimate_sources = False
+return_average_tfr = True
+output = 'power'
+default_subject = exp_info.subjects_ids[0]
 
 # Baseline method
+# logratio: dividing by the mean of baseline values and taking the log
+# ratio: dividing by the mean of baseline values
+# mean: subtracting the mean of baseline values
 bline_mode = 'logratio'
 #----------#
-
-# Time Frequency config
-if estimate_sources:
-    return_average_tfr = False
-    output = 'complex'
-    run_itc = False
-else:
-    return_average_tfr = True
-    output = 'power'
 
 # Duration
 mss_duration = {1: 2, 2: 3.5, 4: 5, None: 0}
@@ -100,16 +93,16 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
         main_path = paths().save_path() + f'Time_Frequency_{data_type}/'
     else:
         main_path = paths().save_path() + f'Time_Frequency_Epochs_{data_type}/'
-    trf_path_mssl = main_path + f'' + run_path_mssl + f'_cyc{int(n_cycles)}/'
-    trf_path_mssh = main_path + f'' + run_path_mssh + f'_cyc{int(n_cycles)}/'
-    trf_diff_save_path = main_path + f'' + run_path_diff + f'_cyc{int(n_cycles)}/'
+    trf_path_mssl = main_path + f'' + run_path_mssl + f'_cyc{int(n_cycles_div)}/'
+    trf_path_mssh = main_path + f'' + run_path_mssh + f'_cyc{int(n_cycles_div)}/'
+    trf_diff_save_path = main_path + f'' + run_path_diff + f'_cyc{int(n_cycles_div)}/'
 
     # Data paths for epochs
     epochs_path_mssl = paths().save_path() + f'Epochs_{data_type}/Band_None/' + run_path_mssl + '/'
     epochs_path_mssh = paths().save_path() + f'Epochs_{data_type}/Band_None/' + run_path_mssh + '/'
 
     # Save figures paths
-    trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + run_path_diff + f'_cyc{int(n_cycles)}/{chs_id}/'
+    trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + run_path_diff + f'_cyc{int(n_cycles_div)}/{chs_id}/'
 
     # Grand average data variable
     grand_avg_power_ms_fname = f'Grand_Average_power_ms_{l_freq}_{h_freq}_tfr.h5'
@@ -207,7 +200,7 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
 
                         # Compute power and PLI over frequencies and save
                         power = functions_analysis.time_frequency(epochs=epochs, l_freq=l_freq, h_freq=h_freq,
-                                                                         freqs_type=freqs_type, n_cycles_div=n_cycles,
+                                                                         freqs_type=freqs_type, n_cycles_div=n_cycles_div,
                                                                          average=return_average_tfr, return_itc=run_itc,
                                                                          output=output, save_data=save_data,
                                                                          trf_save_path=trf_save_path,
@@ -224,74 +217,8 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
                         itc_mssl = mne.time_frequency.read_tfrs(trf_path_mssl + itc_data_fname, condition=0)
                         itc_mssh = mne.time_frequency.read_tfrs(trf_path_mssh + itc_data_fname, condition=0)
 
-                    # -------------- Extra Sources ---------------#
-                    # # csd = mne.time_frequency.csd_tfr(power_epochs, tmin=0, tmax=None)
-                    # # csd_baseline = mne.time_frequency.csd_tfr(power_epochs, tmin=None, tmax=0)
-                    # h_freq = 12
-                    # l_freq = 8
-                    # freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)
-                    # freqs = [10]
-                    # csd = mne.time_frequency.csd_morlet(epochs, freqs, tmin=0, decim=20, n_jobs=4)
-                    # csd_baseline = mne.time_frequency.csd_morlet(epochs, freqs, tmax=0, decim=20, n_jobs=4)
-                    #
-                    # sources_path_subject = paths().sources_path() + subject.subject_id
-                    # ico = 5
-                    # spacing = 5
-                    # fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
-                    #
-                    # fwd = mne.read_forward_solution(fname_fwd)
-                    #
-                    # # rank
-                    # rank = sum([ch_type == 'mag' for ch_type in epochs.get_channel_types()]) - len(epochs.info['bads'])
-                    # if use_ica_data:
-                    #     rank -= len(subject.ex_components)
-                    #
-                    # # compute scalar DICS beamfomer
-                    # filters = mne.beamformer.make_dics(
-                    #     epochs.info,
-                    #     fwd,
-                    #     csd,
-                    #     noise_csd=csd_baseline,
-                    #     pick_ori=None,
-                    #     rank=dict(mag=rank),
-                    #     real_filter=True,
-                    # )
-                    #
-                    # # project the TFR for each epoch to source space
-                    # epochs_stcs = mne.beamformer.apply_dics_epochs(epochs, filters, return_generator=False)
-                    # # epochs_stcs = mne.beamformer.apply_dics_csd(csd, filters)
-                    #
-                    # # average across frequencies and epochs
-                    # data = np.zeros((fwd["nsource"], epochs.times.size))
-                    # for epoch_stcs in epochs_stcs:
-                    #     for stc in epoch_stcs:
-                    #         data += (stc.data * np.conj(stc.data)).real
-                    #
-                    # stc.data = data / len(epochs) / len(freqs)
-                    #
-                    # # apply a baseline correction
-                    # epochs_stcs.apply_baseline(baseline=baseline, mode=bline_mode)
-                    #
-                    # subjects_dir = os.path.join(paths().mri_path(), 'FreeSurfer_out')
-                    # fmax = 4500
-                    # brain = epochs_stcs.plot(
-                    #     subjects_dir=subjects_dir,
-                    #     hemi="both",
-                    #     views="dorsal",
-                    #     initial_time=0.55,
-                    #     brain_kwargs=dict(show=False),
-                    #     add_data_kwargs=dict(
-                    #         fmin=fmax / 10,
-                    #         fmid=fmax / 2,
-                    #         fmax=fmax,
-                    #         scale_factor=0.0001,
-                    #         colorbar_kwargs=dict(label_font_size=10),
-                    #     ),
-                    # )
-                    # --------------- End extra DICS sources ------------------#
-
                     # Average epochs
-                    if not  return_average_tfr:
+                    if not return_average_tfr:
                         power_mssl = power_mssl.average()
                         power_mssh = power_mssh.average()
                         if run_itc:
@@ -688,7 +615,7 @@ for subject_code in exp_info.subjects_ids:
                     # Compute power and PLI over frequencies
                     power, itc = functions_analysis.time_frequency(epochs=epochs, l_freq=l_freq, h_freq=h_freq,
                                                                    freqs_type=freqs_type,
-                                                                   n_cycles_div=4., save_data=save_data,
+                                                                   n_cycles_div=2., save_data=save_data,
                                                                    trf_save_path=trf_save_path,
                                                                    power_data_fname=power_data_fname,
                                                                    itc_data_fname=itc_data_fname)
@@ -981,7 +908,7 @@ for mss in [1, 2, 4]:
                         # Compute power and PLI over frequencies
                         power, itc = functions_analysis.time_frequency(epochs=epochs, l_freq=l_freq, h_freq=h_freq,
                                                                        freqs_type=freqs_type,
-                                                                       n_cycles_div=4., save_data=save_data,
+                                                                       n_cycles_div=2., save_data=save_data,
                                                                        trf_save_path=trf_save_path,
                                                                        power_data_fname=power_data_fname,
                                                                        itc_data_fname=itc_data_fname)
