@@ -556,10 +556,24 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
         for timefreq in timefreqs:
             tfr_crop = tfr_topo.copy().crop(tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1])
             data = tfr_crop.data.ravel()
-            maxs.append(data.max())
-            mins.append(data.min())
+            mins.append(- 1.5 * data.std())
+            maxs.append(1.5 * data.std())
         vmax = np.max(maxs)
         vmin = np.min(mins)
+
+        # Old version
+        # maxs = []
+        # mins = []
+        # for timefreq in timefreqs:
+        #     tfr_crop = tfr_topo.copy().crop(tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1])
+        #     data = tfr_crop.data.ravel()
+        #     maxs.append(data.max())
+        #     mins.append(data.min())
+        # vmax = np.max(maxs)
+        # vmin = np.min(mins)
+        # vmin = - 1.5 * data.std()
+        # vmax = 1.5 * data.std()
+
 
     # Get topo axes and overwrite
     topo_axes = fig.axes[1:-1]
