@@ -63,7 +63,7 @@ for subject_code in exp_info.subjects_ids:
     trf_fname = f'TRF_{subject_code}.pkl'
     try:
         # Load TRF
-        rf = load.var(trf_path+trf_fname)
+        rf = load.var(trf_path + trf_fname)
         # Load MEG sub
         if use_ica_data:
             # Load subject object
@@ -146,11 +146,12 @@ for subject_code in exp_info.subjects_ids:
                 # Use only regions in channels id, or all in case of chs_id == 'mag'
                 if chs_subset in chs_id or chs_id == 'mag':
                     rf[chs_subset] = functions_analysis.fit_mtrf(meg_data=meg_data, tmin=tmin, tmax=tmax, alpha=alpha,
-                                                                 model_input=model_input, chs_id=chs_subset, n_jobs=4)
+                                                                 model_input=model_input, chs_id=chs_subset, standarize=standarize,
+                                                                 n_jobs=4)
         # One region
         else:
             rf = functions_analysis.fit_mtrf(meg_data=meg_data, tmin=tmin, tmax=tmax, alpha=alpha,
-                                             model_input=model_input, chs_id=chs_id, n_jobs=4)
+                                             model_input=model_input, chs_id=chs_id, standarize=standarize, n_jobs=4)
         # Save TRF
         if save_data:
             save.var(var=rf, path=trf_path, fname=trf_fname)
