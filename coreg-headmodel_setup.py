@@ -34,7 +34,7 @@ dig_path = paths().opt_path()
 # --------- Coregistration ---------#
 
 # Iterate over subjects
-for subject_code in exp_info.subjects_ids[9:]:
+for subject_code in exp_info.subjects_ids:
 
     if use_ica_data:
         # Load subject and meg clean data
