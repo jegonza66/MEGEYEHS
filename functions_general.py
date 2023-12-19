@@ -433,12 +433,13 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
     else:
         try:
             dur, cross1_dur, cross2_dur, mss_duration, vs_dur = get_duration(epoch_id=epoch_id, mss=mss)
-            print('Using default time values')
+
             map = dict(ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
                        cross2={'tmin': -cross1_dur - mss_duration[mss], 'tmax': dur,
                                'plot_xlim': (-cross1_dur - mss_duration[mss] + plot_edge, dur - plot_edge)},
                        vs={'tmin': -cross1_dur - mss_duration[mss] - cross2_dur, 'tmax': dur,
                            'plot_xlim': (-cross1_dur - mss_duration[mss] - cross2_dur + plot_edge, dur - plot_edge)},
+                       cross1={'tmin': -2, 'tmax': cross1_dur, 'plot_xlim': (-2 + plot_edge, cross1_dur - plot_edge)},
                        sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)},
                        fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.25, 0.55)})
             if 'fix' in epoch_id:
@@ -453,6 +454,7 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
                 tmin = map[epoch_id]['tmin']
                 tmax = map[epoch_id]['tmax']
                 plot_xlim = map[epoch_id]['plot_xlim']
+            print(f'Using default time values for {epoch_id}: tmin:{tmin}, tmax: {tmax}, plot lims: {plot_xlim}')
         except:
             raise ValueError('Epoch id not in default map keys.')
 
@@ -497,6 +499,9 @@ def get_baseline_duration(epoch_id, mss, tmin, tmax, plot_xlim, cross1_dur, mss_
         plot_baseline = baseline
     elif 'cross2' in epoch_id and mss:
         baseline = (-mss_duration[mss] - cross2_dur, -mss_duration[mss])
+        plot_baseline = baseline
+    elif 'cross1' in epoch_id:
+        baseline = (tmax -cross1_dur, tmax)
         plot_baseline = baseline
     elif 'vs' in epoch_id and mss:
         baseline = (-cross1_dur -cross2_dur - mss_duration[mss], -cross2_dur - mss_duration[mss])
