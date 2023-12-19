@@ -134,7 +134,7 @@ def time_frequency(epochs, l_freq, h_freq, freqs_type, n_cycles_div=4., average=
                    save_data=False, trf_save_path=None, power_data_fname=None, itc_data_fname=None, n_jobs=None):
 
     # Sanity check to save data
-    if save_data and (not trf_save_path or not power_data_fname or not itc_data_fname):
+    if save_data and (not trf_save_path or not power_data_fname) or (return_itc and not itc_data_fname):
         raise ValueError('Please provide path and filename to save data. Else, set save_data to false.')
 
     # Compute power over frequencies
@@ -341,6 +341,50 @@ def noise_cov(exp_info, subject, bads, use_ica_data, reject=dict(mag=4e-12), ran
 
     return noise_cov
 
+
+def noise_csd(exp_info, subject, bads, use_ica_data, freqs):
+    '''
+    Compute background noise csd for source estimation.
+    :param exp_info:
+    :param subject:
+    :param meg_data:
+    :param use_ica_data:
+    :return: noise_cov
+    '''
+
+    # Define background noise session id
+    noise_date_id = exp_info.subjects_noise[subject.subject_id]
+
+    # Load data
+    noise = setup.noise(exp_info=exp_info, date_id=noise_date_id)
+    raw_noise = noise.load_preproc_data()
+
+    # Set bads to match participant's
+    raw_noise.info['bads'] = bads
+
+    if use_ica_data:
+        # ICA
+        save_path_ica = paths().ica_path() + subject.subject_id + '/'
+        ica_fname = 'ICA.pkl'
+
+        # Load ICA
+        ica = load.var(file_path=save_path_ica + ica_fname)
+        print('ICA object loaded')
+
+        # Get excluded components from subject and apply ICA to background noise
+        ica.exclude = subject.ex_components
+        # Load raw noise data to apply ICA
+        raw_noise.load_data()
+        ica.apply(raw_noise)
+
+    # Pick meg channels for source modeling
+    raw_noise.pick('mag')
+
+    # Compute covariance to withdraw from meg data
+    noise_epoch = mne.Epochs(raw_noise, events=np.array([[0, 0, 0]]), tmin=0, tmax=raw_noise.times[-1], baseline=None, preload=True)
+    noise_csd = mne.time_frequency.csd_morlet(epochs=noise_epoch, frequencies=freqs)
+
+    return noise_csd
 
 def get_bad_annot_array(meg_data, subj_path, fname, save_var=True):
     # Get bad annotations times
