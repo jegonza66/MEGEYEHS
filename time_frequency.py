@@ -7,6 +7,9 @@ import save
 import setup
 from paths import paths
 import matplotlib.pyplot as plt
+import numpy as np
+import os
+
 
 #----- Path -----#
 exp_info = setup.exp_info()
@@ -14,7 +17,7 @@ exp_info = setup.exp_info()
 #----- Save data and display figures -----#
 save_data = True
 save_fig = True
-display_figs = True
+display_figs = False
 if display_figs:
     plt.ion()
 else:
@@ -22,14 +25,14 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'parietal_occipital'  # region_hemisphere
+chs_id = 'frontal'  # region_hemisphere
 # ICA / RAW
 use_ica_data = True
 # Epochs
-epoch_id = 'vs'
+epoch_id = 'cross1'
 corr_ans = None
 tgt_pres = None
-mss = 4
+mss = None
 reject = None  # 'subject' for subject's default. False for no rejection, dict for specific values. None for default 5e-12 for magnetometers
 # Trial durations
 vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
@@ -44,6 +47,12 @@ h_freq = 40
 log_bands = False
 run_itc = False
 estimate_sources = False
+sources_from_tfr = False
+default_subject = exp_info.subjects_ids[0]
+# Source model config
+surf_vol = 'surface'
+ico = 4
+spacing = 10.
 
 # Plots parameters
 # Colorbar
@@ -51,9 +60,14 @@ vmin_power, vmax_power = None, None
 vmin_itc, vmax_itc = None, None
 topo_vmin, topo_vmax = None, None
 # plot_joint max and min topoplots
-plot_max, plot_min = False, False
+plot_max, plot_min = True, True
+
 # Baseline method
+# logratio: dividing by the mean of baseline values and taking the log
+# ratio: dividing by the mean of baseline values
+# mean: subtracting the mean of baseline values
 bline_mode = 'logratio'
+
 # Topoplot bands
 topo_bands = ['Alpha', 'Alpha', 'Theta', 'Alpha']
 #----------#
@@ -63,6 +77,7 @@ if estimate_sources:
     return_average_tfr = False
     output = 'complex'
     run_itc = False
+
 else:
     return_average_tfr = True
     output = 'power'
@@ -115,7 +130,14 @@ trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + plot_id +
 grand_avg_power_fname = f'Grand_Average_power_{l_freq}_{h_freq}_tfr.h5'
 grand_avg_itc_fname = f'Grand_Average_itc_{l_freq}_{h_freq}_tfr.h5'
 
+# Freesurfer directory
+subjects_dir = os.path.join(paths().mri_path(), 'FreeSurfer_out')
+
+# Source estimates grand average
+stcs_fs = []
+
 try:
+    raise ValueError
     # Load previous power data
     grand_avg_power = mne.time_frequency.read_tfrs(trf_save_path + grand_avg_power_fname)[0]
     if run_itc:
@@ -148,9 +170,9 @@ except:
 
         try:
             # Load previous data
-            power = mne.time_frequency.read_tfrs(trf_save_path + power_data_fname, condition=0)
+            power = mne.time_frequency.read_tfrs(trf_save_path + power_data_fname)[0]
             if run_itc:
-                itc = mne.time_frequency.read_tfrs(trf_save_path + itc_data_fname, condition=0)
+                itc = mne.time_frequency.read_tfrs(trf_save_path + itc_data_fname)[0]
         except:
             try:
                 # Load epoched data
@@ -178,9 +200,136 @@ except:
             if run_itc:
                 power, itc = power
 
-            # Estimate sources here before averaging #
 
-            if not return_average_tfr:
+            # -------------- Extra Sources ---------------#
+            if estimate_sources:
+                sources_path_subject = paths().sources_path() + subject.subject_id
+
+                # Check if subject has MRI data
+                try:
+                    fs_subj_path = os.path.join(subjects_dir, subject.subject_id)
+                    os.listdir(fs_subj_path)
+                except:
+                    subject_code = 'fsaverage'
+
+                # Load forward model
+                if surf_vol == 'volume':
+                    fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
+                elif surf_vol == 'surface':
+                    fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
+                elif surf_vol == 'mixed':
+                    fname_fwd = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}-fwd.fif'
+                fwd = mne.read_forward_solution(fname_fwd)
+                src = fwd['src']
+
+                if sources_from_tfr:
+                    # From TFR
+                    # rank
+                    rank = sum([ch_type == 'mag' for ch_type in power.get_channel_types()]) - len(power.info['bads'])
+                    if use_ica_data:
+                        rank -= len(subject.ex_components)
+
+                    power.apply_baseline(baseline=baseline, mode=bline_mode)
+                    csd = mne.time_frequency.csd_tfr(power, tmin=0, tmax=None)
+                    csd_baseline = mne.time_frequency.csd_tfr(power, tmin=None, tmax=0)
+
+                    # Compute scalar DICS beamfomer
+                    filters = mne.beamformer.make_dics(
+                        info=power.info,
+                        forward=fwd,
+                        csd=csd,
+                        noise_csd=csd_baseline,
+                        pick_ori=None,
+                        rank=dict(mag=rank),
+                        real_filter=True
+                    )
+
+                    # project the TFR for each epoch to source space
+                    epochs_stcs = mne.beamformer.apply_dics_tfr_epochs(power, filters, return_generator=True)
+
+                    # average across frequencies and epochs
+                    data = np.zeros((fwd["nsource"], power.times.size))
+                    for epoch_stcs in epochs_stcs:
+                        for stc in epoch_stcs:
+                            data += (stc.data * np.conj(stc.data)).real
+
+                    stc.data = data / len(power) / len(power.freqs)
+
+                    # apply a baseline correction
+                    stc.apply_baseline(baseline=baseline)
+
+                else:
+                    # From epochs
+                    # rank
+                    rank = sum([ch_type == 'mag' for ch_type in epochs.get_channel_types()]) - len(epochs.info['bads'])
+                    if use_ica_data:
+                        rank -= len(subject.ex_components)
+                    h_freq = 12
+                    l_freq = 8
+                    freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)
+                    csd = mne.time_frequency.csd_morlet(epochs, freqs, tmin=0, n_jobs=4)
+                    csd_baseline = mne.time_frequency.csd_morlet(epochs, freqs, tmax=0, n_jobs=4)
+
+                    # compute scalar DICS beamfomer
+                    filters = mne.beamformer.make_dics(
+                        info=epochs.info,
+                        forward=fwd,
+                        csd=csd,
+                        noise_csd=csd_baseline,
+                        pick_ori=None,
+                        rank=dict(mag=rank),
+                        real_filter=True,
+                    )
+
+                    # Project the TFR for each epoch to source space
+                    stc, _ = mne.beamformer.apply_dics_csd(csd, filters)
+                    stc_base, _ = mne.beamformer.apply_dics_csd(csd_baseline, filters)
+
+                    # Apply baseline
+                    stc /= stc_base
+
+                # Morph to default subject
+                if subject_code != default_subject:
+                    # Get Source space for default subject
+                    if surf_vol == 'volume':
+                        fname_src = paths().sources_path() + default_subject + f'/{default_subject}_volume_ico{ico}_{int(spacing)}-src.fif'
+                    elif surf_vol == 'surface':
+                        fname_src = paths().sources_path() + default_subject + f'/{default_subject}_surface_ico{ico}-src.fif'
+                    elif surf_vol == 'mixed':
+                        fname_src = paths().sources_path() + default_subject + f'/{default_subject}_mixed_ico{ico}_{int(spacing)}-src.fif'
+
+                    src_fs = mne.read_source_spaces(fname_src)
+
+                    # Define morph function
+                    morph = mne.compute_source_morph(src=src, subject_from=subject_code, subject_to=default_subject,
+                                                     src_to=src_fs, subjects_dir=subjects_dir)
+                    # Morph
+                    stc_fs = morph.apply(stc)
+
+                    # Append to fs_stcs to make GA
+                    stcs_fs.append(stc_fs)
+
+                else:
+                    # Append to fs_stcs to make GA
+                    stcs_fs.append(stc)
+
+                # Plot
+                if surf_vol == 'surface':
+
+                    message = f"DICS source power in the {l_freq}-{h_freq} Hz frequency band"
+                    # 3D plot
+                    brain = stc.plot(src=src, subject=subject_code, subjects_dir=subjects_dir, hemi='both',
+                                     spacing=f'ico{ico}', time_unit='s', smoothing_steps=7, time_label=message)
+
+                elif surf_vol == 'volume':
+                    # 3D plot
+                    brain = stc.plot_3d(src=fwd['src'], subject=subject_code, subjects_dir=subjects_dir)
+                    # Nutmeg plot
+                    stc.plot(src=fwd['src'], subject=subject_code, subjects_dir=subjects_dir)
+
+            # --------------- End extra DICS sources ------------------#
+
+            if not return_average_tfr and output == 'power':
                 # Average epochs
                 power = power.average()
                 if run_itc:
