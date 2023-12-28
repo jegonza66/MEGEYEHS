@@ -25,11 +25,11 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'frontal'  # region_hemisphere
+chs_id = 'central'  # region_hemisphere
 # ICA / RAW
 use_ica_data = True
 # Epochs
-epoch_id = 'cross1'
+epoch_id = 'blue'
 corr_ans = None
 tgt_pres = None
 mss = None
@@ -46,13 +46,16 @@ l_freq = 1
 h_freq = 40
 log_bands = False
 run_itc = False
+
+# Sources params
 estimate_sources = False
 sources_from_tfr = False
-default_subject = exp_info.subjects_ids[0]
-# Source model config
-surf_vol = 'surface'
-ico = 4
-spacing = 10.
+if estimate_sources:
+    default_subject = exp_info.subjects_ids[0]
+    # Source model config
+    surf_vol = 'surface'
+    ico = 4
+    spacing = 10.
 
 # Plots parameters
 # Colorbar
