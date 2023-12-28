@@ -435,13 +435,15 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
             dur, cross1_dur, cross2_dur, mss_duration, vs_dur = get_duration(epoch_id=epoch_id, mss=mss)
 
             map = dict(ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
-                       cross2={'tmin': -cross1_dur - mss_duration[mss], 'tmax': dur,
-                               'plot_xlim': (-cross1_dur - mss_duration[mss] + plot_edge, dur - plot_edge)},
+                       cross2={'tmin': -cross1_dur - mss_duration[mss], 'tmax': cross2_dur,
+                               'plot_xlim': (plot_edge, cross2_dur - plot_edge)},
                        vs={'tmin': -cross1_dur - mss_duration[mss] - cross2_dur, 'tmax': dur,
                            'plot_xlim': (-cross1_dur - mss_duration[mss] - cross2_dur + plot_edge, dur - plot_edge)},
-                       cross1={'tmin': -2, 'tmax': cross1_dur, 'plot_xlim': (-2 + plot_edge, cross1_dur - plot_edge)},
+                       vsend={'tmin': -2, 'tmax': cross1_dur + 1, 'plot_xlim': (-2 + plot_edge, cross1_dur + 1 - plot_edge)},
                        sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)},
-                       fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.25, 0.55)})
+                       fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.25, 0.55)},
+                       blue={'tmin': -0.3, 'tmax': 1, 'plot_xlim': (-0.3 + plot_edge, 1 - plot_edge)},
+                       red={'tmin': -0.3, 'tmax': 1, 'plot_xlim': (-0.3 + plot_edge, 1 - plot_edge)})
             if 'fix' in epoch_id:
                 tmin = map['fix']['tmin']
                 tmax = map['fix']['tmax']
@@ -501,6 +503,9 @@ def get_baseline_duration(epoch_id, mss, tmin, tmax, plot_xlim, cross1_dur, mss_
         baseline = (-mss_duration[mss] - cross2_dur, -mss_duration[mss])
         plot_baseline = baseline
     elif 'cross1' in epoch_id:
+        baseline = (tmax -cross1_dur, tmax)
+        plot_baseline = baseline
+    elif 'vsend' in epoch_id:
         baseline = (tmax -cross1_dur, tmax)
         plot_baseline = baseline
     elif 'vs' in epoch_id and mss:
