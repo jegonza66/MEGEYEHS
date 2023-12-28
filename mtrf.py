@@ -35,7 +35,7 @@ band_id = None
 # ICA / RAW
 use_ica_data = True
 epoch_ids = ['it_fix_subsampled', 'tgt_fix', 'blue', 'red']
-standarize = False
+standarize = True
 
 # Specific run path for saving data and plots
 if use_ica_data:
