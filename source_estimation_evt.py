@@ -23,6 +23,7 @@ exp_info = setup.exp_info()
 save_fig = True
 save_data = True
 display_figs = False
+plot_individuals = False
 if display_figs:
     plt.ion()
 else:
@@ -37,14 +38,15 @@ use_ica_data = True
 corr_ans = None
 tgt_pres = None
 mss = None
+# Screen durations
+vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
 evt_dur = None
-t_dur = None
+t_dur = vs_dur[mss]
 
-# Get time limits
-tmin, tmax, = -0.75, 3
 # Baseline
-baseline = (tmin, 0)
-bline_mode = 'db'
+bline_mode_subj = 'db'
+bline_mode_ga = False
+plot_edge = 0.25
 
 # Epochs parameters
 reject = None  # None to use defalt {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
@@ -52,23 +54,27 @@ reject = None  # None to use defalt {'mag': 5e-12} / False for no rejection / 's
 # Source estimation parameters
 force_fsaverage = False
 model_name = 'lcmv'
-surf_vol = 'surface'
-ico = 4
+surf_vol = 'volume'
+ico = 5
 spacing = 10.
-pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximices output power
+pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
 source_power = True
+estimate_epochs = False  # epochs and covariance cannot be both true (but they can be both false and estimate sources from evoked)
+estimate_covariance = True
 
 # Default source subject
 default_subject = exp_info.subjects_ids[0]  # Any subject or 'fsaverage'
 visualize_alignment = False
 
 # Plot
-initial_time = 0.75
-cbar_percent_lims = (99.9, 99.95, 100)
+initial_time = 1
+clim_3d = dict(kind='percent', pos_lims=(85, 95, 100))
+clim_nutmeg = dict(kind='percent', lims=(99.9, 99.95, 100))
 
 # Frequency band
+filter_sensors = True
 band_id = 'Alpha'
-filter_method = 'fir'
+filter_method = 'iir'
 
 # Permutations test
 run_permutations = False
@@ -82,12 +88,6 @@ if use_ica_data:
 else:
     data_type = 'RAW'
 
-# Plot colobar limits
-clim_3d = dict(kind='percent', pos_lims=cbar_percent_lims)
-clim_nutmeg = dict(kind='percent', lims=cbar_percent_lims)
-
-# Screen durations
-vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
 
 # --------- Freesurfer Path ---------#
 
@@ -100,43 +100,57 @@ os.environ["SUBJECTS_DIR"] = subjects_dir
 
 # Save source estimates time courses on FreeSurfer
 stcs_fs_dict = {}
+GA_stcs = {}
 
 # Run on separate events based on epochs ids to compute difference
 epoch_ids = run_id.split('--')
 
 # Iterate over epoch ids (if applies)
-for epoch_id in epoch_ids:
+for i, epoch_id in enumerate(epoch_ids):
 
     if 'mss' in epoch_id:
         mss = int(epoch_id.split('_mss')[-1][:1])
-        screen = epoch_id.split('_mss')[0]
+        epoch_id = epoch_id.split('_mss')[0]
         t_dur = vs_dur[mss]
 
     # Windows durations
-    dur, cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration(epoch_id=screen, vs_dur=vs_dur, mss=mss)
+    dur, cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration(epoch_id=epoch_id, vs_dur=vs_dur, mss=mss)
 
     # Get time windows from epoch_id name
-    map = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[1], 'plot_xlim': (-cross1_dur - mss_duration[mss], dur)},
-               cross2={'tmin': -cross1_dur - mss_duration[mss], 'tmax': 1, 'plot_xlim': (-cross1_dur - mss_duration[mss], 1)})
+    map = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[1], 'plot_xlim': (-cross1_dur + plot_edge, mss_duration[1] - plot_edge)})
+    tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=plot_edge, map=map)
 
-    tmin, tmax, _ = functions_general.get_time_lims(epoch_id=screen, mss=mss, plot_edge=0, map=map)
+    # Get baseline duration for epoch_id
+    baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=epoch_id, mss=mss, tmin=tmin, tmax=tmax,
+                                                                      plot_xlim=plot_xlim,
+                                                                      cross1_dur=cross1_dur, mss_duration=mss_duration,
+                                                                      cross2_dur=cross2_dur)
 
     # Data and plots paths
-    if 'mss' not in epoch_id:
-        epoch_id += f'_mss{mss}'
-    run_path = f'/Band_{band_id}/{epoch_id}_Corr{corr_ans}_tgt{tgt_pres}_tdur{t_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
+    if filter_sensors:
+        run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{t_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
+    else:
+        run_path = f'/Band_None/{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{t_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
 
     # Data paths
     epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path
     evoked_save_path = paths().save_path() + f'Evoked_{data_type}/' + run_path
 
     # Source plots paths
-    fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}/'
+    if source_power:
+        run_path = run_path.replace(f'{epoch_id}_mss{mss}', f'{epoch_id}_mss{mss}_power')
+    run_path = run_path.replace('Band_None', f'Band_{band_id}')
+
+    if surf_vol == 'volume' or surf_vol == 'mixed':
+        fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}/'
+    else:
+        fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{pick_ori}/'
+
     # Redefine figure save path
-    fig_path_diff = fig_path.replace(epoch_id, run_id)
+    fig_path_diff = fig_path.replace(f'{epoch_id}_mss{mss}', run_id)
 
     # Save source estimates time courses on FreeSurfer
-    stcs_fs_dict[epoch_id] = []
+    stcs_fs_dict[epoch_ids[i]] = []
 
     # Iterate over participants
     for subject_code in exp_info.subjects_ids:
@@ -176,13 +190,13 @@ for epoch_id in epoch_ids:
         except:
             # Compute
             if use_ica_data:
-                if band_id:
+                if band_id and filter_sensors:
                     meg_data = load.filtered_data(subject=subject, band_id=band_id, save_data=save_data,
                                                   method=filter_method)
                 else:
                     meg_data = load.ica_data(subject=subject)
             else:
-                if band_id:
+                if band_id and filter_sensors:
                     meg_data = load.filtered_data(subject=subject, band_id=band_id, use_ica_data=False,
                                                   save_data=save_data, method=filter_method)
                 else:
@@ -232,24 +246,93 @@ for epoch_id in epoch_ids:
             fname_filter = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
         filters = mne.beamformer.read_beamformer(fname_filter)
 
-        # Apply filter and get source estimates
-        stc = beamformer.apply_lcmv(evoked=evoked, filters=filters)
+        if not estimate_epochs:
+            # Apply filter and get source estimates
+            stc = beamformer.apply_lcmv(evoked=evoked, filters=filters)
 
-        # Compute power in source space
-        if source_power:
-            data = stc.data
-            analytic_signal = hilbert(data, axis=-1)
-            amplitude_power = np.abs(analytic_signal)**2
-            stc.data = amplitude_power
+            if source_power:
+                # Compute envelope in source space
+                data = stc.data
+                if band_id and not filter_sensors:
+                    # Filter source data
+                    data = functions_analysis.butter_bandpass_filter(data, band_id=band_id, sfreq=evoked.info['sfreq'], order=3)
+                # Compute envelope
+                analytic_signal = hilbert(data, axis=-1)
+                signal_envelope = np.abs(analytic_signal)
+                # Save envelope as data
+                stc.data = signal_envelope
 
-        # Apply baseline correction
-        # stc.apply_baseline(baseline=baseline)
-        if bline_mode == 'db':
-            stc.data = 10 * np.log10(stc.data / stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None])
-        elif bline_mode == 'ratio':
-            stc.data = stc.data / stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None]
-        elif bline_mode == 'mean':
-            stc.data = stc.data - stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None]
+        elif not estimate_covariance:
+            # Define sources estimated on epochs
+            stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
+
+            # Define stc object
+            stc = beamformer.apply_lcmv(evoked=evoked, filters=filters)
+
+            # Set data as zero to average epochs
+            stc.data = np.zeros(shape=(stc.data.shape))
+            for stc_epoch in stc_epochs:
+                data = stc_epoch.data
+                if source_power:
+                    # Compute source power on epochs and average
+                    if band_id and not filter_sensors:
+                        # Filter source data
+                        data = functions_analysis.butter_bandpass_filter(data, band_id=band_id, sfreq=evoked.info['sfreq'], order=3)
+                    # Compute envelope
+                    analytic_signal = hilbert(data, axis=-1)
+                    signal_envelope = np.abs(analytic_signal)
+                    # Sum data of every epoch
+                    stc.data += signal_envelope
+                else:
+                    stc.data += data
+                # Divide by epochs number
+                stc.data /= len(epochs)
+
+        elif estimate_covariance:
+
+            # Background noise covariance
+            noise_cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=epochs.info['bads'], use_ica_data=use_ica_data)
+
+            # Spatial filter
+            rank = sum([ch_type == 'mag' for ch_type in epochs.get_channel_types()]) - len(epochs.info['bads'])
+            if use_ica_data:
+                rank -= len(subject.ex_components)
+
+            # Define active times
+            if baseline[0] == tmin:
+                active_times = [baseline[1], tmax]
+            elif baseline[1] == tmax:
+                active_times = [tmin, baseline[0]]
+            else:
+                raise ValueError('Active time window undefined')
+
+            # Covariance matrices
+            baseline_cov = mne.cov.compute_covariance(epochs=epochs, tmin=baseline[0], tmax=baseline[1], method="shrunk", rank=rank)
+            active_cov = mne.cov.compute_covariance(epochs=epochs, tmin=active_times[0], tmax=active_times[1], method="shrunk", rank=rank)
+
+            # Compute sources and apply baseline
+            stc_base = mne.beamformer.apply_lcmv_cov(baseline_cov, filters)
+            stc_act = mne.beamformer.apply_lcmv_cov(active_cov, filters)
+            stc_act /= stc_base
+
+        # Drop edges due to artifacts from power computation
+        stc.crop(tmin=stc.tmin + plot_edge, tmax=stc.tmax - plot_edge)
+
+        if bline_mode_subj:
+            # Apply baseline correction
+            print(f'Applying baseline correction: {bline_mode_subj} from {baseline[0]} to {baseline[1]}')
+            # stc.apply_baseline(baseline=baseline)  # mean
+            if bline_mode_subj == 'db':
+                stc.data = 10 * np.log10(stc.data / stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None])
+            elif bline_mode_subj == 'ratio':
+                stc.data = stc.data / stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None]
+            elif bline_mode_subj == 'mean':
+                stc.data = stc.data - stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None]
+
+        if band_id and source_power:
+            # Filter higher frequencies than corresponding to nyquist of bandpass filter higher freq
+            l_freq, h_freq = functions_general.get_freq_band(band_id=band_id)
+            stc.data = functions_analysis.butter_lowpass_filter(data=stc.data, h_freq=h_freq/2, sfreq=evoked.info['sfreq'], order=3)
 
         # Morph to default subject
         if subject_code != default_subject:
@@ -263,60 +346,59 @@ for epoch_id in epoch_ids:
 
             src_fs = mne.read_source_spaces(fname_src)
 
-            # Morph to default subject
-            morph = mne.compute_source_morph(src=src, subject_from=subject_code,
-                                                 subject_to=default_subject,
-                                                 src_to=src_fs, subjects_dir=subjects_dir)
+            # Define morph function
+            morph = mne.compute_source_morph(src=src, subject_from=subject_code, subject_to=default_subject, src_to=src_fs, subjects_dir=subjects_dir)
 
             # Apply morph
             stc_fs = morph.apply(stc)
 
             # Append to fs_stcs to make GA
-            stcs_fs_dict[epoch_id].append(stc_fs)
+            stcs_fs_dict[epoch_ids[i]].append(stc_fs)
 
         else:
             # Append to fs_stcs to make GA
-            stcs_fs_dict[epoch_id].append(stc)
+            stcs_fs_dict[epoch_ids[i]].append(stc)
 
-        # # Plot
-        # if surf_vol == 'volume':
-        #     fname = f'{subject.subject_id}'
-        #     if subject_code == 'fsaverage':
-        #         fname += '_fsaverage'
-        #
-        #     # 3D plot
-        #     brain = stc.copy().crop(tmin=0).plot_3d(src=src, subject=subject_code, subjects_dir=subjects_dir, hemi='split',
-        #                            spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', views='lateral', size=(1920, 1072))
-        #     if save_fig:
-        #         # brain.show_view(azimuth=-90)
-        #         os.makedirs(fig_path + '/svg/', exist_ok=True)
-        #         brain.save_image(filename=fig_path + fname + '.png')
-        #         brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
-        #
-        #     # Nutmeg
-        #     fig = stc.plot(src=src, subject=subject_code, subjects_dir=subjects_dir, initial_time=initial_time, clim=clim_nutmeg)
-        #     # Save figure
-        #     if save_fig:
-        #         save.fig(fig=fig, path=fig_path, fname=fname)
-        #
-        # elif surf_vol == 'surface':
-        #     # 3D plot
-        #     brain = stc.copy().crop(tmin=0).plot(src=src, subject=subject_code, subjects_dir=subjects_dir, hemi='split',
-        #                      spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', views='lateral', size=(1920, 1072))
-        #     # brain.add_annotation('aparc.DKTatlas40')
-        #     if save_fig:
-        #         fname = f'{subject.subject_id}'
-        #         if subject_code == 'fsaverage':
-        #             fname += '_fsaverage'
-        #         # brain.show_view(azimuth=-90)
-        #         os.makedirs(fig_path + '/svg/', exist_ok=True)
-        #         brain.save_image(filename=fig_path + fname + '.png')
-        #         brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
+        # Plot
+        if plot_individuals:
+            if surf_vol == 'volume':
+                fname = f'{subject.subject_id}'
+                if subject_code == 'fsaverage':
+                    fname += '_fsaverage'
+
+                # 3D plot
+                brain = stc.plot_3d(src=src, subject=subject_code, subjects_dir=subjects_dir, hemi='both', surface='white', clim=clim_3d,
+                                       spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', views='lateral', size=(1000, 500))
+                if save_fig:
+                    # brain.show_view(azimuth=-90)
+                    os.makedirs(fig_path + '/svg/', exist_ok=True)
+                    brain.save_image(filename=fig_path + fname + '.png')
+                    brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
+
+                # Nutmeg
+                fig = stc.plot(src=src, subject=subject_code, subjects_dir=subjects_dir, initial_time=initial_time, clim=clim_nutmeg)
+                # Save figure
+                if save_fig:
+                    save.fig(fig=fig, path=fig_path, fname=fname)
+
+            elif surf_vol == 'surface':
+                # 3D plot
+                brain = stc.plot(src=src, subject=subject_code, subjects_dir=subjects_dir, hemi='split', clim=clim_3d,
+                                 spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', views='lateral', size=(1000, 500))
+                # brain.add_annotation('aparc.DKTatlas40')
+                if save_fig:
+                    fname = f'{subject.subject_id}'
+                    if subject_code == 'fsaverage':
+                        fname += '_fsaverage'
+                    # brain.show_view(azimuth=-90)
+                    os.makedirs(fig_path + '/svg/', exist_ok=True)
+                    brain.save_image(filename=fig_path + fname + '.png')
+                    brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
 
     # Grand Average: Average evoked stcs from this epoch_id
-    source_data_fs = np.zeros(tuple([len(stcs_fs_dict[epoch_id])] + [size for size in stcs_fs_dict[epoch_id][0].data.shape]))
-    for i, stc in enumerate(stcs_fs_dict[epoch_id]):
-        source_data_fs[i] = stcs_fs_dict[epoch_id][i].data
+    source_data_fs = np.zeros(tuple([len(stcs_fs_dict[epoch_ids[i]])] + [size for size in stcs_fs_dict[epoch_ids[i]][0].data.shape]))
+    for j, stc in enumerate(stcs_fs_dict[epoch_ids[i]]):
+        source_data_fs[j] = stcs_fs_dict[epoch_ids[i]][j].data
     GA_stc_data = source_data_fs.mean(0)
 
     # Copy Source Time Course from default subject morph to define GA STC
@@ -327,47 +409,57 @@ for epoch_id in epoch_ids:
     GA_stc.subject = default_subject
 
     # Apply baseline on GA data
-    GA_stc.apply_baseline(baseline=baseline)
-    # if bline_mode == 'db':
-    #     GA_stc.data = 10 * np.log10(GA_stc.data / GA_stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None])
-    # elif bline_mode == 'ratio':
-    #     GA_stc.data = GA_stc.data / GA_stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None]
-    # elif bline_mode == 'mean':
-    #     GA_stc.data = GA_stc.data - GA_stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None]
+    if bline_mode_ga:
+        print(f'Applying baseline correction: {bline_mode_ga} from {baseline[0]} to {baseline[1]}')
+        # GA_stc.apply_baseline(baseline=baseline)
+        if bline_mode_ga == 'db':
+            GA_stc.data = 10 * np.log10(GA_stc.data / GA_stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None])
+        elif bline_mode_ga == 'ratio':
+            GA_stc.data = GA_stc.data / GA_stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None]
+        elif bline_mode_ga == 'mean':
+            GA_stc.data = GA_stc.data - GA_stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None]
+
+    # Save GA from epoch id
+    GA_stcs[epoch_ids[i]] = GA_stc
+
+    #--------- Plot GA ---------#
 
     if surf_vol == 'volume':
-        fname = 'GA'
-        if force_fsaverage:
-            fname += '_fsaverage'
-
         # 3D plot
-        brain = GA_stc.copy().crop(tmin=0).plot_3d(src=src_fs, subject=default_subject, subjects_dir=subjects_dir,  hemi='split',
-                               spacing=f'ico{ico}', initial_time=initial_time, size=(1920, 1072))
+        brain = GA_stc.plot_3d(src=src_fs, subject=default_subject, subjects_dir=subjects_dir,  hemi='both', clim=clim_3d,
+                               spacing=f'ico{ico}', initial_time=initial_time, size=(1000, 500))
+        # brain.show_view(azimuth=-90)
         if save_fig:
-            # brain.show_view(azimuth=-90)
+            fname = 'GA_3D'
+            if force_fsaverage:
+                fname += '_fsaverage'
             os.makedirs(fig_path + '/svg/', exist_ok=True)
             brain.save_image(filename=fig_path + fname + '.png')
             brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
-            brain.save_movie(filename=fig_path + fname + '.mp4', tmin=0, time_dilation=12, framerate=30)
+            brain.save_movie(filename=fig_path + fname + '.mp4', time_dilation=12, framerate=30)
 
         # Nutmeg plot
-        fig = GA_stc.plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, initial_time=initial_time, clim=clim_nutmeg)
+        fig = GA_stc.plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, initial_time=initial_time)
         if save_fig:
+            fname = 'GA'
+            if force_fsaverage:
+                fname += '_fsaverage'
             save.fig(fig=fig, path=fig_path, fname=fname)
 
     elif surf_vol == 'surface':
         # 3D plot
-        brain = GA_stc.copy().crop(tmin=0).plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, hemi='split',
-                            spacing=f'ico{ico}', time_unit='s', views='lateral', size=(1920, 1072))
+        brain = GA_stc.plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, hemi='split', clim=clim_3d,
+                            spacing=f'ico{ico}', time_unit='s', views='lateral', size=(1000, 500))
         if save_fig:
-            fname = 'GA'
+            fname = 'GA_3D'
             if force_fsaverage:
                 fname += '_fsaverage'
             # brain.show_view(azimuth=-90)
             os.makedirs(fig_path + '/svg/', exist_ok=True)
             brain.save_image(filename=fig_path + fname + '.png')
             brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
-            brain.save_movie(filename=fig_path + fname + '.mp4', tmin=0, time_dilation=12, framerate=30)
+            brain.save_movie(filename=fig_path + fname + '.mp4', time_dilation=12, framerate=30)
+
 
 #----- Difference between conditions -----#
 
@@ -417,39 +509,45 @@ if len(stcs_fs_dict.keys()) > 1:
     GA_stc_diff.data = GA_stc_diff_data
     GA_stc_diff.subject = default_subject
 
-    # Apply baseline on GA diff
-    if any('cross2' in id for id in epoch_ids):
-        source_data_fs_base = np.zeros(tuple([len(stcs_fs)] + [size for size in stcs_fs_base[0].data.shape]))
-        for i, stc in enumerate(stcs_fs_base):
-            source_data_fs_base[i] = stcs_fs_base[i].data
-        GA_stc_diff_data_base = source_data_fs_base.mean(0)
 
-        # if bline_mode == 'db':
-        #     GA_stc_diff_data = 10 * np.log10(GA_stc_diff_data / GA_stc_diff_data_base.mean(axis=1)[:, None])
-        # elif bline_mode == 'ratio':
-        #     GA_stc_diff_data = GA_stc_diff_data / GA_stc_diff_data_base.mean(axis=1)[:, None]
-        # elif bline_mode == 'mean':
-        #     GA_stc_diff_data = GA_stc_diff_data - GA_stc_diff_data_base.mean(axis=1)[:, None]
+    # --------- Plots ---------#
+    # 3D Plot
+    if surf_vol == 'volume' or surf_vol == 'mixed':
+        # Difference Nutmeg plot
+        fig = GA_stc_diff.plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, initial_time=initial_time)
+        if save_fig and surf_vol == 'volume':
+            fname = 'GA'
+            if force_fsaverage:
+                fname += '_fsaverage'
+            save.fig(fig=fig, path=fig_path_diff, fname=fname)
 
-        # Apply mean baseline
-        GA_stc_diff_data = GA_stc_diff_data - GA_stc_diff_data_base.mean(axis=1)[:, None]
+        # Difference 3D plot
+        brain = GA_stc_diff.copy().plot_3d(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, hemi='both', clim=clim_3d,
+                                           spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', size=(1000, 500))
+        if save_fig:
+            fname = 'GA_3D'
+            if force_fsaverage:
+                fname += '_fsaverage'
+            # brain.show_view(azimuth=-90)
+            os.makedirs(fig_path_diff + '/svg/', exist_ok=True)
+            brain.save_image(filename=fig_path_diff + fname + '.png')
+            brain.save_image(filename=fig_path_diff + '/svg/' + fname + '.pdf')
+            brain.save_movie(filename=fig_path_diff + fname + '.mp4', time_dilation=12, framerate=30)
 
-        # Overwrite data in stc
-        GA_stc_diff.data = GA_stc_diff_data
+    elif surf_vol == 'surface':
+        # Difference 3D plot
+        brain = GA_stc_diff.plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, hemi='split', clim=clim_3d,
+                                 spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', views='lateral', size=(1000, 500))
+        if save_fig:
+            fname = 'GA_3D'
+            if force_fsaverage:
+                fname += '_fsaverage'
+            # brain.show_view(azimuth=-90)
+            os.makedirs(fig_path_diff + '/svg/', exist_ok=True)
+            brain.save_image(filename=fig_path_diff + fname + '.png')
+            brain.save_image(filename=fig_path_diff + '/svg/' + fname + '.pdf')
+            brain.save_movie(filename=fig_path_diff + fname + '.mp4', time_dilation=12, framerate=30)
 
-    else:
-        # Apply mean baseline
-        GA_stc_diff.apply_baseline(baseline=baseline)
-        # if bline_mode == 'db':
-        #     GA_stc_diff.data = 10 * np.log10(
-        #         GA_stc_diff.data / GA_stc_diff.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None])
-        # elif bline_mode == 'ratio':
-        #     GA_stc_diff.data = GA_stc_diff.data / GA_stc_diff.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None]
-        # elif bline_mode == 'mean':
-        #     GA_stc_diff.data = GA_stc_diff.data - GA_stc_diff.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None]
-
-    # Get vertices from source space
-    fsave_vertices = [s["vertno"] for s in src_fs]
 
     #--------- Cluster permutations test ---------#
 
@@ -479,29 +577,33 @@ if len(stcs_fs_dict.keys()) > 1:
         good_clusters = [clusters[idx] for idx in good_clusters_idx]
         # [cluster_p_values[idx] for idx in good_clusters_idx]
 
+        # Get vertices from source space
+        fsave_vertices = [s["vertno"] for s in src_fs]
+
         # Select clusters for visualization
         stc_all_cluster_vis = summarize_clusters_stc(clu=clu, p_thresh=p_threshold, tstep=GA_stc_diff.tstep, vertices=fsave_vertices,
                                                      subject=default_subject)
 
 
-    # --------- Plots ---------#
-
-    # 3D Plot
-    if surf_vol == 'volume' or surf_vol == 'mixed':
-        if run_permutations:
+        # --------- Plots ---------#
+        # 3D Plot
+        if surf_vol == 'volume' or surf_vol == 'mixed':
             # Clusters 3D plot
-            brain = stc_all_cluster_vis.plot_3d(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, hemi='split',
-                                        spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', views='lateral', size=(1920, 1072))
+            brain = stc_all_cluster_vis.plot_3d(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, hemi='both',
+                                        spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', size=(1000, 500))
 
             if save_fig:
-                fname = f'Clus_t{round(t_thresh, 2)}_p{p_threshold}'
+                if type(t_thresh) == dict:
+                    fname = f'Clus_t_TFCE_p{p_threshold}_3D'
+                else:
+                    fname = f'Clus_t{round(t_thresh, 2)}_p{p_threshold}_3D'
                 if force_fsaverage:
                     fname += '_fsaverage'
                 # brain.show_view(azimuth=-90)
                 os.makedirs(fig_path_diff + '/svg/', exist_ok=True)
                 brain.save_image(filename=fig_path_diff + fname + '.png')
                 brain.save_image(filename=fig_path_diff + '/svg/' + fname + '.pdf')
-                brain.save_movie(filename=fig_path_diff + fname + '.mp4', tmin=0, time_dilation=12, framerate=30)
+                brain.save_movie(filename=fig_path_diff + fname + '.mp4', time_dilation=12, framerate=30)
 
             # Clusters Nutmeg plot
             fig = stc_all_cluster_vis.plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir)
@@ -514,54 +616,20 @@ if len(stcs_fs_dict.keys()) > 1:
                     fname += '_fsaverage'
                 save.fig(fig=fig, path=fig_path_diff, fname=fname)
 
-        # Difference Nutmeg plot
-        fig = GA_stc_diff.plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, initial_time=initial_time, clim=clim_nutmeg)
-        if save_fig and surf_vol == 'volume':
-            fname = 'GA'
-            if force_fsaverage:
-                fname += '_fsaverage'
-            save.fig(fig=fig, path=fig_path_diff, fname=fname)
 
-        # Difference 3D plot
-        brain = GA_stc_diff.copy().crop(tmin=0).plot_3d(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, hemi='split',
-                       spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', views='lateral', size=(1920, 1072))
-        if save_fig:
-            fname = 'GA'
-            if force_fsaverage:
-                fname += '_fsaverage'
-            # brain.show_view(azimuth=-90)
-            os.makedirs(fig_path_diff + '/svg/', exist_ok=True)
-            brain.save_image(filename=fig_path_diff + fname + '.png')
-            brain.save_image(filename=fig_path_diff + '/svg/' + fname + '.pdf')
-            brain.save_movie(filename=fig_path_diff + fname + '.mp4', tmin=0, time_dilation=12, framerate=30)
-
-    elif surf_vol == 'surface':
-        if run_permutations:
+        elif surf_vol == 'surface':
             # Clusters 3D plot
             fig = stc_all_cluster_vis.plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, hemi='split',
-                                     spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', views='lateral', size=(1920, 1072))
+                                     spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', views='lateral', size=(1000, 500))
             if save_fig:
                 if type(t_thresh) == dict:
-                    fname = f'Clus_t_TFCE_p{p_threshold}'
+                    fname = f'Clus_t_TFCE_p{p_threshold}_3D'
                 else:
-                    fname = f'Clus_t{round(t_thresh, 2)}_p{p_threshold}'
+                    fname = f'Clus_t{round(t_thresh, 2)}_p{p_threshold}_3D'
                 if force_fsaverage:
                     fname += '_fsaverage'
                 # fig.show_view(azimuth=-90)
                 os.makedirs(fig_path_diff + '/svg/', exist_ok=True)
                 fig.save_image(filename=fig_path_diff + fname + '.png')
                 brain.save_image(filename=fig_path_diff + '/svg/' + fname + '.pdf')
-                brain.save_movie(filename=fig_path_diff + fname + '.mp4', tmin=0, time_dilation=12, framerate=30)
-
-        # Difference 3D plot
-        brain = GA_stc_diff.copy().crop(tmin=0).plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, hemi='split',
-                    spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', views='lateral', size=(1920, 1072))
-        if save_fig:
-            fname = 'GA'
-            if force_fsaverage:
-                fname += '_fsaverage'
-            # brain.show_view(azimuth=-90)
-            os.makedirs(fig_path_diff + '/svg/', exist_ok=True)
-            brain.save_image(filename=fig_path_diff + fname + '.png')
-            brain.save_image(filename=fig_path_diff + '/svg/' + fname + '.pdf')
-            brain.save_movie(filename=fig_path_diff + fname + '.mp4', tmin=0, time_dilation=12, framerate=30)
+                brain.save_movie(filename=fig_path_diff + fname + '.mp4', time_dilation=12, framerate=30)
