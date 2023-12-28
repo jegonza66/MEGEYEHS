@@ -9,6 +9,7 @@ import save
 import load
 import setup
 from mne.decoding import ReceptiveField
+from scipy.signal import butter, lfilter
 
 
 def define_events(subject, meg_data, epoch_id, trials=None, evt_dur=None, epoch_keys=None):
@@ -38,8 +39,10 @@ def define_events(subject, meg_data, epoch_id, trials=None, evt_dur=None, epoch_
             epoch_keys = [key for key in epoch_keys if 'fix' not in key]
         if trials != None and epoch_id != 'blue' and epoch_id != 'red':
             try:
-                epoch_keys = [epoch_key for epoch_key in epoch_keys if
-                              (epoch_key.split('_t')[-1].split('_')[0] in trials and 'end' not in epoch_key)]
+                if 'vsend' in epoch_id:
+                    epoch_keys = [epoch_key for epoch_key in epoch_keys if epoch_key.split('_t')[-1] in trials]
+                else:
+                    epoch_keys = [epoch_key for epoch_key in epoch_keys if (epoch_key.split('_t')[-1].split('_')[0] in trials and 'end' not in epoch_key)]
             except:
                 print('Trial selection skipped. Epoch_id does not contain trial number.')
 
@@ -461,3 +464,22 @@ def fit_mtrf(meg_data, tmin, tmax, alpha, model_input, chs_id, standarize=True, 
     rf.fit(model_input, meg_data_array)
 
     return rf
+
+
+def butter_bandpass_filter(data, band_id, sfreq=1200, order=3):
+    l_freq, h_freq = functions_general.get_freq_band(band_id=band_id)
+    b, a = butter(N=order, Wn=[l_freq, h_freq], fs=sfreq, btype='band')
+    y = lfilter(b, a, data)
+    return y
+
+
+def butter_lowpass_filter(data, h_freq, sfreq=1200, order=3):
+    b, a = butter(N=order, Wn=h_freq, fs=sfreq, btype='low')
+    y = lfilter(b, a, data)
+    return y
+
+
+def butter_highpass_filter(data, l_freq, sfreq=1200, order=3):
+    b, a = butter(N=order, Wn=l_freq, fs=sfreq, btype='high')
+    y = lfilter(b, a, data)
+    return y
