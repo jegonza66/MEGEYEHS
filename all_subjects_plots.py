@@ -18,6 +18,11 @@ all_rt = pd.DataFrame()
 all_mss = pd.DataFrame()
 all_corr_ans = pd.DataFrame()
 
+# Saccades, tgt fixations and response times relative to end time
+all_saccades_end = pd.DataFrame()
+all_fixations_target = pd.DataFrame()
+all_response_times_end = pd.DataFrame()
+
 for subject_code in exp_info.subjects_ids:
 
     subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
@@ -39,6 +44,32 @@ for subject_code in exp_info.subjects_ids:
     corr_ans = pd.DataFrame(subject.corr_ans)
     mss = pd.DataFrame(subject.bh_data['Nstim'])
 
+    # Saccades times distributions
+    saccades_vs = saccades.loc[saccades['screen'] == 'vs']
+    saccades_end_subj = []
+    for index, saccade in saccades_vs.iterrows():
+        trial_idx = saccade.trial - 1
+        vs_dur = subject.vsend[trial_idx] - subject.vs[trial_idx]
+        saccades_end_subj.append(saccade.delay - float(vs_dur))
+
+    # tgt_fix times distributions
+    tgt_fixations = fixations.loc[fixations['fix_target'] == 1]
+    tgt_fixations_subj = []
+    for index, fixation in tgt_fixations.iterrows():
+        trial_idx = fixation.trial - 1
+        vs_dur = subject.vsend[trial_idx] - subject.vs[trial_idx]
+        tgt_fixations_subj.append(fixation.delay - float(vs_dur))
+
+    # Response times distributions reslative to trial end
+    response_times_end = []
+    for trial_idx, response_time in rt.iterrows():
+        vs_dur = subject.vsend[trial_idx] - subject.vs[trial_idx]
+        response_times_end.append(response_time.values[0] - float(vs_dur))
+
+    all_saccades_end = pd.concat([all_saccades_end, pd.Series(saccades_end_subj)])
+    all_fixations_target = pd.concat([all_fixations_target, pd.Series(tgt_fixations_subj)])
+    all_response_times_end = pd.concat([all_response_times_end, pd.Series(response_times_end)])
+
     all_fixations = pd.concat([all_fixations, fixations])
     all_saccades = pd.concat([all_saccades, saccades])
     all_bh_data = pd.concat([all_bh_data, bh_data])
@@ -46,12 +77,42 @@ for subject_code in exp_info.subjects_ids:
     all_mss = pd.concat([all_mss, mss])
     all_corr_ans = pd.concat([all_corr_ans, corr_ans])
 
+
+# Relative to end time plots
+
+# Saccades
+fig, ax = plt.subplots()
+all_saccades_end.hist(range=[-2, 0], edgecolor='black', linewidth=1.2, density=True, stacked=True, ax=ax)
+plt.title('VS saccades realtive to search end')
+plt.xlabel('time [s]')
+save_path = paths().plots_path()
+fname = f'VS saccades trial end'
+save.fig(fig=fig, path=save_path, fname=fname)
+
+# Target fixations
+fig, ax = plt.subplots()
+all_fixations_target.hist(range=[-2, 0], edgecolor='black', linewidth=1.2, density=True, stacked=True, ax=ax)
+plt.title('Target fixations realtive to search end')
+plt.xlabel('time [s]')
+save_path = paths().plots_path()
+fname = f'Target fixations trial end'
+save.fig(fig=fig, path=save_path, fname=fname)
+
+# Response times
+fig, ax = plt.subplots()
+all_response_times_end.hist(range=[-0.03, 0], edgecolor='black', linewidth=1.2, density=True, stacked=True, ax=ax)
+plt.title('Response time realtive to search end')
+plt.xlabel('time [s]')
+save_path = paths().plots_path()
+fname = f'Response trime trial end'
+save.fig(fig=fig, path=save_path, fname=fname)
+
+
 # Define all subjects class instance
 subjects = setup.all_subjects(all_fixations, all_saccades, all_bh_data, all_rt, all_corr_ans, all_mss)
 
 plot_preproc.first_fixation_delay(subject=subjects)
 plot_preproc.pupil_size_increase(subject=subjects)
-
 
 plt.rcParams.update({'font.size': 12})
 fig, axs = plt.subplots(2, 2, figsize=(12, 7))
