@@ -246,8 +246,8 @@ else:
 #-----  Parameters -----#
 # ICA vs raw data
 use_ica_data = True
-run_tfce = False
-standarize = False
+run_tfce = True
+standarize = True
 band_id = None
 # Id
 epoch_ids = ['it_fix_subsampled', 'tgt_fix', 'blue', 'red']
@@ -268,7 +268,7 @@ baseline = (tmin, -0.05)
 # TRF hiper-parameter
 alpha = None
 # Reescale and plot with FRF
-FRF_TRF = True
+FRF_TRF = False
 
 # Data type
 if use_ica_data:
