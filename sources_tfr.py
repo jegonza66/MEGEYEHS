@@ -1,17 +1,13 @@
-import functions_general
 import functions_analysis
 import load
 import mne
 import os
-import plot_general
 import save
-import pandas as pd
 import setup
 from paths import paths
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy
-from mne.stats import permutation_cluster_1samp_test
+
 
 #----- Path -----#
 exp_info = setup.exp_info()
@@ -335,7 +331,7 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
                                 # Load morph map
                                 morph_save_path = fname_src.replace(default_subject + '/', f'morphs/{subject_code}_to_')[:-8] + '-morph.h5'
                                 try:
-                                    mne.read_source_morph(morph_save_path)
+                                    morph = mne.read_source_morph(morph_save_path)
                                 except:
                                     # Define morph function
                                     morph = mne.compute_source_morph(src=src, subject_from=subject_code,
