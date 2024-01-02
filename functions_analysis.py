@@ -31,39 +31,43 @@ def define_events(subject, meg_data, epoch_id, trials=None, evt_dur=None, epoch_
     all_events, all_event_id = mne.events_from_annotations(meg_data, verbose=False)
 
     if epoch_keys is None:
-        # Select epochs
-        epoch_keys = [key for key in all_event_id.keys() if epoch_id in key]
-        if 'sac' not in epoch_id:
-            epoch_keys = [key for key in epoch_keys if 'sac' not in key]
-        if 'fix' not in epoch_id:
-            epoch_keys = [key for key in epoch_keys if 'fix' not in key]
-        if trials != None and epoch_id != 'blue' and epoch_id != 'red':
-            try:
-                if 'vsend' in epoch_id:
-                    epoch_keys = [epoch_key for epoch_key in epoch_keys if epoch_key.split('_t')[-1] in trials]
-                else:
-                    epoch_keys = [epoch_key for epoch_key in epoch_keys if (epoch_key.split('_t')[-1].split('_')[0] in trials and 'end' not in epoch_key)]
-            except:
-                print('Trial selection skipped. Epoch_id does not contain trial number.')
+        # Define epoch keys as all events
+        epoch_keys = []
 
-        # Set duration limit
-        if 'fix' in epoch_id:
-            metadata = subject.fixations
-            if evt_dur:
-                metadata = metadata.loc[(metadata['duration'] >= evt_dur)]
-                metadata_ids = list(metadata['id'])
-                epoch_keys = [key for key in epoch_keys if key in metadata_ids]
-        elif 'sac' in epoch_id:
-            metadata = subject.saccades
-            if evt_dur:
-                metadata = metadata.loc[(metadata['duration'] >= evt_dur)]
-                metadata_ids = list(metadata['id'])
-                epoch_keys = [key for key in epoch_keys if key in metadata_ids]
+        # Iterate over posible multiple epoch ids
+        for epoch_sub_id in epoch_id.split('+'):
+
+            # Select epochs
+            epoch_keys += [key for key in all_event_id if epoch_sub_id in key]
+            if 'sac' not in epoch_sub_id:
+                epoch_keys = [key for key in epoch_keys if 'sac' not in key]
+            if 'fix' not in epoch_sub_id:
+                epoch_keys = [key for key in epoch_keys if 'fix' not in key]
+            if trials != None and '_t' in epoch_sub_id:
+                try:
+                    if 'vsend' in epoch_sub_id:
+                        epoch_keys = [epoch_key for epoch_key in epoch_keys if epoch_key.split('_t')[-1] in trials]
+                    else:
+                        epoch_keys = [epoch_key for epoch_key in epoch_keys if (epoch_key.split('_t')[-1].split('_')[0] in trials and 'end' not in epoch_key)]
+                except:
+                    print('Trial selection skipped. Epoch_id does not contain trial number.')
+
+            # Set duration limit
+            if 'fix' in epoch_sub_id:
+                metadata = subject.fixations
+                if evt_dur:
+                    metadata = metadata.loc[(metadata['duration'] >= evt_dur)]
+                    metadata_ids = list(metadata['id'])
+                    epoch_keys = [key for key in epoch_keys if key in metadata_ids]
+            elif 'sac' in epoch_sub_id:
+                metadata = subject.saccades
+                if evt_dur:
+                    metadata = metadata.loc[(metadata['duration'] >= evt_dur)]
+                    metadata_ids = list(metadata['id'])
+                    epoch_keys = [key for key in epoch_keys if key in metadata_ids]
 
     # Get events and ids matchig selection
-    metadata, events, events_id = mne.epochs.make_metadata(events=all_events, event_id=all_event_id,
-                                                           row_events=epoch_keys, tmin=0, tmax=0,
-                                                           sfreq=meg_data.info['sfreq'])
+    metadata, events, events_id = mne.epochs.make_metadata(events=all_events, event_id=all_event_id, row_events=epoch_keys, tmin=0, tmax=0, sfreq=meg_data.info['sfreq'])
 
     if 'fix' in epoch_id:
         metadata_sup = subject.fixations
@@ -100,11 +104,9 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
         raise ValueError('Please provide path and filename to save data. If not, set save_data to false.')
 
     # Trials
-    cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss, trial_dur=trial_dur,
-                                                                      corr_ans=corr_ans, tgt_pres=tgt_pres)
+    cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss, trial_dur=trial_dur, corr_ans=corr_ans, tgt_pres=tgt_pres)
     # Define events
-    metadata, events, events_id, metadata_sup = define_events(subject=subject, epoch_id=epoch_id, evt_dur=evt_dur,
-                                                              trials=cond_trials, meg_data=meg_data)
+    metadata, events, events_id, metadata_sup = define_events(subject=subject, epoch_id=epoch_id, evt_dur=evt_dur, trials=cond_trials, meg_data=meg_data)
     # Reject based on channel amplitude
     if reject == False:
         # Setting reject parameter to False uses No rejection (None in mne will not reject)
