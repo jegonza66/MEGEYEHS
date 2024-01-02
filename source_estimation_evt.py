@@ -30,7 +30,7 @@ else:
     plt.ioff()
 
 # Select epochs
-run_id = 'ms_mss4'  # use '--' to compute difference between 2 conditions
+run_id = 'ms_mss1'  # use '--' to compute difference between 2 conditions
 # ICA
 use_ica_data = True
 
@@ -60,7 +60,7 @@ spacing = 10.
 pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
 source_power = True
 estimate_epochs = False  # epochs and covariance cannot be both true (but they can be both false and estimate sources from evoked)
-estimate_covariance = True
+estimate_covariance = False
 
 # Default source subject
 default_subject = exp_info.subjects_ids[0]  # Any subject or 'fsaverage'
@@ -125,7 +125,7 @@ for i, epoch_id in enumerate(epoch_ids):
     dur, cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration(epoch_id=epoch_id, vs_dur=vs_dur, mss=mss)
 
     # Get time windows from epoch_id name
-    map = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[1] + 1, 'plot_xlim': (-cross1_dur + plot_edge, mss_duration[1] + 1 - plot_edge)})
+    map = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[mss] + cross2_dur, 'plot_xlim': (-cross1_dur + plot_edge, mss_duration[mss] + cross2_dur - plot_edge)})
     tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=plot_edge, map=map)
 
     # Get baseline duration for epoch_id
