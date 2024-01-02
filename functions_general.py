@@ -442,8 +442,8 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
                        vsend={'tmin': -2, 'tmax': cross1_dur + 1, 'plot_xlim': (-2 + plot_edge, cross1_dur + 1 - plot_edge)},
                        sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)},
                        fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.25, 0.55)},
-                       blue={'tmin': -0.3, 'tmax': 1, 'plot_xlim': (-0.3 + plot_edge, 1 - plot_edge)},
-                       red={'tmin': -0.3, 'tmax': 1, 'plot_xlim': (-0.3 + plot_edge, 1 - plot_edge)})
+                       blue={'tmin': -0.5, 'tmax': 5, 'plot_xlim': (-0.5 + plot_edge, 5 - plot_edge)},
+                       red={'tmin': -0.5, 'tmax': 5, 'plot_xlim': (-0.5 + plot_edge, 5 - plot_edge)})
             if 'fix' in epoch_id:
                 tmin = map['fix']['tmin']
                 tmax = map['fix']['tmax']
@@ -453,10 +453,13 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
                 tmax = map['sac']['tmax']
                 plot_xlim = map['sac']['plot_xlim']
             else:
-                tmin = map[epoch_id]['tmin']
-                tmax = map[epoch_id]['tmax']
-                plot_xlim = map[epoch_id]['plot_xlim']
-            print(f'Using default time values for {epoch_id}: tmin:{tmin}, tmax: {tmax}, plot lims: {plot_xlim}')
+                for key in map.keys():
+                    if key in epoch_id:
+                        tmin = map[key]['tmin']
+                        tmax = map[key]['tmax']
+                        plot_xlim = map[key]['plot_xlim']
+                        break
+                print(f'Using default time values for {epoch_id}: tmin:{tmin}, tmax: {tmax}, plot lims: {plot_xlim}')
         except:
             raise ValueError('Epoch id not in default map keys.')
 
@@ -474,7 +477,7 @@ def get_duration(epoch_id,  mss, vs_dur=None):
     if 'ms' in epoch_id:
         dur = mss_duration[mss] + cross2_dur + vs_dur[mss][0]
     elif 'cross2' in epoch_id:
-        dur = cross2_dur + vs_dur[mss][-0]  # seconds
+        dur = cross2_dur + vs_dur[mss][0]  # seconds
     elif 'vs' in epoch_id:
         dur = vs_dur[mss][0]  # seconds
     else:
@@ -502,20 +505,19 @@ def get_baseline_duration(epoch_id, mss, tmin, tmax, plot_xlim, cross1_dur, mss_
     elif 'cross2' in epoch_id and mss:
         baseline = (-mss_duration[mss] - cross2_dur, -mss_duration[mss])
         plot_baseline = baseline
-    elif 'cross1' in epoch_id:
-        baseline = (tmax -cross1_dur, tmax)
-        plot_baseline = baseline
     elif 'vsend' in epoch_id:
         baseline = (tmax -cross1_dur, tmax)
         plot_baseline = baseline
-    elif 'vs' in epoch_id and mss:
+    elif 'vs' in epoch_id:
         baseline = (-cross1_dur -cross2_dur - mss_duration[mss], -cross2_dur - mss_duration[mss])
         plot_baseline = baseline
+    elif 'red' in epoch_id or 'blue' in epoch_id:
+        baseline = (tmin, -0.1)
+        plot_baseline = baseline
+
     else:
-        tmax = tmin + cross1_dur
-        if tmax.is_integer():
-            tmax = int(tmax)
-        baseline = (tmin, tmax)
+        print(f'Using default baseline from tmin: {tmin} to 0')
+        baseline = (tmin, 0)
         plot_baseline = baseline
 
     if baseline[0] < tmin:
