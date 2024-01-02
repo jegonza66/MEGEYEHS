@@ -30,7 +30,7 @@ else:
     plt.ioff()
 
 # Select epochs
-run_id = 'cross2_mss4--cross2_mss1'  # use '--' to compute difference between 2 conditions
+run_id = 'ms_mss4'  # use '--' to compute difference between 2 conditions
 # ICA
 use_ica_data = True
 
@@ -67,7 +67,7 @@ default_subject = exp_info.subjects_ids[0]  # Any subject or 'fsaverage'
 visualize_alignment = False
 
 # Plot
-initial_time = 1
+initial_time = None
 clim_3d = dict(kind='percent', pos_lims=(85, 95, 100))
 clim_nutmeg = dict(kind='percent', lims=(99.9, 99.95, 100))
 
@@ -87,6 +87,14 @@ if use_ica_data:
     data_type = 'ICA'
 else:
     data_type = 'RAW'
+
+# Source computation method
+if estimate_covariance:
+    source_computation = 'cov'
+elif estimate_epochs:
+    source_computation = 'epo'
+else:
+    source_computation = 'evk'
 
 
 # --------- Freesurfer Path ---------#
@@ -117,7 +125,7 @@ for i, epoch_id in enumerate(epoch_ids):
     dur, cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration(epoch_id=epoch_id, vs_dur=vs_dur, mss=mss)
 
     # Get time windows from epoch_id name
-    map = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[1], 'plot_xlim': (-cross1_dur + plot_edge, mss_duration[1] - plot_edge)})
+    map = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[1] + 1, 'plot_xlim': (-cross1_dur + plot_edge, mss_duration[1] + 1 - plot_edge)})
     tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=plot_edge, map=map)
 
     # Get baseline duration for epoch_id
@@ -141,10 +149,11 @@ for i, epoch_id in enumerate(epoch_ids):
         run_path = run_path.replace(f'{epoch_id}_mss{mss}', f'{epoch_id}_mss{mss}_power')
     run_path = run_path.replace('Band_None', f'Band_{band_id}')
 
+    # Define path
     if surf_vol == 'volume' or surf_vol == 'mixed':
-        fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}/'
+        fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{source_computation}/'
     else:
-        fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{pick_ori}/'
+        fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{source_computation}/'
 
     # Redefine figure save path
     fig_path_diff = fig_path.replace(f'{epoch_id}_mss{mss}', run_id)
@@ -246,7 +255,35 @@ for i, epoch_id in enumerate(epoch_ids):
             fname_filter = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
         filters = mne.beamformer.read_beamformer(fname_filter)
 
-        if not estimate_epochs:
+        if estimate_covariance:
+
+            # # Background noise covariance
+            # noise_cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=epochs.info['bads'], use_ica_data=use_ica_data)
+
+            # Spatial filter
+            rank = sum([ch_type == 'mag' for ch_type in epochs.get_channel_types()]) - len(epochs.info['bads'])
+            if use_ica_data:
+                rank -= len(subject.ex_components)
+
+            # Define active times
+            if baseline[0] == tmin:
+                active_times = [baseline[1], tmax]
+            elif baseline[1] == tmax:
+                active_times = [tmin, baseline[0]]
+            else:
+                raise ValueError('Active time window undefined')
+
+            # Covariance matrices
+            baseline_cov = mne.cov.compute_covariance(epochs=epochs, tmin=baseline[0], tmax=baseline[1], method="shrunk", rank=dict(mag=rank))
+            active_cov = mne.cov.compute_covariance(epochs=epochs, tmin=active_times[0], tmax=active_times[1], method="shrunk", rank=dict(mag=rank))
+
+            # Compute sources and apply baseline
+            stc_base = mne.beamformer.apply_lcmv_cov(baseline_cov, filters)
+            stc_act = mne.beamformer.apply_lcmv_cov(active_cov, filters)
+            stc = stc_act / stc_base
+            stc.data = 10 * np.log10(stc.data)
+
+        elif not estimate_epochs:
             # Apply filter and get source estimates
             stc = beamformer.apply_lcmv(evoked=evoked, filters=filters)
 
@@ -288,37 +325,10 @@ for i, epoch_id in enumerate(epoch_ids):
                 # Divide by epochs number
                 stc.data /= len(epochs)
 
-        elif estimate_covariance:
-
-            # Background noise covariance
-            noise_cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=epochs.info['bads'], use_ica_data=use_ica_data)
-
-            # Spatial filter
-            rank = sum([ch_type == 'mag' for ch_type in epochs.get_channel_types()]) - len(epochs.info['bads'])
-            if use_ica_data:
-                rank -= len(subject.ex_components)
-
-            # Define active times
-            if baseline[0] == tmin:
-                active_times = [baseline[1], tmax]
-            elif baseline[1] == tmax:
-                active_times = [tmin, baseline[0]]
-            else:
-                raise ValueError('Active time window undefined')
-
-            # Covariance matrices
-            baseline_cov = mne.cov.compute_covariance(epochs=epochs, tmin=baseline[0], tmax=baseline[1], method="shrunk", rank=rank)
-            active_cov = mne.cov.compute_covariance(epochs=epochs, tmin=active_times[0], tmax=active_times[1], method="shrunk", rank=rank)
-
-            # Compute sources and apply baseline
-            stc_base = mne.beamformer.apply_lcmv_cov(baseline_cov, filters)
-            stc_act = mne.beamformer.apply_lcmv_cov(active_cov, filters)
-            stc_act /= stc_base
-
         # Drop edges due to artifacts from power computation
         stc.crop(tmin=stc.tmin + plot_edge, tmax=stc.tmax - plot_edge)
 
-        if bline_mode_subj:
+        if bline_mode_subj and not estimate_covariance:
             # Apply baseline correction
             print(f'Applying baseline correction: {bline_mode_subj} from {baseline[0]} to {baseline[1]}')
             # stc.apply_baseline(baseline=baseline)  # mean
@@ -329,7 +339,7 @@ for i, epoch_id in enumerate(epoch_ids):
             elif bline_mode_subj == 'mean':
                 stc.data = stc.data - stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None]
 
-        if band_id and source_power:
+        if band_id and source_power and not estimate_covariance:
             # Filter higher frequencies than corresponding to nyquist of bandpass filter higher freq
             l_freq, h_freq = functions_general.get_freq_band(band_id=band_id)
             stc.data = functions_analysis.butter_lowpass_filter(data=stc.data, h_freq=h_freq/2, sfreq=evoked.info['sfreq'], order=3)
@@ -372,8 +382,8 @@ for i, epoch_id in enumerate(epoch_ids):
                 if save_fig:
                     # brain.show_view(azimuth=-90)
                     os.makedirs(fig_path + '/svg/', exist_ok=True)
-                    brain.save_image(filename=fig_path + fname + '.png')
-                    brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
+                    brain.save_image(filename=fig_path + fname + '_3D.png')
+                    brain.save_image(filename=fig_path + '/svg/' + fname + '_3D.pdf')
 
                 # Nutmeg
                 fig = stc.plot(src=src, subject=subject_code, subjects_dir=subjects_dir, initial_time=initial_time, clim=clim_nutmeg)
@@ -392,8 +402,8 @@ for i, epoch_id in enumerate(epoch_ids):
                         fname += '_fsaverage'
                     # brain.show_view(azimuth=-90)
                     os.makedirs(fig_path + '/svg/', exist_ok=True)
-                    brain.save_image(filename=fig_path + fname + '.png')
-                    brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
+                    brain.save_image(filename=fig_path + fname + '_3D.png')
+                    brain.save_image(filename=fig_path + '/svg/' + fname + '_3D.pdf')
 
     # Grand Average: Average evoked stcs from this epoch_id
     source_data_fs = np.zeros(tuple([len(stcs_fs_dict[epoch_ids[i]])] + [size for size in stcs_fs_dict[epoch_ids[i]][0].data.shape]))
@@ -409,7 +419,7 @@ for i, epoch_id in enumerate(epoch_ids):
     GA_stc.subject = default_subject
 
     # Apply baseline on GA data
-    if bline_mode_ga:
+    if bline_mode_ga and not estimate_covariance:
         print(f'Applying baseline correction: {bline_mode_ga} from {baseline[0]} to {baseline[1]}')
         # GA_stc.apply_baseline(baseline=baseline)
         if bline_mode_ga == 'db':
