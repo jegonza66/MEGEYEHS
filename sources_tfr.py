@@ -95,17 +95,17 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
     mss_diff_name = f'{mssh}-{mssl}'
     run_path_mssl = f'/{epoch_id}_mss{mssl}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin_mssl}_{tmax_mssl}_bline{baseline}'
     run_path_mssh = f'/{epoch_id}_mss{mssh}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin_mssh}_{tmax_mssh}_bline{baseline}'
-    run_path_diff = f'/{epoch_id}_mss{mss_diff_name}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin_mssl}_{tmax_mssl}_bline{baseline}_cyc{int(n_cycles_div)}/'
+    run_path_diff = f'/{epoch_id}_mss{mss_diff_name}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin_mssl}_{tmax_mssl}_bline{baseline}_cyc{round(n_cycles_div, 1)}/'
 
     # Data paths
     # Sensor space TFR
-    sensor_tfr_path_mssl =  paths().save_path() + f'Time_Frequency_Epochs_{data_type}/' + run_path_mssl + f'_cyc{int(n_cycles_div)}/'
-    sensor_tfr_path_mssh =  paths().save_path() + f'Time_Frequency_Epochs_{data_type}/' + run_path_mssh + f'_cyc{int(n_cycles_div)}/'
+    sensor_tfr_path_mssl =  paths().save_path() + f'Time_Frequency_Epochs_{data_type}/' + run_path_mssl + f'_cyc{round(n_cycles_div, 1)}/'
+    sensor_tfr_path_mssh =  paths().save_path() + f'Time_Frequency_Epochs_{data_type}/' + run_path_mssh + f'_cyc{round(n_cycles_div, 1)}/'
     sensor_tfr_diff_save_path =  paths().save_path() + f'Time_Frequency_Epochs_{data_type}/' + run_path_diff
 
     # Source space TFR
-    source_tfr_path_mssl = paths().save_path() + f'Source_Space_TFR_{data_type}/' + run_path_mssl + f'_cyc{int(n_cycles_div)}/'
-    source_tfr_path_mssh = paths().save_path() + f'Source_Space_TFR_{data_type}/' + run_path_mssh + f'_cyc{int(n_cycles_div)}/'
+    source_tfr_path_mssl = paths().save_path() + f'Source_Space_TFR_{data_type}/' + run_path_mssl + f'_cyc{round(n_cycles_div, 1)}/'
+    source_tfr_path_mssh = paths().save_path() + f'Source_Space_TFR_{data_type}/' + run_path_mssh + f'_cyc{round(n_cycles_div, 1)}/'
     source_tfr_diff_save_path = paths().save_path() + f'Source_Space_TFR_{data_type}/' + run_path_diff
 
     # Epochs

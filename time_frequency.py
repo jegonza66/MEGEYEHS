@@ -25,14 +25,14 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'frontal'  # region_hemisphere
+chs_id = 'parietal_occipital'  # region_hemisphere
 # ICA / RAW
 use_ica_data = True
 # Epochs
-epoch_id = 'hl_start'
+epoch_id = 'vs'
 corr_ans = None
 tgt_pres = None
-mss = None
+mss = 4
 reject = False  # 'subject' for subject's default. False for no rejection, dict for specific values. None for default 5e-12 for magnetometers
 # Trial durations
 vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
@@ -41,7 +41,10 @@ trial_dur = None  # Edit this to determine the minimum visual search duration fo
 evt_dur = None
 
 # Power time frequency params
-n_cycles_div = 2.
+if mss:
+    n_cycles_div = 2./mss
+else:
+    n_cycles_div = 2.
 l_freq = 1
 h_freq = 40
 log_bands = False
@@ -120,13 +123,13 @@ else:
 
 # Save ids
 save_id = f'{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
-plot_id = f'{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}_cyc{int(n_cycles_div)}/'
+plot_id = f'{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}_cyc{round(n_cycles_div, 1)}/'
 
 # Save data paths
 if return_average_tfr:
-    trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{save_id}_{tmin}_{tmax}_bline{baseline}_cyc{int(n_cycles_div)}/'
+    trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{save_id}_{tmin}_{tmax}_bline{baseline}_cyc{round(n_cycles_div, 1)}/'
 else:
-    trf_save_path = paths().save_path() + f'Time_Frequency_Epochs_{data_type}/{save_id}_{tmin}_{tmax}_bline{baseline}_cyc{int(n_cycles_div)}/'
+    trf_save_path = paths().save_path() + f'Time_Frequency_Epochs_{data_type}/{save_id}_{tmin}_{tmax}_bline{baseline}_cyc{round(n_cycles_div, 1)}/'
 epochs_save_path = paths().save_path() + f'Epochs_{data_type}/Band_None/{save_id}_{tmin}_{tmax}_bline{baseline}/'
 # Save figures paths
 trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + plot_id + f'{chs_id}/'

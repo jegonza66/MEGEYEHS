@@ -38,7 +38,6 @@ evt_dur = None
 l_freq = 1
 h_freq = 40
 log_bands = False
-n_cycles_div = 2.
 run_itc = False
 return_average_tfr = True
 output = 'power'
@@ -93,16 +92,20 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
         main_path = paths().save_path() + f'Time_Frequency_{data_type}/'
     else:
         main_path = paths().save_path() + f'Time_Frequency_Epochs_{data_type}/'
-    trf_path_mssl = main_path + f'' + run_path_mssl + f'_cyc{int(n_cycles_div)}/'
-    trf_path_mssh = main_path + f'' + run_path_mssh + f'_cyc{int(n_cycles_div)}/'
-    trf_diff_save_path = main_path + f'' + run_path_diff + f'_cyc{int(n_cycles_div)}/'
+
+    n_cycles_div_mssl = 2. / mssl
+    n_cycles_div_mssh = 2. / mssh
+
+    trf_path_mssl = main_path + f'' + run_path_mssl + f'_cyc{round(n_cycles_div_mssl, 1)}/'
+    trf_path_mssh = main_path + f'' + run_path_mssh + f'_cyc{round(n_cycles_div_mssh, 1)}/'
+    trf_diff_save_path = main_path + f'' + run_path_diff + f'_cyc{round(n_cycles_div_mssh, 1)}-{round(n_cycles_div_mssl, 1)}/'
 
     # Data paths for epochs
     epochs_path_mssl = paths().save_path() + f'Epochs_{data_type}/Band_None/' + run_path_mssl + '/'
     epochs_path_mssh = paths().save_path() + f'Epochs_{data_type}/Band_None/' + run_path_mssh + '/'
 
     # Save figures paths
-    trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + run_path_diff + f'_cyc{int(n_cycles_div)}/{chs_id}/'
+    trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + run_path_diff + f'_cyc{round(n_cycles_div_mssh, 1)}-{round(n_cycles_div_mssl, 1)}/{chs_id}/'
 
     # Grand average data variable
     grand_avg_power_ms_fname = f'Grand_Average_power_ms_{l_freq}_{h_freq}_tfr.h5'
@@ -173,12 +176,9 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
                         itc_mssh = mne.time_frequency.read_tfrs(trf_path_mssh + itc_data_fname, condition=0)
                 except:
                     # Compute power using from epoched data
-                    for mss, tmin, tmax, epochs_path, trf_save_path in zip((mssl, mssh), (tmin_mssl, tmin_mssh),
-                                                                                (tmax_mssl, tmax_mssh),
-                                                                                (epochs_path_mssl,
-                                                                                 epochs_path_mssh),
-                                                                                (trf_path_mssl,
-                                                                                 trf_path_mssh)):
+                    for mss, tmin, tmax, epochs_path, trf_save_path, n_cycles_div in zip((mssl, mssh), (tmin_mssl, tmin_mssh), (tmax_mssl, tmax_mssh),
+                                                                                         (epochs_path_mssl, epochs_path_mssh), (trf_path_mssl, trf_path_mssh),
+                                                                                         (n_cycles_div_mssl, n_cycles_div_mssh)):
                         try:
                             # Load epoched data
                             epochs = mne.read_epochs(epochs_path + epochs_data_fname)
