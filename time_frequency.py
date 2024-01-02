@@ -25,19 +25,19 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'central'  # region_hemisphere
+chs_id = 'frontal'  # region_hemisphere
 # ICA / RAW
 use_ica_data = True
 # Epochs
-epoch_id = 'blue'
+epoch_id = 'hl_start'
 corr_ans = None
 tgt_pres = None
 mss = None
-reject = None  # 'subject' for subject's default. False for no rejection, dict for specific values. None for default 5e-12 for magnetometers
+reject = False  # 'subject' for subject's default. False for no rejection, dict for specific values. None for default 5e-12 for magnetometers
 # Trial durations
 vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
 plot_edge = 0.15
-trial_dur = vs_dur[mss]  # Edit this to determine the minimum visual search duration for the trial selection (this will also affect ms trials)
+trial_dur = None  # Edit this to determine the minimum visual search duration for the trial selection (this will also affect ms trials)
 evt_dur = None
 
 # Power time frequency params
@@ -89,7 +89,9 @@ else:
 dur, cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration(epoch_id=epoch_id, vs_dur=vs_dur, mss=mss)
 
 # Get time windows from epoch_id name
-map = dict(tgt_fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3, 0.6)})
+map = dict(tgt_fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3, 0.6)},
+           sac_emap={'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.3, 2.5)},
+           hl_start={'tmin': -3, 'tmax': 35, 'plot_xlim': (-2.5, 33)})
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=plot_edge, map=map)
 
 # Define time-frequency bands to plot in plot_joint
