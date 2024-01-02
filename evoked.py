@@ -26,22 +26,33 @@ else:
 use_ica_data = True
 band_id = None
 # Id
-epoch_id = 'it_fix'
+epoch_id = 'sac_emap'
 # Pick MEG chs (Select channels or set picks = 'mag')
 chs_id = 'mag'
 # Plot eye movements
 plot_gaze = False
-corr_ans = True
-tgt_pres = True
+corr_ans = None
+tgt_pres = None
 mss = None
 reject = None
 trial_dur = None
-evt_dur = 0.4
+evt_dur = None
+
+# Screen durations
+vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
+dur, cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration(epoch_id=epoch_id, vs_dur=vs_dur, mss=mss)
 
 # Get time windows from epoch_id name
-tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
+map = dict(tgt_fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3, 0.6)},
+           sac_emap={'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.3, 2.5)},
+           hl_start={'tmin': -3, 'tmax': 35, 'plot_xlim': (-2.5, 33)})
+tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=0, map=map)
+tmin, tmax, plot_xlim = -0.5, 3, (-0.5, 3)
+
 # Baseline
-baseline = (-0.3, -0.05)
+baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=epoch_id, mss=mss, tmin=tmin, tmax=tmax, plot_xlim=plot_xlim, cross1_dur=cross1_dur,
+                                                                  mss_duration=mss_duration, cross2_dur=cross2_dur)
+baseline = (-0.5, 0)
 
 # Data type
 if use_ica_data:
@@ -59,7 +70,7 @@ evoked_save_path = save_path + f'Evoked_{data_type}/' + run_path
 grand_avg_data_fname = f'Grand_average_ave.fif'
 # Save figures paths
 epochs_fig_path = plot_path + f'Epochs_{data_type}/' + run_path
-evoked_fig_path = plot_path + f'Evoked_{data_type}/' + run_path
+evoked_fig_path = plot_path + f'Evoked_{data_type}/' + run_path + f'{chs_id}/'
 
 
 evokeds = []
@@ -124,10 +135,10 @@ for subject_code in exp_info.subjects_ids:
             evoked = epochs.average(picks=['mag', 'misc'])
             evokeds.append(evoked)
 
-    if save_data:
-        # Save evoked data
-        os.makedirs(evoked_save_path, exist_ok=True)
-        evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
+        if save_data:
+            # Save evoked data
+            os.makedirs(evoked_save_path, exist_ok=True)
+            evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
 
     # Apend to evokeds list to pass to grand average
     evokeds.append(evoked)
