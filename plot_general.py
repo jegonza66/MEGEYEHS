@@ -686,7 +686,7 @@ def connectivity_circle(subject, labels, con, surf_vol, connectivity_method='pli
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_glass_fsaverage', connections_num=30,
+def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_connectome', connections_num=30,
                node_size=10, node_color='k', linewidth=2):
 
     # Sanity check
@@ -725,7 +725,7 @@ def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, 
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_glass_fsaverage'):
+def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_matrix'):
 
     # Sanity check
     if save_fig and (not fig_path):
@@ -767,3 +767,29 @@ def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, save_fig=Fa
         if subject_code == 'fsaverage' and 'fsaverage' not in fname:
             fname += '_fsaverage'
         save.fig(fig=fig, path=fig_path, fname=fname)
+
+
+def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, force_fsaverage, subjects_dir, display_figs, save_fig, fig_path, fname):
+
+    # Plot connectivity strength (connections from each region to other regions)
+    degree = mne_connectivity.degree(con)
+    if surf_vol == 'surface':
+        stc = mne.labels_to_stc(labels, degree)
+        stc = stc.in_label(mne.Label(src[0]["vertno"], hemi="lh") + mne.Label(src[1]["vertno"], hemi="rh"))
+        hemi = 'split'
+        views = 'lateral'
+
+    if surf_vol == 'volume':
+        stc = mne.VolSourceEstimate(degree, [src[0]["vertno"]], 0, 1, "bst_resting")
+        hemi = 'both'
+        views = 'dorsal'
+
+    brain = stc.plot(src=src, subject=subject_code, subjects_dir=subjects_dir, size=(1000, 500), clim=dict(kind="percent", lims=[75, 85, 95]), hemi=hemi, views=views,
+                     show=display_figs)
+    if save_fig:
+        if not fname:
+            fname = f'{subject.subject_id}_strength'
+        if force_fsaverage:
+            fname += '_fsaverage'
+        brain.save_image(filename=fig_path + fname + '.png')
+        brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
