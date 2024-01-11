@@ -65,7 +65,7 @@ mins = {}
 fig, axs = plt.subplots(ncols=len(chs_ids), figsize=(17, 5))
 
 for i, epoch_id in enumerate(epoch_ids):
-    ga_dict[epoch_id] = {}
+
     evokeds[epoch_id] = {}
     means[epoch_id] = {}
     stds[epoch_id] = {}
@@ -73,7 +73,7 @@ for i, epoch_id in enumerate(epoch_ids):
     mins[epoch_id] = {}
     for j, lat_chs in enumerate(chs_ids):
 
-        ga_dict[epoch_id][lat_chs] = []
+        ga_dict[epoch_id] = []  # Save evokeds of all channels (not lateralized)
         evokeds[epoch_id][lat_chs] = []
 
         # Specific run path for saving data and plots
@@ -106,7 +106,7 @@ for i, epoch_id in enumerate(epoch_ids):
 
             # Append evoked averaged over all channels
             ga_evoked = evoked.copy()
-            ga_dict[epoch_id][lat_chs].append(ga_evoked)
+            ga_dict[epoch_id].append(ga_evoked)
 
             # Subsample to selected region
             picks = functions_general.pick_chs(chs_id=lat_chs, info=evoked.info)
@@ -144,17 +144,18 @@ if run_tfce:
     obs_right = [evokeds[epoch_ids[0]][chs_ids[1]], evokeds[epoch_ids[1]][chs_ids[1]]]
 
     # Permutation cluster test
-    n_permutations = 256
-    degrees_of_freedom = len(exp_info.subjects_ids[:12]) - 1
-    desired_pval = 0.01
-    t_thresh = scipy.stats.t.ppf(1 - desired_pval / 2, df=degrees_of_freedom)
+    pval_threshold = 0.05
+    n_permutations = 1024
+    degrees_of_freedom = len(exp_info.subjects_ids) - 1
+    desired_tval = 0.01
+    t_thresh = scipy.stats.t.ppf(1 - desired_tval / 2, df=degrees_of_freedom)
     # t_thresh = dict(start=0, step=0.2)
 
     # Left
     t_tfce_left, clusters_left, p_tfce_left, H0_left = permutation_cluster_test(X=obs_left, threshold=t_thresh,
                                                                                 n_permutations=n_permutations)
 
-    good_clusters_left_idx = np.where(p_tfce_left < 0.05)[0]
+    good_clusters_left_idx = np.where(p_tfce_left < pval_threshold)[0]
     significant_clusters_left = [clusters_left[i][0] for i in good_clusters_left_idx]
     # Plot significant clusters
     if len(significant_clusters_left):
@@ -183,7 +184,7 @@ axs[1].set_xlabel('time (s)')
 axs[0].set_ylabel('FRF (fT)')
 axs[1].set_ylabel('FRF (fT)')
 if run_tfce:
-    fig.suptitle(f'Target vs. Distractor FRF {chs_id} (t_threshold: {t_thresh} - Significance threshold: {0.05})')
+    fig.suptitle(f'Target vs. Distractor FRF {chs_id} (t_threshold: {round(t_thresh, 2)} - Significance threshold: {pval_threshold})')
 else:
     fig.suptitle(f'Target vs. Distractor FRF {chs_id}')
 
@@ -204,12 +205,16 @@ fig.tight_layout()
 if save_fig:
     fig_path = paths().plots_path() + f'Evoked_{data_type}/it_vs_tgt/'
     fname = (save_id + f'_{chs_id}').replace(epoch_id, 'Evoked')
+    if type(t_thresh) == dict:
+        fname += f'_tTFCE_p{pval_threshold}'
+    else:
+        fname += f'_t{round(t_thresh, 2)}_p{pval_threshold}'
     save.fig(fig=fig, path=fig_path, fname=fname)
 
 # Plot topographies
 topo_times = [0.1, 0.3]
 topo_times_span = [0.005, 0.1]
-grand_average = mne.grand_average(ga_dict['tgt_fix'][lat_chs], interpolate_bads=True)
+grand_average = mne.grand_average(ga_dict['tgt_fix'], interpolate_bads=True)
 fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='jet', show=display_figs, vlim=(-60, 60))
 
 if save_fig:
@@ -244,6 +249,8 @@ else:
     plt.ioff()
 
 #-----  Parameters -----#
+# Reescale and plot with FRF
+FRF_TRF = False
 # ICA vs raw data
 use_ica_data = True
 run_tfce = True
@@ -267,8 +274,7 @@ tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
 baseline = (tmin, -0.05)
 # TRF hiper-parameter
 alpha = None
-# Reescale and plot with FRF
-FRF_TRF = False
+
 
 # Data type
 if use_ica_data:
@@ -306,12 +312,12 @@ else:
     fig, axs = plt.subplots(ncols=2, figsize=(17, 5))
 
 for i, epoch_id in enumerate(epoch_ids[:2]):
-    ga_dict[epoch_id] = {}
     evokeds[epoch_id] = {}
     means[epoch_id] = {}
     stds[epoch_id] = {}
+
     for j, lat_chs in enumerate(chs_ids):
-        ga_dict[epoch_id][lat_chs] = []
+        ga_dict[epoch_id] = []
         evokeds[epoch_id][lat_chs] = []
 
         # Iterate over subjects
@@ -365,7 +371,7 @@ for i, epoch_id in enumerate(epoch_ids[:2]):
                 evoked = mne.EvokedArray(data=trf, info=meg_sub.info, tmin=tmin, baseline=baseline)
 
             evoked_ga = evoked.copy()
-            ga_dict[epoch_id][lat_chs].append(evoked_ga)
+            ga_dict[epoch_id].append(evoked_ga)
 
             if chs_id != 'mag':
                 # Subsample channels
@@ -413,15 +419,15 @@ obs_right = [evokeds[epoch_ids[0]][chs_ids[1]], evokeds[epoch_ids[1]][chs_ids[1]
 
 # TFCE test
 n_permutations = 2048
-degrees_of_freedom = len(exp_info.subjects_ids[:12]) - 1
-desired_pval = 0.01
-t_thresh = scipy.stats.t.ppf(1 - desired_pval / 2, df=degrees_of_freedom)
+degrees_of_freedom = len(exp_info.subjects_ids) - 1
+desired_tval = 0.01
+t_thresh = scipy.stats.t.ppf(1 - desired_tval / 2, df=degrees_of_freedom)
 # t_thresh = dict(start=0, step=0.2)
+pval_threshold = 0.05
 
-pval_thresh = 0.05
 # Left
 t_tfce_left, clusters_left, p_tfce_left, H0_left = permutation_cluster_test(X=obs_left, threshold=t_thresh, n_permutations=n_permutations)
-good_clusters_left_idx = np.where(p_tfce_left < pval_thresh)[0]
+good_clusters_left_idx = np.where(p_tfce_left < pval_threshold)[0]
 significant_clusters_left = [clusters_left[i][0] for i in good_clusters_left_idx]
 
 # Plot significant clusters
@@ -433,7 +439,7 @@ if len(significant_clusters_left):
 
 # Right
 t_tfce_right, clusters_right, p_tfce_right, H0_right = permutation_cluster_test(X=obs_right, threshold=t_thresh, n_permutations=n_permutations)
-good_clusters_right_idx = np.where(p_tfce_right < pval_thresh)[0]
+good_clusters_right_idx = np.where(p_tfce_right < pval_threshold)[0]
 significant_clusters_right = [clusters_right[i][0] for i in good_clusters_right_idx]
 # Plot significant clusters
 if len(significant_clusters_right):
@@ -464,7 +470,7 @@ if not FRF_TRF:
 else:
     axs[0].set_ylabel('TRF (a.u.)')
     axs[1].set_ylabel('TRF (a.u.)')
-    fig.suptitle(f'Target vs. Distractor FRF-TRF {chs_id} (t_threshold: {t_thresh} - Significance threshold: {0.05})')
+    fig.suptitle(f'Target vs. Distractor FRF-TRF {chs_id} (t_threshold: {round(t_thresh, 2)} - Significance threshold: {pval_threshold})')
 
 axs[0].xaxis.label.set_fontsize(18)
 axs[0].yaxis.label.set_fontsize(18)
@@ -482,16 +488,22 @@ fig.tight_layout()
 
 if save_fig:
     fig_path += 'it_vs_tgt/'
+
     if FRF_TRF:
         fname = f'FRF_TRF_{chs_id}'
     else:
         fname = f'TRF_{chs_id}'
+
+    if type(t_thresh) == dict:
+        fname += f'_tTFCE_p{pval_threshold}'
+    else:
+        fname += f'_t{round(t_thresh, 2)}_p{pval_threshold}'
     save.fig(fig=fig, path=fig_path, fname=fname)
 
 # Plot topographies
 topo_times = [0.1, 0.4]
 topo_times_span = [0.01, 0.2]
-grand_average = mne.grand_average(ga_dict['tgt_fix'][lat_chs], interpolate_bads=True)
+grand_average = mne.grand_average(ga_dict['tgt_fix'], interpolate_bads=True)
 
 
 # Mascara en temporales
@@ -526,6 +538,7 @@ import setup
 from paths import paths
 import functions_general
 import numpy as np
+import scipy.stats
 
 save_path = paths().save_path()
 plot_path = paths().plots_path()
@@ -628,13 +641,13 @@ for i, epoch_id in enumerate(epoch_ids):
 grand_avg = mne.grand_average(evokeds_ga['tgt_fix'], interpolate_bads=True)
 
 # Permutation cluster test parameters
-n_permutations = 256
-degrees_of_freedom = len(exp_info.subjects_ids[:12]) - 1
-desired_pval = 0.05
-# t_thresh = scipy.stats.t.ppf(1 - desired_pval / 2, df=degrees_of_freedom)
+n_permutations = 1024
+degrees_of_freedom = len(exp_info.subjects_ids) - 1
+desired_tval = 0.01
+# t_thresh = scipy.stats.t.ppf(1 - desired_tval / 2, df=degrees_of_freedom)
 t_thresh = dict(start=0, step=0.2)
 # Get channel adjacency
-ch_adjacency_sparse = functions_general.get_channel_adjacency(info=evoked.info)
+ch_adjacency_sparse = functions_general.get_channel_adjacency(info=grand_avg.info)
 # Clusters out type
 if type(t_thresh) == dict:
     out_type = 'indices'
@@ -645,7 +658,7 @@ else:
 t_tfce, clusters, p_tfce, H0 = permutation_cluster_test(X=observations, threshold=t_thresh, adjacency=ch_adjacency_sparse,
                                                         n_permutations=n_permutations, out_type=out_type, n_jobs=6)
 
-pval_threshold = 0.5
+pval_threshold = 0.05
 # Make clusters mask
 if type(t_thresh) == dict:
     # If TFCE use p-vaues of voxels directly
@@ -667,9 +680,9 @@ else:
 # Plot
 fig, ax = plt.subplots(figsize=(14, 5))
 if type(t_thresh) == dict:
-    title = f'{chs_id}_tthreshTFCE_pthresh{pval_threshold}'
+    title = f'{chs_id}_tTFCE_p{pval_threshold}'
 else:
-     title = f'{chs_id}_tthresh{round(t_thresh, 2)}_pthresh{pval_threshold}'
+     title = f'{chs_id}_t{round(t_thresh, 2)}_p{pval_threshold}'
 
 fig = grand_avg.plot_image(cmap='jet', mask=clusters_mask, mask_style='mask', mask_alpha=0.5,
                            titles=title, axes=ax, show=display_figs)
@@ -691,6 +704,7 @@ from paths import paths
 import functions_general
 import numpy as np
 import scipy
+import scipy.stats
 
 save_path = paths().save_path()
 plot_path = paths().plots_path()
@@ -822,8 +836,8 @@ grand_avg = mne.grand_average(evokeds_ga['tgt_fix'], interpolate_bads=True)
 # Permutation cluster test parameters
 n_permutations = 1024
 degrees_of_freedom = len(exp_info.subjects_ids) - 1
-desired_pval = 0.05
-t_thresh = scipy.stats.t.ppf(1 - desired_pval / 2, df=degrees_of_freedom)
+desired_tval = 0.01
+t_thresh = scipy.stats.t.ppf(1 - desired_tval / 2, df=degrees_of_freedom)
 # t_thresh = dict(start=0, step=0.2)
 # Get channel adjacency
 ch_adjacency_sparse = functions_general.get_channel_adjacency(info=evoked.info)
