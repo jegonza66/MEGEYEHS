@@ -47,11 +47,12 @@ map = dict(tgt_fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3, 0.6)},
            sac_emap={'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.3, 2.5)},
            hl_start={'tmin': -3, 'tmax': 35, 'plot_xlim': (-2.5, 33)})
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=0, map=map)
-tmin, tmax, plot_xlim = -0.5, 3, (-0.5, 3)
 
 # Baseline
-baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=epoch_id, mss=mss, tmin=tmin, tmax=tmax, plot_xlim=plot_xlim, cross1_dur=cross1_dur,
+baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=epoch_id, mss=mss, tmin=tmin, tmax=tmax, cross1_dur=cross1_dur,
                                                                   mss_duration=mss_duration, cross2_dur=cross2_dur)
+# Hardcode
+tmin, tmax, plot_xlim = -0.5, 3, (-0.5, 3)
 baseline = (-0.5, 0)
 
 # Data type

@@ -486,7 +486,7 @@ def get_duration(epoch_id,  mss, vs_dur=None):
     return dur, cross1_dur, cross2_dur, mss_duration, vs_dur
 
 
-def get_baseline_duration(epoch_id, mss, tmin, tmax, plot_xlim, cross1_dur, mss_duration, cross2_dur, map=None):
+def get_baseline_duration(epoch_id, mss, tmin, tmax, cross1_dur, mss_duration, cross2_dur, map=None):
     # Baseline duration
     if map and epoch_id in map.keys():
         baseline = (map[epoch_id]['baseline'][0], map[epoch_id]['baseline'][1])
@@ -494,11 +494,11 @@ def get_baseline_duration(epoch_id, mss, tmin, tmax, plot_xlim, cross1_dur, mss_
 
     elif 'sac' in epoch_id:
         baseline = (tmin, 0)
-        plot_baseline = (plot_xlim[0], 0)
+        plot_baseline = baseline
         # baseline = None
     elif 'fix' in epoch_id or 'fix' in epoch_id:
         baseline = (tmin, -0.05)
-        plot_baseline = (plot_xlim[0], 0)
+        plot_baseline = baseline
     elif 'ms' in epoch_id:
         baseline = (-cross1_dur, 0)
         plot_baseline = baseline
@@ -696,7 +696,7 @@ def get_channel_adjacency(info, ch_type='mag', picks=None, bads=None):
     if picks:
         channels_to_use = picks
     else:
-        info.ch_names
+        channels_to_use = info.ch_names
 
     # Default ctf275 info has 275 channels, we are using 271. Check for extra channels
     if bads:
