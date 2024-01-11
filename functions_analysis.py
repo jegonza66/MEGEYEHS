@@ -43,7 +43,7 @@ def define_events(subject, meg_data, epoch_id, trials=None, evt_dur=None, epoch_
                 epoch_keys = [key for key in epoch_keys if 'sac' not in key]
             if 'fix' not in epoch_sub_id:
                 epoch_keys = [key for key in epoch_keys if 'fix' not in key]
-            if trials != None and '_t' in epoch_sub_id:
+            if trials != None and any('_t' in epoch_key for epoch_key in epoch_keys):
                 try:
                     if 'vsend' in epoch_sub_id:
                         epoch_keys = [epoch_key for epoch_key in epoch_keys if epoch_key.split('_t')[-1] in trials]
