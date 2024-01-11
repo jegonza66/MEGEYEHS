@@ -9,6 +9,7 @@ from paths import paths
 import matplotlib.pyplot as plt
 import numpy as np
 from mne.stats import permutation_cluster_1samp_test
+import scipy.stats
 
 #----- Path -----#
 exp_info = setup.exp_info()
@@ -16,7 +17,7 @@ exp_info = setup.exp_info()
 #----- Save data and display figures -----#
 save_data = True
 save_fig = True
-display_figs = True
+display_figs = False
 if display_figs:
     plt.ion()
 else:
@@ -35,6 +36,7 @@ trial_dur = None
 evt_dur = None
 
 # Time frequency params
+n_cycles_div = 2.
 l_freq = 1
 h_freq = 40
 log_bands = False
@@ -93,19 +95,16 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
     else:
         main_path = paths().save_path() + f'Time_Frequency_Epochs_{data_type}/'
 
-    n_cycles_div_mssl = 2. / mssl
-    n_cycles_div_mssh = 2. / mssh
-
-    trf_path_mssl = main_path + f'' + run_path_mssl + f'_cyc{round(n_cycles_div_mssl, 1)}/'
-    trf_path_mssh = main_path + f'' + run_path_mssh + f'_cyc{round(n_cycles_div_mssh, 1)}/'
-    trf_diff_save_path = main_path + f'' + run_path_diff + f'_cyc{round(n_cycles_div_mssh, 1)}-{round(n_cycles_div_mssl, 1)}/'
+    trf_path_mssl = main_path + f'' + run_path_mssl + f'_cyc{int(n_cycles_div)}/'
+    trf_path_mssh = main_path + f'' + run_path_mssh + f'_cyc{int(n_cycles_div)}/'
+    trf_diff_save_path = main_path + f'' + run_path_diff + f'_cyc{int(n_cycles_div)}/'
 
     # Data paths for epochs
     epochs_path_mssl = paths().save_path() + f'Epochs_{data_type}/Band_None/' + run_path_mssl + '/'
     epochs_path_mssh = paths().save_path() + f'Epochs_{data_type}/Band_None/' + run_path_mssh + '/'
 
     # Save figures paths
-    trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + run_path_diff + f'_cyc{round(n_cycles_div_mssh, 1)}-{round(n_cycles_div_mssl, 1)}/{chs_id}/'
+    trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + run_path_diff + f'_cyc{int(n_cycles_div)}/'
 
     # Grand average data variable
     grand_avg_power_ms_fname = f'Grand_Average_power_ms_{l_freq}_{h_freq}_tfr.h5'
@@ -170,15 +169,14 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
                 try:
                     # Load previous data
                     power_mssl = mne.time_frequency.read_tfrs(trf_path_mssl + power_data_fname, condition=0)
-                    power_mssh = mne.time_frequency.read_tfrs(trf_path_mssl + power_data_fname, condition=0)
+                    power_mssh = mne.time_frequency.read_tfrs(trf_path_mssh + power_data_fname, condition=0)
                     if run_itc:
                         itc_mssl = mne.time_frequency.read_tfrs(trf_path_mssl + itc_data_fname, condition=0)
                         itc_mssh = mne.time_frequency.read_tfrs(trf_path_mssh + itc_data_fname, condition=0)
                 except:
                     # Compute power using from epoched data
-                    for mss, tmin, tmax, epochs_path, trf_save_path, n_cycles_div in zip((mssl, mssh), (tmin_mssl, tmin_mssh), (tmax_mssl, tmax_mssh),
-                                                                                         (epochs_path_mssl, epochs_path_mssh), (trf_path_mssl, trf_path_mssh),
-                                                                                         (n_cycles_div_mssl, n_cycles_div_mssh)):
+                    for mss, tmin, tmax, epochs_path, trf_save_path in zip((mssl, mssh), (tmin_mssl, tmin_mssh), (tmax_mssl, tmax_mssh),
+                                                                                         (epochs_path_mssl, epochs_path_mssh), (trf_path_mssl, trf_path_mssh)):
                         try:
                             # Load epoched data
                             epochs = mne.read_epochs(epochs_path + epochs_data_fname)
@@ -361,7 +359,7 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
         data_power_cross2_diff[i].drop(all_bads_set, axis='columns', errors='ignore', inplace=True)
 
         # Keep selected channels
-        data_power_ms_diff[i] = data_power_ms_diff[i][data_power_ms_diff[i].columns & picks+[]]
+        data_power_ms_diff[i] = data_power_ms_diff[i][data_power_ms_diff[i].columns & picks]
         data_power_cross2_diff[i] = data_power_cross2_diff[i][data_power_cross2_diff[i].columns & picks]
 
         # Convert to array and drop times and frequencies
@@ -397,8 +395,7 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
             out_type = 'mask'
 
         # Permutations cluster test (TFCE if t_thresh as dict)
-        t_tfce, clusters, p_tfce, H0 = permutation_cluster_1samp_test(X=data, threshold=t_thresh,
-                                                                      n_permutations=n_permutations, out_type=out_type)
+        t_tfce, clusters, p_tfce, H0 = permutation_cluster_1samp_test(X=data, threshold=t_thresh, n_permutations=n_permutations, out_type=out_type)
 
         pval_threshold = 0.05
         # Make clusters mask
@@ -408,23 +405,28 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
 
             # Reshape to data's shape
             clusters_mask = p_tfce < pval_threshold
-            clusters_mask = clusters_mask
+
         else:
             # Get significant clusters
             good_clusters_idx = np.where(p_tfce < pval_threshold)[0]
             significant_clusters = [clusters[idx] for idx in good_clusters_idx]
 
             # Rehsape to data's shape by adding all clusters into one bool array
-            clusters_mask = np.zeros(clusters[0].shape)
-            for significant_cluster in significant_clusters:
-                clusters_mask += significant_cluster
-            # clusters_mask = clusters_mask.sum(axis=-1)
-            clusters_mask = clusters_mask.astype(bool)
+            clusters_mask = np.zeros(data[0, :, :].shape)
+            if len(significant_clusters):
+                for significant_cluster in significant_clusters:
+                    clusters_mask += significant_cluster
+                # clusters_mask = clusters_mask.sum(axis=-1)
+                clusters_mask = clusters_mask.astype(bool)
 
         image_args = {'mask': clusters_mask, 'mask_style': 'contour'}
 
-        # Power Plotjoint Cross2
-        fname = f'GA_Power_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_TFCE_pval_{pval_threshold}'
+        # Power Plotjoint
+        if type(t_thresh) == dict:
+            fname = f'GA_Power_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_tTFCE_pval{pval_threshold}'
+        else:
+            fname = f'GA_Power_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_t{round(t_thresh, 2)}_pval{pval_threshold}'
+
         plot_general.tfr_plotjoint_picks(tfr=ga, plot_baseline=None, bline_mode=bline_mode,
                                          image_args=image_args, chs_id=chs_id, plot_max=False, plot_min=True, vmin=-0.2,
                                          vmax=0.2, display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path,
