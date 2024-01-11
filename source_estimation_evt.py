@@ -30,7 +30,7 @@ else:
     plt.ioff()
 
 # Select epochs
-run_id = 'ms_mss1'  # use '--' to compute difference between 2 conditions
+run_id = 'cross2_mss2--cross2_mss1'  # use '--' to compute difference between 2 conditions
 # ICA
 use_ica_data = True
 
@@ -41,7 +41,7 @@ mss = None
 # Screen durations
 vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
 evt_dur = None
-t_dur = vs_dur[mss]
+trial_dur = vs_dur[mss]
 
 # Baseline
 bline_mode_subj = 'db'
@@ -49,7 +49,7 @@ bline_mode_ga = False
 plot_edge = 0.25
 
 # Epochs parameters
-reject = None  # None to use defalt {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
+reject = None  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
 
 # Source estimation parameters
 force_fsaverage = False
@@ -60,7 +60,7 @@ spacing = 10.
 pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
 source_power = True
 estimate_epochs = False  # epochs and covariance cannot be both true (but they can be both false and estimate sources from evoked)
-estimate_covariance = False
+estimate_covariance = True
 
 # Default source subject
 default_subject = exp_info.subjects_ids[0]  # Any subject or 'fsaverage'
@@ -69,7 +69,7 @@ visualize_alignment = False
 # Plot
 initial_time = None
 clim_3d = dict(kind='percent', pos_lims=(85, 95, 100))
-clim_nutmeg = dict(kind='percent', lims=(99.9, 99.95, 100))
+clim_nutmeg = dict(kind='percent', pos_lims=(99.9, 99.95, 100))
 
 # Frequency band
 filter_sensors = True
@@ -77,7 +77,7 @@ band_id = 'Alpha'
 filter_method = 'iir'
 
 # Permutations test
-run_permutations = False
+run_permutations = True
 
 
 #--------- Setup ---------#
@@ -119,30 +119,30 @@ for i, epoch_id in enumerate(epoch_ids):
     if 'mss' in epoch_id:
         mss = int(epoch_id.split('_mss')[-1][:1])
         epoch_id = epoch_id.split('_mss')[0]
-        t_dur = vs_dur[mss]
+        trial_dur = vs_dur[mss]
 
     # Windows durations
     dur, cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration(epoch_id=epoch_id, vs_dur=vs_dur, mss=mss)
 
     # Get time windows from epoch_id name
-    map = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[mss] + cross2_dur, 'plot_xlim': (-cross1_dur + plot_edge, mss_duration[mss] + cross2_dur - plot_edge)})
-    tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=plot_edge, map=map)
+    map = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[1], 'plot_xlim': (-cross1_dur + plot_edge, mss_duration[1] - plot_edge)})
+    tmin, tmax, _ = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=plot_edge, map=map)
 
     # Get baseline duration for epoch_id
     baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=epoch_id, mss=mss, tmin=tmin, tmax=tmax,
-                                                                      plot_xlim=plot_xlim,
                                                                       cross1_dur=cross1_dur, mss_duration=mss_duration,
                                                                       cross2_dur=cross2_dur)
 
     # Data and plots paths
     if filter_sensors:
-        run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{t_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
+        run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
     else:
-        run_path = f'/Band_None/{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{t_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
+        run_path = f'/Band_None/{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
 
     # Data paths
     epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path
     evoked_save_path = paths().save_path() + f'Evoked_{data_type}/' + run_path
+    cov_save_path = paths().save_path() + f'Cov_Epochs_{data_type}/' + run_path
 
     # Source plots paths
     if source_power:
@@ -256,9 +256,8 @@ for i, epoch_id in enumerate(epoch_ids):
         filters = mne.beamformer.read_beamformer(fname_filter)
 
         if estimate_covariance:
-
-            # # Background noise covariance
-            # noise_cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=epochs.info['bads'], use_ica_data=use_ica_data)
+            # Covariance method
+            cov_method = 'shrunk'
 
             # Spatial filter
             rank = sum([ch_type == 'mag' for ch_type in epochs.get_channel_types()]) - len(epochs.info['bads'])
@@ -273,9 +272,29 @@ for i, epoch_id in enumerate(epoch_ids):
             else:
                 raise ValueError('Active time window undefined')
 
-            # Covariance matrices
-            baseline_cov = mne.cov.compute_covariance(epochs=epochs, tmin=baseline[0], tmax=baseline[1], method="shrunk", rank=dict(mag=rank))
-            active_cov = mne.cov.compute_covariance(epochs=epochs, tmin=active_times[0], tmax=active_times[1], method="shrunk", rank=dict(mag=rank))
+            # Covariance fnames
+            cov_baseline_fname = f'Subject_{subject.subject_id}_times{baseline}_{cov_method}_{rank}-cov.fif'
+            cov_act_fname = f'Subject_{subject.subject_id}_times{active_times}_{cov_method}_{rank}-cov.fif'
+
+            try:
+                # Load covariance matrix
+                baseline_cov = mne.read_cov(fname=cov_save_path + cov_baseline_fname)
+            except:
+                # Compute covariance matrices
+                baseline_cov = mne.cov.compute_covariance(epochs=epochs, tmin=baseline[0], tmax=baseline[1], method="shrunk", rank=dict(mag=rank))
+                # Save
+                os.makedirs(cov_save_path, exist_ok=True)
+                baseline_cov.save(fname=cov_save_path + cov_baseline_fname, overwrite=True)
+
+            try:
+                # Load covariance matrix
+                active_cov = mne.read_cov(fname=cov_save_path + cov_act_fname)
+            except:
+                # Compute covariance matrices
+                active_cov = mne.cov.compute_covariance(epochs=epochs, tmin=active_times[0], tmax=active_times[1], method="shrunk", rank=dict(mag=rank))
+                # Save
+                os.makedirs(cov_save_path, exist_ok=True)
+                active_cov.save(fname=cov_save_path + cov_act_fname, overwrite=True)
 
             # Compute sources and apply baseline
             stc_base = mne.beamformer.apply_lcmv_cov(baseline_cov, filters)
@@ -446,7 +465,8 @@ for i, epoch_id in enumerate(epoch_ids):
             os.makedirs(fig_path + '/svg/', exist_ok=True)
             brain.save_image(filename=fig_path + fname + '.png')
             brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
-            brain.save_movie(filename=fig_path + fname + '.mp4', time_dilation=12, framerate=30)
+            if not estimate_covariance:
+                brain.save_movie(filename=fig_path + fname + '.mp4', time_dilation=12, framerate=30)
 
         # Nutmeg plot
         fig = GA_stc.plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, initial_time=initial_time)
@@ -468,7 +488,8 @@ for i, epoch_id in enumerate(epoch_ids):
             os.makedirs(fig_path + '/svg/', exist_ok=True)
             brain.save_image(filename=fig_path + fname + '.png')
             brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
-            brain.save_movie(filename=fig_path + fname + '.mp4', time_dilation=12, framerate=30)
+            if not estimate_covariance:
+              brain.save_movie(filename=fig_path + fname + '.mp4', time_dilation=12, framerate=30)
 
 
 #----- Difference between conditions -----#
@@ -519,7 +540,6 @@ if len(stcs_fs_dict.keys()) > 1:
     GA_stc_diff.data = GA_stc_diff_data
     GA_stc_diff.subject = default_subject
 
-
     # --------- Plots ---------#
     # 3D Plot
     if surf_vol == 'volume' or surf_vol == 'mixed':
@@ -542,7 +562,8 @@ if len(stcs_fs_dict.keys()) > 1:
             os.makedirs(fig_path_diff + '/svg/', exist_ok=True)
             brain.save_image(filename=fig_path_diff + fname + '.png')
             brain.save_image(filename=fig_path_diff + '/svg/' + fname + '.pdf')
-            brain.save_movie(filename=fig_path_diff + fname + '.mp4', time_dilation=12, framerate=30)
+            if not estimate_covariance:
+                brain.save_movie(filename=fig_path_diff + fname + '.mp4', time_dilation=12, framerate=30)
 
     elif surf_vol == 'surface':
         # Difference 3D plot
@@ -556,7 +577,8 @@ if len(stcs_fs_dict.keys()) > 1:
             os.makedirs(fig_path_diff + '/svg/', exist_ok=True)
             brain.save_image(filename=fig_path_diff + fname + '.png')
             brain.save_image(filename=fig_path_diff + '/svg/' + fname + '.pdf')
-            brain.save_movie(filename=fig_path_diff + fname + '.mp4', time_dilation=12, framerate=30)
+            if not estimate_covariance:
+                brain.save_movie(filename=fig_path_diff + fname + '.mp4', time_dilation=12, framerate=30)
 
 
     #--------- Cluster permutations test ---------#
@@ -575,71 +597,81 @@ if len(stcs_fs_dict.keys()) > 1:
         t_thresh = stats.distributions.t.ppf(1 - desired_pval / 2, df=df)
 
         # Run permutations
+        n_permutations = 1024
         T_obs, clusters, cluster_p_values, H0 = clu = spatio_temporal_cluster_1samp_test(X=source_data_fs,
-                                                                                         n_permutations=512,
+                                                                                         n_permutations=n_permutations,
                                                                                          adjacency=adjacency_matrix,
                                                                                          n_jobs=4,
                                                                                          threshold=t_thresh)
 
         # Select the clusters that are statistically significant at p
-        p_threshold = 0.05
+        p_threshold = 0.01
         good_clusters_idx = np.where(cluster_p_values < p_threshold)[0]
         good_clusters = [clusters[idx] for idx in good_clusters_idx]
-        # [cluster_p_values[idx] for idx in good_clusters_idx]
+        significant_pvalues = [cluster_p_values[idx] for idx in good_clusters_idx]
 
-        # Get vertices from source space
-        fsave_vertices = [s["vertno"] for s in src_fs]
+        if len(good_clusters):
+            # Get vertices from source space
+            fsave_vertices = [s["vertno"] for s in src_fs]
 
-        # Select clusters for visualization
-        stc_all_cluster_vis = summarize_clusters_stc(clu=clu, p_thresh=p_threshold, tstep=GA_stc_diff.tstep, vertices=fsave_vertices,
-                                                     subject=default_subject)
+            # Select clusters for visualization
+            stc_all_cluster_vis = summarize_clusters_stc(clu=clu, p_thresh=p_threshold, tstep=GA_stc_diff.tstep, vertices=fsave_vertices,
+                                                         subject=default_subject)
 
+            # Get significant clusters
+            significance_mask = np.where(stc_all_cluster_vis.data[:, 0] == 0)[0]
 
-        # --------- Plots ---------#
-        # 3D Plot
-        if surf_vol == 'volume' or surf_vol == 'mixed':
-            # Clusters 3D plot
-            brain = stc_all_cluster_vis.plot_3d(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, hemi='both',
-                                        spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', size=(1000, 500))
+            # Mask data
+            GA_stc_diff_sig = GA_stc_diff.copy()
+            GA_stc_diff_sig.data[significance_mask] = 0
 
-            if save_fig:
-                if type(t_thresh) == dict:
-                    fname = f'Clus_t_TFCE_p{p_threshold}_3D'
-                else:
-                    fname = f'Clus_t{round(t_thresh, 2)}_p{p_threshold}_3D'
-                if force_fsaverage:
-                    fname += '_fsaverage'
-                # brain.show_view(azimuth=-90)
-                os.makedirs(fig_path_diff + '/svg/', exist_ok=True)
-                brain.save_image(filename=fig_path_diff + fname + '.png')
-                brain.save_image(filename=fig_path_diff + '/svg/' + fname + '.pdf')
-                brain.save_movie(filename=fig_path_diff + fname + '.mp4', time_dilation=12, framerate=30)
+            # --------- Plots ---------#
+            # 3D Plot
+            if surf_vol == 'volume' or surf_vol == 'mixed':
+                # Clusters 3D plot
+                brain = GA_stc_diff_sig.plot_3d(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, hemi='both', spacing=f'ico{ico}', initial_time=initial_time,
+                                                time_unit='s', size=(1000, 500), clim=clim_3d, time_label=str(significant_pvalues))
 
-            # Clusters Nutmeg plot
-            fig = stc_all_cluster_vis.plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir)
-            if save_fig and surf_vol == 'volume':
-                if type(t_thresh) == dict:
-                    fname = f'Clus_t_TFCE_p{p_threshold}'
-                else:
-                    fname = f'Clus_t{round(t_thresh, 2)}_p{p_threshold}'
-                if force_fsaverage:
-                    fname += '_fsaverage'
-                save.fig(fig=fig, path=fig_path_diff, fname=fname)
+                if save_fig:
+                    if type(t_thresh) == dict:
+                        fname = f'Clus_tTFCE_p{p_threshold}_3D'
+                    else:
+                        fname = f'Clus_t{round(t_thresh, 2)}_p{p_threshold}_3D'
+                    if force_fsaverage:
+                        fname += '_fsaverage'
+                    # brain.show_view(azimuth=-90)
+                    os.makedirs(fig_path_diff + '/svg/', exist_ok=True)
+                    brain.save_image(filename=fig_path_diff + fname + '.png')
+                    brain.save_image(filename=fig_path_diff + '/svg/' + fname + '.pdf')
+                    if not estimate_covariance:
+                        brain.save_movie(filename=fig_path_diff + fname + '.mp4', time_dilation=12, framerate=30)
 
+                # Clusters Nutmeg plot
+                fig = GA_stc_diff_sig.plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, initial_time=initial_time)
 
-        elif surf_vol == 'surface':
-            # Clusters 3D plot
-            fig = stc_all_cluster_vis.plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, hemi='split',
-                                     spacing=f'ico{ico}', initial_time=initial_time, time_unit='s', views='lateral', size=(1000, 500))
-            if save_fig:
-                if type(t_thresh) == dict:
-                    fname = f'Clus_t_TFCE_p{p_threshold}_3D'
-                else:
-                    fname = f'Clus_t{round(t_thresh, 2)}_p{p_threshold}_3D'
-                if force_fsaverage:
-                    fname += '_fsaverage'
-                # fig.show_view(azimuth=-90)
-                os.makedirs(fig_path_diff + '/svg/', exist_ok=True)
-                fig.save_image(filename=fig_path_diff + fname + '.png')
-                brain.save_image(filename=fig_path_diff + '/svg/' + fname + '.pdf')
-                brain.save_movie(filename=fig_path_diff + fname + '.mp4', time_dilation=12, framerate=30)
+                if save_fig and surf_vol == 'volume':
+                    if type(t_thresh) == dict:
+                        fname = f'Clus_t_TFCE_p{p_threshold}'
+                    else:
+                        fname = f'Clus_t{round(t_thresh, 2)}_p{p_threshold}'
+                    if force_fsaverage:
+                        fname += '_fsaverage'
+                    save.fig(fig=fig, path=fig_path_diff, fname=fname)
+
+            elif surf_vol == 'surface':
+                # Clusters 3D plot
+                fig = GA_stc_diff_sig.plot(src=src_fs, subject=default_subject, subjects_dir=subjects_dir, hemi='split', spacing=f'ico{ico}', initial_time=initial_time,
+                                           time_unit='s', views='lateral', size=(1000, 500), clim=clim_3d, time_label=str(significant_pvalues))
+                if save_fig:
+                    if type(t_thresh) == dict:
+                        fname = f'Clus_t_TFCE_p{p_threshold}_3D'
+                    else:
+                        fname = f'Clus_t{round(t_thresh, 2)}_p{p_threshold}_3D'
+                    if force_fsaverage:
+                        fname += '_fsaverage'
+                    # fig.show_view(azimuth=-90)
+                    os.makedirs(fig_path_diff + '/svg/', exist_ok=True)
+                    fig.save_image(filename=fig_path_diff + fname + '.png')
+                    fig.save_image(filename=fig_path_diff + '/svg/' + fname + '.pdf')
+                    if not estimate_covariance:
+                        fig.save_movie(filename=fig_path_diff + fname + '.mp4', time_dilation=12, framerate=30)
