@@ -32,19 +32,16 @@ use_ica_data = True
 epoch_id = 'vs'
 corr_ans = None
 tgt_pres = None
-mss = 4
+mss = 2
 reject = False  # 'subject' for subject's default. False for no rejection, dict for specific values. None for default 5e-12 for magnetometers
 # Trial durations
 vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
 plot_edge = 0.15
-trial_dur = None  # Edit this to determine the minimum visual search duration for the trial selection (this will also affect ms trials)
+trial_dur = vs_dur[mss]  # Edit this to determine the minimum visual search duration for the trial selection (this will also affect ms trials)
 evt_dur = None
 
 # Power time frequency params
-if mss:
-    n_cycles_div = 2./mss
-else:
-    n_cycles_div = 2.
+n_cycles_div = 2.
 l_freq = 1
 h_freq = 40
 log_bands = False
@@ -106,7 +103,7 @@ if (plot_max or plot_min):
     timefreqs_joint = None
 
 # Get baseline duration for epoch_id
-baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=epoch_id, mss=mss, tmin=tmin, tmax=tmax, plot_xlim=plot_xlim,
+baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=epoch_id, mss=mss, tmin=tmin, tmax=tmax,
                                                                   cross1_dur=cross1_dur, mss_duration=mss_duration,
                                                                   cross2_dur=cross2_dur)
 # freqs type
@@ -123,16 +120,16 @@ else:
 
 # Save ids
 save_id = f'{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
-plot_id = f'{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}_cyc{round(n_cycles_div, 1)}/'
+plot_id = f'{save_id}_{plot_xlim[0]}_{plot_xlim[1]}_bline{baseline}_cyc{int(n_cycles_div)}/'
 
 # Save data paths
 if return_average_tfr:
-    trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{save_id}_{tmin}_{tmax}_bline{baseline}_cyc{round(n_cycles_div, 1)}/'
+    trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{save_id}_{tmin}_{tmax}_bline{baseline}_cyc{int(n_cycles_div)}/'
 else:
-    trf_save_path = paths().save_path() + f'Time_Frequency_Epochs_{data_type}/{save_id}_{tmin}_{tmax}_bline{baseline}_cyc{round(n_cycles_div, 1)}/'
+    trf_save_path = paths().save_path() + f'Time_Frequency_Epochs_{data_type}/{save_id}_{tmin}_{tmax}_bline{baseline}_cyc{int(n_cycles_div)}/'
 epochs_save_path = paths().save_path() + f'Epochs_{data_type}/Band_None/{save_id}_{tmin}_{tmax}_bline{baseline}/'
 # Save figures paths
-trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + plot_id + f'{chs_id}/'
+trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/' + plot_id
 
 # Grand average data variable
 grand_avg_power_fname = f'Grand_Average_power_{l_freq}_{h_freq}_tfr.h5'
