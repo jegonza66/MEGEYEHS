@@ -3,7 +3,6 @@ import functions_analysis
 import functions_general
 import mne
 import mne.beamformer as beamformer
-import save
 from paths import paths
 import load
 import setup
@@ -15,21 +14,35 @@ import numpy as np
 
 
 # --------- Define Parameters ---------#
-save_fig = False
+save_fig = True
 display_figs = False
-save_data=False
+save_data = True
+
+# Turn on/off show figures
+if display_figs:
+    plt.ion()
+else:
+    plt.ioff()
+
+
 # Select epochs by id
-epoch_id = 'ms'
-run_id = 'ms'
+epoch_id = 'ms'  # Use ms for cross1 and ms. Use vs for cross2 and vs
+
 # Data
 use_ica_data = True
-# Frequency band
-band_id = 'Alpha'
+# Frequency band (filter sensor space)
+band_id = 'Beta'
+filter_method = 'iir'  # Only for envelope connectivity
 
 # Trials
 corr_ans = None
 tgt_pres = None
 mss = None
+reject = None
+evt_dur = None
+# Windows durations
+dur, cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration(epoch_id=epoch_id, mss=mss)
+trial_dur = vs_dur[mss]
 
 # Source estimation parameters
 force_fsaverage = False
@@ -42,43 +55,31 @@ surf_vol = 'surface'
 pick_ori = None  # 'vector' For dipoles, 'max_power' for
 # Parcelation (aparc / aparc.a2009s)
 parcelation = 'aparc'
-connectivity_method = 'pli'
+
+# Connectivity parameters
+envelope_connectivity = False
+if envelope_connectivity:
+    connectivity_method = 'corr'
+    orthogonalization = 'pair'  # 'pair' for pairwise leakage correction / 'sym' for symmetric leakage correction
+    downsample_ts = True
+    desired_sfreq = 10
+else:
+    connectivity_method = 'pli'
 
 
 # --------- Setup ---------#
 # Frequencies from band
 fmin, fmax = functions_general.get_freq_band(band_id=band_id)
 
-# Duration
-mss_duration = {1: 2, 2: 3.5, 4: 5, None: 2}
-cross1_dur = 0.75
-cross2_dur = 1
-plot_edge = 0.15
-vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
-trial_dur = vs_dur[mss]
-
 # Get time windows from epoch_id name
-map = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[mss], 'plot_xlim': (None, None)},
-           vs={'tmin': - cross2_dur, 'tmax': vs_dur[mss][0], 'plot_xlim': (None, None)})
-tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, cross1_dur=cross1_dur,
-                                                        mss_duration=mss_duration, cross2_dur=cross2_dur, dur=None,
-                                                        plot_edge=plot_edge, map=map)
+map = dict(cross1={'tmin': 0, 'tmax': cross1_dur, 'plot_xlim': (None, None)},
+           ms={'tmin': 0, 'tmax': mss_duration[mss], 'plot_xlim': (None, None)},
+           cross2={'tmin': 0, 'tmax': cross2_dur, 'plot_xlim': (None, None)},
+           vs={'tmin': 0, 'tmax': vs_dur[mss][0], 'plot_xlim': (None, None)})
 
-# conectivity matrix counts time starting from 0
-if run_id == 'cross1':
-    con_tmin = 0
-    con_tmax = cross1_dur
-elif run_id == 'ms':
-    con_tmin = cross1_dur
-    con_tmax = tmax
-elif run_id == 'cross2':
-    con_tmin = 0
-    con_tmax = cross2_dur
-elif run_id == 'vs':
-    con_tmin = cross2_dur
-    con_tmax = tmax
+tmin, tmax, _ = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, map=map)
 
-# Get baseline duration for epoch_id
+# Baseline has no effect in connectivity
 baseline = None
 
 # Load experiment info
@@ -95,23 +96,41 @@ else:
     data_type = 'RAW'
 
 # Load data paths
-run_path_data = f'Band_None/{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}'
-if (epoch_id == 'ms' or epoch_id == 'vs') and trial_dur:
-    run_path_data += f'_tdur{trial_dur}'
+if envelope_connectivity:
+    band_path = band_id
+elif not envelope_connectivity:
+    band_path = 'None'
+
+run_path_data = f'Band_{band_path}/{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}'
 
 epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path_data + f'_{tmin}_{tmax}_bline{baseline}/'
 evoked_save_path = paths().save_path() + f'Evoked_{data_type}/' + run_path_data + f'_{tmin}_{tmax}_bline{baseline}/'
 
-# Source plots and data spaths
-run_path_plot = run_path_data.replace('Band_None', f'Band_{band_id}')
-run_path_plot = run_path_plot.replace(f'{epoch_id}_', f'{run_id}_')
-fig_path = paths().plots_path() + f'Connectivity_{data_type}/' + run_path_plot + \
-           f'/{model_name}_{surf_vol}_ico{ico}_{spacing}_{pick_ori}_{parcelation}_{connectivity_method}/'  # Replace band id for None because Epochs are the same on all bands
-save_path = paths().save_path() + f'Connectivity_{data_type}/' + run_path_plot + \
-            f'/{model_name}_{surf_vol}_ico{ico}_{spacing}_{pick_ori}_{parcelation}_{connectivity_method}/'
-os.makedirs(save_path, exist_ok=True)
+# Source plots and data paths
+run_path_plot = run_path_data.replace('Band_None', f'Band_{band_id}')  # Replace band id for None because Epochs are the same on all bands
 
-# Set up connectivity matrix
+
+# Set path for envelope or signal connectivity
+if envelope_connectivity:
+    main_path = 'Connectivity_Env'
+    # Modify path if downsample ts
+    if downsample_ts:
+        downsample_path = f'ds{desired_sfreq}'
+    else:
+        downsample_path = f'dsFalse'
+    final_path = f'{orthogonalization}_{downsample_path}_{connectivity_method}'
+else:
+    main_path = 'Connectivity'
+    final_path = f'{connectivity_method}'
+
+if surf_vol == 'volume':
+    fig_path = paths().plots_path() + f'{main_path}_{data_type}/' + run_path_plot + f'/{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{parcelation}_{final_path}/'
+    save_path = paths().save_path() + f'{main_path}_{data_type}/' + run_path_plot + f'/{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{parcelation}_{final_path}/'
+elif surf_vol == 'surface':
+    fig_path = paths().plots_path() + f'{main_path}_{data_type}/' + run_path_plot + f'/{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{parcelation}_{final_path}/'
+    save_path = paths().save_path() + f'{main_path}_{data_type}/' + run_path_plot + f'/{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{parcelation}_{final_path}/'
+
+# Get parcelatino labels and set up connectivity matrix
 if surf_vol == 'surface':  # or surf_vol == 'mixed':
     # Get labels for FreeSurfer 'aparc' cortical parcellation with 34 labels/hemi
     fsaverage_labels = mne.read_labels_from_annot(subject='fsaverage', parc=parcelation, subjects_dir=subjects_dir)
@@ -122,24 +141,17 @@ if surf_vol == 'surface':  # or surf_vol == 'mixed':
         for drop_idx in drop_idxs:
             fsaverage_labels.pop(drop_idx)
     con_matrix = np.zeros((len(exp_info.subjects_ids), len(fsaverage_labels), len(fsaverage_labels)))
-    # if surf_vol == 'mixed':
-    #     fsaverage_labels + [1]
+
 if surf_vol == 'volume':
     labels_fname = subjects_dir + f'/fsaverage/mri/aparc+aseg.mgz'
     fsaverage_labels = mne.get_volume_labels_from_aseg(labels_fname, return_colors=True)
     # Drop extra labels in fsaverage
-    drop_idxs = [i for i, label in enumerate(fsaverage_labels[0]) if (label == 'ctx-lh-corpuscallosum' or
-                                                                   label == 'ctx-rh-corpuscallosum')]
+    drop_idxs = [i for i, label in enumerate(fsaverage_labels[0]) if (label == 'ctx-lh-corpuscallosum' or label == 'ctx-rh-corpuscallosum')]
     for drop_idx in drop_idxs:
         fsaverage_labels[0].pop(drop_idx)
         fsaverage_labels[1].pop(drop_idx)
     con_matrix = np.zeros((len(exp_info.subjects_ids), len(fsaverage_labels[0]), len(fsaverage_labels[0])))
 
-# Turn on/off show figures
-if display_figs:
-    plt.ion()
-else:
-    plt.ioff()
 
 # --------- Run ---------#
 for subj_num, subject_code in enumerate(exp_info.subjects_ids):
@@ -173,10 +185,32 @@ for subj_num, subject_code in enumerate(exp_info.subjects_ids):
     # Save figures path
     fig_path_subj = fig_path + f'{subject.subject_id}/'
     # Connectivity data fname
-    fname = save_path + f'{subject.subject_id}'
+    fname_con = save_path + f'{subject.subject_id}'
+
+    # Source data path
+    sources_path_subject = paths().sources_path() + subject.subject_id
+    # Load forward model
+    if surf_vol == 'volume':
+        fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
+    elif surf_vol == 'surface':
+        fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
+    fwd = mne.read_forward_solution(fname_fwd)
+    # Get sources from forward model
+    src = fwd['src']
 
     try:
-        mne_connectivity.read_connectivity(fname)
+        # Load connectivity matrix
+        con = mne_connectivity.read_connectivity(fname_con)
+
+        # Parcellation labels
+        if surf_vol == 'volume':
+            labels = subjects_dir + f'/{subject_code}/mri/aparc+aseg.mgz'
+        elif subject_code != 'fsaverage':
+            # Get labels for FreeSurfer cortical parcellation
+            labels = mne.read_labels_from_annot(subject=subject_code, parc=parcelation, subjects_dir=subjects_dir)
+        else:
+            labels = fsaverage_labels
+
     except:
         try:
             # Load data
@@ -184,17 +218,24 @@ for subj_num, subject_code in enumerate(exp_info.subjects_ids):
             evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
         except:
             if use_ica_data:
-                meg_data = load.ica_data(subject=subject)
+                if band_id and envelope_connectivity:
+                    meg_data = load.filtered_data(subject=subject, band_id=band_id, save_data=save_data,
+                                                  method=filter_method)
+                else:
+                    meg_data = load.ica_data(subject=subject)
             else:
-                meg_data = subject.load_preproc_meg_data()
-
+                if band_id and envelope_connectivity:
+                    meg_data = load.filtered_data(subject=subject, band_id=band_id, use_ica_data=False,
+                                                  save_data=save_data, method=filter_method)
+                else:
+                    meg_data = subject.load_preproc_meg_data()
             try:
                 epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
             except:
                 # Epoch data
                 epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
                                                                epoch_id=epoch_id, meg_data=meg_data, trial_dur=trial_dur,
-                                                               tmin=tmin, tmax=tmax, baseline=baseline, reject=None,
+                                                               tmin=tmin, tmax=tmax, baseline=baseline, reject=reject,
                                                                save_data=save_data, epochs_save_path=epochs_save_path,
                                                                epochs_data_fname=epochs_data_fname)
 
@@ -211,27 +252,11 @@ for subj_num, subject_code in enumerate(exp_info.subjects_ids):
 
 
         # --------- Source estimation ---------#
-        # Source data path
-        sources_path_subject = paths().sources_path() + subject.subject_id
-
-        # Load forward model
-        if surf_vol == 'volume':
-            fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
-        elif surf_vol == 'surface':
-            fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
-        # elif surf_vol == 'mixed':
-        #     fname_fwd = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}-fwd.fif'
-        fwd = mne.read_forward_solution(fname_fwd)
-        # Get sources from forward model
-        src = fwd['src']
-
         # Load filter
         if surf_vol == 'volume':
             fname_filter = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
         elif surf_vol == 'surface':
             fname_filter = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-{model_name}.fif'
-        # elif surf_vol == 'mixed':
-        #     fname_filter = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
         filters = mne.beamformer.read_beamformer(fname_filter)
 
         # Apply filter and get source estimates
@@ -248,20 +273,45 @@ for subj_num, subject_code in enumerate(exp_info.subjects_ids):
             labels = fsaverage_labels
 
         # Average the source estimates within each label using sign-flips to reduce signal cancellations, also here we return a generator
-        label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=labels, src=src, mode='auto', return_generator=True)
+        label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=labels, src=src, mode='auto', return_generator=False)
 
-        # Compute connectivity
-        con = mne_connectivity.spectral_connectivity_epochs(label_ts, method=connectivity_method, mode='multitaper', sfreq=epochs.info['sfreq'],
-                                                            fmin=fmin, fmax=fmax, tmin=con_tmin, tmax=con_tmax, faverage=True,  mt_adaptive=True)
+        if envelope_connectivity:
+            if downsample_ts:
+                for i, ts in enumerate(label_ts):
+                    sfreq = epochs.info['sfreq']
+                    samples_interval = int(sfreq/desired_sfreq)
+                    # Taking jumping windows average of samples
+                    label_ts[i] = np.array([np.mean(ts[:, j*samples_interval:(j+1)*samples_interval], axis=-1) for j in range(int(len(ts[0])/samples_interval) + 1)]).T
+                    # Subsampling
+                    # label_ts[i] = ts[:, ::samples_interval]
 
+            # Compute envelope connectivity (automatically computes hilbert transform to extract envelope)
+            if orthogonalization == 'pair':
+                label_names = [label.name for label in labels]
+                con = mne_connectivity.envelope_correlation(data=label_ts, names=label_names)
+
+            elif orthogonalization == ' sym':
+                label_ts_orth = mne_connectivity.envelope.symmetric_orth(label_ts)
+                con = mne_connectivity.envelope_correlation(label_ts_orth, orthogonalize=False)
+                # Take absolute value of correlations (orthogonalize False does not take abs by default)
+                con.xarray.data = abs(con.get_data())
+
+            # Average across epochs
+            con = con.combine()
+
+        else:
+            con = mne_connectivity.spectral_connectivity_epochs(label_ts, method=connectivity_method, mode='multitaper', sfreq=epochs.info['sfreq'],
+                                                                fmin=fmin, fmax=fmax, tmin=tmin, tmax=tmax, faverage=True, mt_adaptive=True)
         # Save
-        con.save(fname)
+        if save_data:
+            os.makedirs(save_path, exist_ok=True)
+            con.save(fname_con)
 
     # Get connectivity matrix
     con_matrix[subj_num] = con.get_data(output='dense')[:, :, 0]
 
     # Plot circle
-    plot_general.connectivity_circle(subject=subject, labels=labels, surf_vol=surf_vol, con=con_matrix[subj_num], connectivity_method='pli',
+    plot_general.connectivity_circle(subject=subject, labels=labels, surf_vol=surf_vol, con=con_matrix[subj_num], connectivity_method=connectivity_method,
                                      subject_code=subject_code, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_subj, fname=None)
 
     # Plot connectome
@@ -272,16 +322,17 @@ for subj_num, subject_code in enumerate(exp_info.subjects_ids):
     plot_general.plot_con_matrix(subject=subject, labels=labels, adjacency_matrix=con_matrix[subj_num], subject_code=subject_code,
                                  save_fig=save_fig, fig_path=fig_path_subj, fname=None)
 
+    # Plot connectivity strength (connections from each region to other regions)
+    plot_general.connectivity_strength(subject=subject, subject_code=subject_code, con=con, src=src, labels=labels, surf_vol=surf_vol, force_fsaverage=force_fsaverage,
+                                       subjects_dir=subjects_dir, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_subj, fname=None)
 
 # --------- Grand Average ---------#
 # Get connectivity matrix for GA
 ga_con_matrix = con_matrix.mean(0)
 
-
 # Plot circle
-plot_general.connectivity_circle(subject='GA', labels=labels, surf_vol=surf_vol, con=ga_con_matrix, connectivity_method='pli', subject_code='fsaverage',
+plot_general.connectivity_circle(subject='GA', labels=labels, surf_vol=surf_vol, con=ga_con_matrix, connectivity_method='corr', subject_code='fsaverage',
                                  display_figs=display_figs, save_fig=save_fig, fig_path=fig_path, fname='GA_circle')
-
 
 # Plot connectome
 plot_general.connectome(subject='GA', labels=labels, adjacency_matrix=ga_con_matrix, subject_code='fsaverage',
@@ -290,28 +341,7 @@ plot_general.connectome(subject='GA', labels=labels, adjacency_matrix=ga_con_mat
 plot_general.plot_con_matrix(subject='GA', labels=labels, adjacency_matrix=ga_con_matrix, subject_code='fsaverage',
                              save_fig=save_fig, fig_path=fig_path, fname='GA_matrix')
 
-# # Plot markers positions
-# plotting.plot_markers(np.arange(len(labels)), nodes_pos*1000)
-#
-# # Plot connectome in 3d interactive
-# view = plotting.view_connectome(ga_con_matrix, nodes_pos, edge_threshold=ga_con_matrix.max()*0.9).open_in_browser()
 
-
-## Epochs and evokeds in source space
-
-stc_epochs[0].plot(hemi='both')
-
-epochs_data = np.zeros((len(stc_epochs), stc_epochs[0].data.shape[0], stc_epochs[0].data.shape[1]))
-
-print('Getting epoched data')
-for epoch_num, epoch in enumerate(stc_epochs):
-    epochs_data[epoch_num] = epoch.data
-    print(f'\rProgress: {int((epoch_num + 1) / len(stc_epochs) * 100)}%', end='')
-
-print('Averaging evoked data')
-evoked_data = epochs_data.mean(0)
-
-evoked_stc = epoch.copy()
-evoked_stc.data = evoked_data
-
-evoked_stc.plot(hemi='both')
+# Plot connectivity strength (connections from each region to other regions)
+plot_general.connectivity_strength(subject='GA', subject_code='fsaverage', con=ga_con_matrix, src=src, labels=labels, surf_vol=surf_vol, force_fsaverage=force_fsaverage,
+                                       subjects_dir=subjects_dir, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path, fname='GA_strength')
