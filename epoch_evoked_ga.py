@@ -41,14 +41,20 @@ corr_ans = True
 tgt_pres = True
 mss = None
 reject = None  # None to use defalt {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
-trial_dur = None
 evt_dur = None
+
+# Windows durations
+cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
+if 'vs' in epoch_id:
+    trial_dur = vs_dur[mss]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
+else:
+    trial_dur = None
 
 # Get time windows from epoch_id name
 map_times = dict(l_sac={'tmin': -0.05, 'tmax': 0.1, 'plot_xlim': (-0.05, 0.05)},
                  fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.2, 0.5)})
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
-# Baseline
+
 # Baseline duration
 if 'sac' in epoch_id:
     baseline = (tmin, 0)
