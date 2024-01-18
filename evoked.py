@@ -35,12 +35,14 @@ corr_ans = None
 tgt_pres = None
 mss = None
 reject = None
-trial_dur = None
 evt_dur = None
 
-# Screen durations
-vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
-dur, cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration(epoch_id=epoch_id, vs_dur=vs_dur, mss=mss)
+# Windows durations
+dur, cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
+if 'vs' in epoch_id:
+    trial_dur = vs_dur[mss]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
+else:
+    trial_dur = None
 
 # Get time windows from epoch_id name
 map = dict(tgt_fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3, 0.6)},
