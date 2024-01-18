@@ -2,7 +2,9 @@ import numpy as np
 import pandas as pd
 import mne
 import scipy
-
+import warnings
+from paths import paths
+from scipy.signal import butter, lfilter
 
 def scale_from_interval(signal_to_scale, reference_signal, interval_signal=None, interval_ref=None):
     """
@@ -432,13 +434,14 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
 
     else:
         try:
-            dur, cross1_dur, cross2_dur, mss_duration, vs_dur = get_duration(epoch_id=epoch_id, mss=mss)
+            cross1_dur, cross2_dur, mss_duration, vs_dur = get_duration()
 
-            map = dict(ms={'tmin': -cross1_dur, 'tmax': dur, 'plot_xlim': (-cross1_dur + plot_edge, dur - plot_edge)},
+            map = dict(cross1={'tmin': 0, 'tmax': cross1_dur, 'plot_xlim': (plot_edge, cross1_dur - plot_edge)},
+                       ms={'tmin': -cross1_dur, 'tmax': mss_duration[mss], 'plot_xlim': (-cross1_dur + plot_edge, mss_duration[mss] - plot_edge)},
                        cross2={'tmin': -cross1_dur - mss_duration[mss], 'tmax': cross2_dur,
                                'plot_xlim': (plot_edge, cross2_dur - plot_edge)},
-                       vs={'tmin': -cross1_dur - mss_duration[mss] - cross2_dur, 'tmax': dur,
-                           'plot_xlim': (-cross1_dur - mss_duration[mss] - cross2_dur + plot_edge, dur - plot_edge)},
+                       vs={'tmin': -cross1_dur - mss_duration[mss] - cross2_dur, 'tmax': vs_dur[mss][0],
+                           'plot_xlim': (-cross1_dur - mss_duration[mss] - cross2_dur + plot_edge, vs_dur[mss][0] - plot_edge)},
                        vsend={'tmin': -2, 'tmax': cross1_dur + 1, 'plot_xlim': (-2 + plot_edge, cross1_dur + 1 - plot_edge)},
                        sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)},
                        fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.25, 0.55)},
@@ -466,24 +469,26 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
     return tmin, tmax, plot_xlim
 
 
-def get_duration(epoch_id,  mss, vs_dur=None):
+def get_duration():
     mss_duration = {1: 2, 2: 3.5, 4: 5, None: 2}
-    if not vs_dur:
-        vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
+    vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
     cross2_dur = 1
     cross1_dur = 0.75
 
-    # Duration
-    if 'ms' in epoch_id:
-        dur = mss_duration[mss] + cross2_dur + vs_dur[mss][0]
-    elif 'cross2' in epoch_id:
-        dur = cross2_dur + vs_dur[mss][0]  # seconds
-    elif 'vs' in epoch_id:
-        dur = vs_dur[mss][0]  # seconds
-    else:
-        dur = 0
+    # # Duration
+    # if epoch_id:
+    #     if 'ms' in epoch_id:
+    #         dur = mss_duration[mss] + cross2_dur + vs_dur[mss][0]
+    #     elif 'cross2' in epoch_id:
+    #         dur = cross2_dur + vs_dur[mss][0]  # seconds
+    #     elif 'vs' in epoch_id:
+    #         dur = vs_dur[mss][0]  # seconds
+    #     else:
+    #         dur = 0
+    # else:
+    #     dur = None
 
-    return dur, cross1_dur, cross2_dur, mss_duration, vs_dur
+    return cross1_dur, cross2_dur, mss_duration, vs_dur
 
 
 def get_baseline_duration(epoch_id, mss, tmin, tmax, cross1_dur, mss_duration, cross2_dur, map=None):
@@ -718,3 +723,171 @@ def get_channel_adjacency(info, ch_type='mag', picks=None, bads=None):
         ch_adjacency_sparse = ch_adjacency[0]
 
     return ch_adjacency_sparse
+
+
+def find_structure(mni, DB=None):
+    # ----------------------------  find_structure ---------------------------
+    # Converts MNI coordinate to a description of brain structure in aal
+    # Input: - mni : the coordinates (MNI) of some points, in mm.  It is Mx3 matrix
+    #        where each row is the coordinate for one point.
+    #        -DB (optional): The database. If is omit, make sure TDdatabase.mat is in the
+    #        same folder
+    # Output: -one_line_result: A list of M elements, each describing each point.
+    #        -table_result:  A  MxN matrix being N the size of the database (DB)
+    # Copy from cuixuFindStructure.m
+
+    # Vectorize this functions
+    vstr = np.vectorize(str)
+    vround = np.vectorize(my_round)
+    vint = np.vectorize(int)
+
+    if DB == None:
+        mat = scipy.io.loadmat(paths().save_path() + 'TDdatabase.mat')
+
+    mni = np.array(mni)
+
+    # round coordinates
+    mni = vround(mni / 2) * 2
+
+    T = np.array([[2, 0, 0, -92], [0, 2, 0, -128],
+                  [0, 0, 2, -74], [0, 0, 0, 1]])
+
+    index = mni2cor(mni, T)
+    M = np.shape(index)[0]
+
+    # -1 by python indexation
+    index = vint(index) - 1
+
+    N = np.shape(mat['DB'])[1]
+    table_result = np.zeros((M, N))
+    table_result = table_result.tolist()  # instead of [i,j] use [i][j]
+
+    one_line_result = [""] * M
+
+    for i in range(M):
+        for j in range(N):
+            # mat['DB'][0,j][0,0][0] is the j-th 3D-matrix 
+            graylevel = mat['DB'][0, j][0, 0][0][index[i, 0], index[i, 1], index[i, 2]]
+            if graylevel == 0:
+                label = 'undefined'
+            else:
+                if j < (N - 1):
+                    tmp = ''
+                else:
+                    tmp = ' (aal)'
+
+                    # mat['DB'][0,j][0,0][1]  is the list with regions
+                label = mat['DB'][0, j][0, 0][1][0, (graylevel - 1)][0] + tmp
+
+            table_result[i][j] = label
+            one_line_result[i] = one_line_result[i] + ' // ' + label
+    return (one_line_result, table_result)
+
+
+# ---------------------------- mni2cor --------------------------------
+# convert mni coordinate to matrix coordinate
+# Input: - mni : the coordinates (MNI) of some points, in mm.  It is Mx3 matrix
+#        where each row is the coordinate for one point.
+#        -T (optional): transform matrix coordinate is the returned coordinate in matrix.
+# Output: -coords : Coordinate matrix
+#
+def mni2cor(mni, T=np.array([[-4, 0, 0, 84], [0, 4, 0, -116],
+                             [0, 0, 4, -56], [0, 0, 0, 1]])):
+    mni = np.array(mni)
+
+    if len(np.shape(mni)) == 1:
+        mni = mni.reshape((1, len(mni)))
+
+    if np.shape(mni)[1] != 3:
+        warnings.warn('are not 3-length coordinates')
+        return (np.array([]))
+
+    a = np.hstack((mni, np.ones((np.shape(mni)[0], 1))))
+    b = np.transpose(np.linalg.inv(T))
+    coords = a.dot(b)
+    coords = coords[:, 0:3]
+
+    vround = np.vectorize(my_round)
+    coords = vround(coords)
+    return (coords)
+
+
+# -------------------------- my_round ------------------------------
+# round function to integer to match with round in MATLAB
+# Input: -x: value to be rounded
+# Output: rounded x
+def my_round(x):
+    r = x - np.floor(x)
+    if (r == 0.5):
+        if x < 0:
+            return (x - 0.5)
+        else:
+            return (x + 0.5)
+    else:
+        return (round(x))
+
+
+def get_regions_from_mni(src_default, significant_voxels, save_path, t_thresh_name, p_threshold, masked_negatves=False):
+
+    # Get all source space used voxels locations (meters -> mm)
+    used_voxels_mm = src_default[0]['rr'][src_default[0]['inuse'].astype(bool)] * 1000
+
+    # Get significant voxels mni locations
+    significant_voxels_mm = np.round(used_voxels_mm[significant_voxels])
+
+    # Significant regions
+    _, significant_regions = find_structure(significant_voxels_mm)
+
+    # Atlas regions
+    all_aals = [region[-1] for region in significant_regions]
+    aals_count = [(region[-1], all_aals.count(region[-1])) for region in significant_regions]
+    sig_aals = list(set(aals_count))
+
+    # Define dictonary to save regions
+    save_dict = {'aal': [region[0] for region in sig_aals], 'aal occurence': [region[1] for region in sig_aals]}
+
+    # Broadmann areas
+    all_brodmanns = [region[-2] for region in significant_regions]
+    brodmanns_count = [(region[-2], all_brodmanns.count(region[-2])) for region in significant_regions]
+    sig_brodmann_regions = list(set(brodmanns_count))
+
+    # Add brodmann areas to dictionary
+    save_dict['brodmann'] = [region[0] for region in sig_brodmann_regions]
+    save_dict['brodmann occurence'] = [region[1] for region in sig_brodmann_regions]
+
+    # Define save dataframe
+    significant_regions_df = pd.DataFrame(dict([(key, pd.Series(value)) for key, value in save_dict.items()]))
+
+    # Save
+    if masked_negatves:
+        fname = f'significant_regions_t{t_thresh_name}_p{p_threshold}_masked.csv'
+    else:
+        fname = f'significant_regions_t{t_thresh_name}_p{p_threshold}.csv'
+    significant_regions_df.to_csv(save_path + fname)
+
+    # # Other alternative for regions definition allowing for AAl3 (not only AAL, but loosing Bradman areas)
+    # # Instantiate the AtlasBrowser class and specify the atlas to use
+    # from mni_to_atlas import AtlasBrowser
+    # atlas = AtlasBrowser("AAL3")
+    # regions = atlas.find_regions(significant_voxels_mm[7], plot=True)
+
+    return significant_regions_df
+
+
+def butter_bandpass_filter(data, band_id, sfreq=1200, order=3):
+    l_freq, h_freq = get_freq_band(band_id=band_id)
+    b, a = butter(N=order, Wn=[l_freq, h_freq], fs=sfreq, btype='band')
+    y = lfilter(b, a, data)
+    return y
+
+
+def butter_lowpass_filter(data, h_freq, sfreq=1200, order=3):
+    b, a = butter(N=order, Wn=h_freq, fs=sfreq, btype='low')
+    y = lfilter(b, a, data)
+    return y
+
+
+def butter_highpass_filter(data, l_freq, sfreq=1200, order=3):
+    b, a = butter(N=order, Wn=l_freq, fs=sfreq, btype='high')
+    y = lfilter(b, a, data)
+    return y
