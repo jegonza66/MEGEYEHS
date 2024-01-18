@@ -667,11 +667,10 @@ def connectivity_circle(subject, labels, con, surf_vol, connectivity_method='pli
                                           group_boundaries=[0, len(label_names) / 2])
 
     # Plot the graph using node colors from the FreeSurfer parcellation
-    fig, ax = plt.subplots(figsize=(8, 8), facecolor='black',
-                           subplot_kw=dict(polar=True))
+    fig, ax = plt.subplots(figsize=(8, 8), facecolor='black', subplot_kw=dict(polar=True))
 
     # Plot
-    mne_connectivity.viz.plot_connectivity_circle(con, label_names, n_lines=200,
+    mne_connectivity.viz.plot_connectivity_circle(con, label_names, n_lines=50,
                                                   node_angles=node_angles, node_colors=label_colors,
                                                   title=f'All-to-All Connectivity ({connectivity_method})', ax=ax,
                                                   show=display_figs)
@@ -686,7 +685,7 @@ def connectivity_circle(subject, labels, con, surf_vol, connectivity_method='pli
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_connectome', connections_num=30,
+def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_connectome', connections_num=.98,
                node_size=10, node_color='k', linewidth=2):
 
     # Sanity check
@@ -708,13 +707,36 @@ def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, 
     nodes_pos = np.array([label_xpos, label_ypos, label_zpos]).transpose() * 1000
 
     # Make adjacency matrix symetric for two-way connectome
-    adjacency_matrix = np.maximum(adjacency_matrix, adjacency_matrix.transpose())
+    adjacency_matrix = np.tril(adjacency_matrix) + np.tril(adjacency_matrix, -1).T
+
+    # Define edges to plot
+    if connections_num > 1:
+        edge_threshold = np.sort(adjacency_matrix, axis=None)[-int(connections_num * 2)]
+        edge_vmin = np.sort(adjacency_matrix, axis=None)[-int(connections_num * 10)]  # Set min as 10 times lower index than minimum plo
+        edge_vmax = np.sort(adjacency_matrix, axis=None)[-1]
+        if edge_vmin < 0:
+            edge_cmap = 'bwr'
+        else:
+            edge_cmap = 'Reds'
+
+    elif connections_num < 1 :
+        edge_threshold = f'{connections_num*100}%'
+        edge_vmax = adjacency_matrix.max()
+
+        if adjacency_matrix.min() < 0:
+            edge_vmin = adjacency_matrix.min()
+            edge_cmap = 'bwr'
+        else:
+            edge_vmin = np.sort(adjacency_matrix, axis=None)[-int((1 - connections_num * 2) * len(adjacency_matrix) ** 2)]  # set colorbar minimum as twice smaller than plot minimum
+            edge_cmap = 'Reds'
+    else:
+        edge_vmin = None
+        edge_vmax = None
+        edge_threshold = None
 
     # Plot connectome
-    edge_threshold = np.sort(adjacency_matrix, axis=None)[-int(connections_num)*2]
-    fig = plotting.plot_connectome(adjacency_matrix=adjacency_matrix, node_coords=nodes_pos,
-                                   edge_threshold=edge_threshold, node_size=node_size, node_color=node_color,
-                                   edge_kwargs=dict(linewidth=linewidth))
+    fig = plotting.plot_connectome(adjacency_matrix=adjacency_matrix, node_coords=nodes_pos, edge_threshold=edge_threshold, edge_vmin=edge_vmin, edge_vmax=edge_vmax,
+                                   edge_cmap=edge_cmap, node_size=node_size, node_color=node_color, edge_kwargs=dict(linewidth=linewidth))
 
     # Save
     if save_fig:
@@ -769,7 +791,7 @@ def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, save_fig=Fa
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, force_fsaverage, subjects_dir, display_figs, save_fig, fig_path, fname):
+def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, subjects_dir, save_fig, fig_path, fname):
 
     # Plot connectivity strength (connections from each region to other regions)
     degree = mne_connectivity.degree(con)
@@ -784,12 +806,57 @@ def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, for
         hemi = 'both'
         views = 'dorsal'
 
-    brain = stc.plot(src=src, subject=subject_code, subjects_dir=subjects_dir, size=(1000, 500), clim=dict(kind="percent", lims=[75, 85, 95]), hemi=hemi, views=views,
-                     show=display_figs)
+    brain = stc.plot(src=src, subject=subject_code, subjects_dir=subjects_dir, size=(1000, 500), clim=dict(kind="percent", lims=[75, 85, 95]), hemi=hemi, views=views)
     if save_fig:
         if not fname:
             fname = f'{subject.subject_id}_strength'
-        if force_fsaverage:
+        if subject_code == 'fsaverage' and 'fsaverage' not in fname:
             fname += '_fsaverage'
         brain.save_image(filename=fig_path + fname + '.png')
         brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
+
+
+def sources(stc, src, subject , subjects_dir, ico, initial_time, surf_vol, force_fsaverage, estimate_covariance, save_fig, fig_path, fname, time_label='auto'):
+
+    # Define clim
+    if stc.data.min() >= 0:
+        clim = {'kind': 'values', 'lims': (0, (abs(stc.data).max() - abs(stc.data).min()) / 2, stc.data.max())}
+    else:
+        clim = {'kind': 'values', 'pos_lims': (0, (abs(stc.data).max() - abs(stc.data).min()) / 2, abs(stc.data).max())}
+
+
+    if surf_vol == 'volume':
+
+        # Nutmeg plot
+        fig = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, initial_time=initial_time, clim=clim)
+        if save_fig:
+            if force_fsaverage:
+                fname += '_fsaverage'
+            save.fig(fig=fig, path=fig_path, fname=fname)
+
+        # 3D plot
+        brain = stc.plot_3d(src=src, subject=subject, subjects_dir=subjects_dir,  hemi='both', clim=clim,
+                               spacing=f'ico{ico}', initial_time=initial_time, size=(1000, 500), time_label=time_label)
+        if save_fig:
+            fname += '_3D'
+            if force_fsaverage:
+                fname += '_fsaverage'
+            os.makedirs(fig_path + '/svg/', exist_ok=True)
+            brain.save_image(filename=fig_path + fname + '.png')
+            brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
+            if not estimate_covariance:
+                brain.save_movie(filename=fig_path + fname + '.mp4', time_dilation=12, framerate=30)
+
+    elif surf_vol == 'surface':
+        # 3D plot
+        brain = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, hemi='split', clim=clim,
+                         spacing=f'ico{ico}', initial_time=initial_time, views='lateral', size=(1000, 500))
+        if save_fig:
+            fname += '_3D'
+            if force_fsaverage:
+                fname += '_fsaverage'
+            os.makedirs(fig_path + '/svg/', exist_ok=True)
+            brain.save_image(filename=fig_path + fname + '.png')
+            brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
+            if not estimate_covariance:
+              brain.save_movie(filename=fig_path + fname + '.mp4', time_dilation=12, framerate=30)
