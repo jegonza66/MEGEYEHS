@@ -21,20 +21,29 @@ else:
     plt.ioff()
 
 #-----  Parameters -----#
+# Select epochs
+epoch_ids = ['it_fix_subsampled', 'tgt_fix', 'blue', 'red']
+
 # Select channels
 chs_id = 'mag'  # region_hemisphere (frontal_L)
 all_chs_regions = ['frontal', 'temporal', 'central', 'parietal', 'occipital']
 
-mss = None
-evt_dur = None
-trial_dur = None
 corr_ans = True
 tgt_pres = True
 band_id = None
+mss = None
+evt_dur = None
+
+# Window durations
+cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
+if 'vs' in epoch_ids:
+    trial_dur = vs_dur[mss]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
+else:
+    trial_dur = None
+
 
 # ICA / RAW
 use_ica_data = True
-epoch_ids = ['it_fix_subsampled', 'tgt_fix', 'blue', 'red']
 standarize = True
 
 # Specific run path for saving data and plots
@@ -50,8 +59,9 @@ alpha = None
 baseline = (tmin, -0.05)
 
 # Define Grand average variables
+ga = {}
 for var_name in epoch_ids:
-    exec(f'{var_name}_ga = []')
+    ga[var_name] = []
 
 plot_edge = 0.1
 fig_path = paths().plots_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}' \
@@ -157,13 +167,16 @@ for subject_code in exp_info.subjects_ids:
             save.var(var=rf, path=trf_path, fname=trf_fname)
 
     # Get model coeficients as separate responses to target and items
+    trf = {}
+    evoked = {}
+    evoked_list = {}
     for i, var_name in enumerate(epoch_ids):
 
         # All or multiple regions
         if chs_id == 'mag' or '_' in chs_id:
 
             # Define evoked from TRF list to concatenate all
-            exec(f'{var_name}_evoked_list = []')
+            evoked_list[var_name] = []
 
             # iterate over regions
             for chs_idx, chs_subset in enumerate(rf.keys()):
@@ -172,58 +185,52 @@ for subject_code in exp_info.subjects_ids:
                 meg_sub = meg_data.copy().pick(picks)
 
                 # Get TRF coeficients from chs subset
-                exec(f'{var_name}_trf = rf[chs_subset].coef_[:, i, :]')
+                trf[var_name] = rf[chs_subset].coef_[:, i, :]
 
                 if chs_idx == 0:
                     # Define evoked object from arrays of TRF
-                    exec(f'{var_name}_evoked = mne.EvokedArray(data={var_name}_trf, info=meg_sub.info, tmin=tmin, baseline=baseline)')
+                    evoked[var_name] = mne.EvokedArray(data=trf[var_name], info=meg_sub.info, tmin=tmin, baseline=baseline)
                 else:
                     # Append evoked object from arrays of TRF to list, to concatenate all
-                    exec(f'{var_name}_evoked_list.append(mne.EvokedArray(data={var_name}_trf, info=meg_sub.info, tmin=tmin, baseline=baseline))')
-
+                    evoked_list[var_name].append(mne.EvokedArray(data=trf[var_name], info=meg_sub.info, tmin=tmin, baseline=baseline))
             # Concatenate evoked from al regions
-            exec(f'{var_name}_evoked = {var_name}_evoked.add_channels({var_name}_evoked_list)')
-
+            evoked[var_name] = evoked[var_name].add_channels(evoked_list[var_name()])
         else:
-            exec(f'{var_name}_trf = rf.coef_[:, i, :]')
+            trf[var_name] = rf.coef_[:, i, :]
             # Define evoked objects from arrays of TRF
-            exec(f'{var_name}_evoked = mne.EvokedArray(data={var_name}_trf, info=meg_sub.info, tmin=tmin, baseline=baseline)')
+            evoked[var_name] = mne.EvokedArray(data=trf[var_name], info=meg_sub.info, tmin=tmin, baseline=baseline)
 
         # Append for Grand average
-        exec(f'{var_name}_ga.append({var_name}_evoked)')
+        ga[var_name].append(evoked[var_name])
         # Plot
-        exec(f'fig = {var_name}_evoked.plot(spatial_colors=True, gfp=True, show=display_figs, '
-             f'xlim=(tmin+plot_edge, tmax-plot_edge))')
+        fig = evoked[var_name].plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(tmin+plot_edge, tmax-plot_edge))
 
         if save_fig:
             # Save
             fig_path_subj = fig_path + f'{subject.subject_id}/'
             fname = f'{var_name}_{chs_id}'
-            exec('save.fig(fig=fig, fname=fname, path=fig_path_subj)')
-
+            save.fig(fig=fig, fname=fname, path=fig_path_subj)
 
 bads = []
-
+grand_avg = {}
 for var_name in epoch_ids:
     # Compute grand average
-    exec(f'{var_name}_grand_avg = mne.grand_average({var_name}_ga, interpolate_bads=True)')
+    grand_avg[var_name] = mne.grand_average(ga[var_name], interpolate_bads=True)
     # Append every subject bad channels
-    exec(f'{var_name}_grand_avg.info["bads"] = bads')
-
+    grand_avg[var_name].info["bads"] = bads
     # Calculate max and min plot lims excluding bad channels
-    exec(f'bad_ch_idx = np.where(np.array({var_name}_grand_avg.info["ch_names"]) == {var_name}_grand_avg.info["bads"])[0]')
-    exec(f'plot_times_idx = np.where(({var_name}_grand_avg.times > tmin + plot_edge) & ({var_name}_grand_avg.times < tmax - plot_edge))[0]')
-    exec(f'data = {var_name}_grand_avg.get_data()[:, plot_times_idx]')
-    exec(f'ylims = [(np.delete(data, bad_ch_idx, axis=0).min()*1.2)*1e15, (np.delete(data, bad_ch_idx, axis=0).max()*1.2)*1e15]')
-
-    # plot
-    exec(f'fig = {var_name}_grand_avg.plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(tmin+plot_edge, tmax-plot_edge),'
-         f' ylim=dict(mag=ylims))')
+    bad_ch_idx = np.where(np.array(grand_avg[var_name].info["ch_names"]) == grand_avg[var_name].info["bads"])[0]
+    plot_times_idx = np.where((grand_avg[var_name].times > tmin + plot_edge) & (grand_avg[var_name].times < tmax - plot_edge))[0]
+    data = grand_avg[var_name].get_data()[:, plot_times_idx]
+    ylims = [(np.delete(data, bad_ch_idx, axis=0).min() * 1.2) * 1e15, (np.delete(data, bad_ch_idx, axis=0).max() * 1.2) * 1e15]
+    # Plot
+    fig = grand_avg[var_name].plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(tmin + plot_edge, tmax - plot_edge), ylim=dict(mag=ylims))
 
     if save_fig:
         # Save
         fname = f'{var_name}_GA_{chs_id}'
-        exec('save.fig(fig=fig, fname=fname, path=fig_path)')
+        save.fig(fig=fig, fname=fname, path=fig_path)
+
 
 ## mTRF to band power
 import functions_analysis
@@ -235,7 +242,6 @@ import setup
 from paths import paths
 import matplotlib.pyplot as plt
 import numpy as np
-from mne.decoding import ReceptiveField
 import mne
 
 #----- Path -----#
@@ -252,23 +258,26 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'parietal'  # region_hemisphere (frontal_L)
+chs_id = 'parietal_occipital'  # regions_hemisphere (frontal_central_L)
 mss = None
 evt_dur = None
-trial_dur = None
 corr_ans = None
 tgt_pres = None
+# Windows durations
+dur, cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
+trial_dur = vs_dur[mss]
 
 # ICA / RAW
 use_ica_data = True
-band_id = 'Alpha'
-epoch_ids = ['vs', 'fix_vs']
+band_id = 'Beta'
+epoch_ids = ['ms', 'fix_ms', 'sac_ms']
 standarize = True
+
 # TRF parameters
-tmin = -0.3
+tmin = -0.75
 tmax = 2
 alpha = None
-baseline = (tmin, -0.05)
+baseline = (tmin, 0)
 fmin, fmax = functions_general.get_freq_band(band_id=band_id)
 # Plot
 plot_edge = 0.1
@@ -287,8 +296,9 @@ trf_save_path = paths().save_path() + f'TRF_{data_type}_ENV/Band_{band_id}/{epoc
 env_save_path = paths().save_path() + f'ENV_{data_type}/Band_{band_id}/'
 
 # Define Grand average variables
+ga = {}
 for var_name in epoch_ids:
-    exec(f'{var_name}_ga = []')
+    ga[var_name] = []
 
 for subject_code in exp_info.subjects_ids:
     trf_path = trf_save_path
@@ -309,37 +319,24 @@ for subject_code in exp_info.subjects_ids:
         meg_sub = meg_data.copy().pick(picks)
         print('Loaded Receptive Field')
     except:
-        print(f'Computing TRF for {epoch_ids}')
-        env_subj_path = env_save_path + subject_code + '/'
-        env_fname = f'{subject_code}.fif'
-        try:
-            # Load Envelope in frequency band
-            meg_env = mne.io.read_raw_fif(env_subj_path + env_fname, preload=False)
-            if use_ica_data:
-                # Load subject object
-                subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
+
+        if use_ica_data:
+            # Load subject object
+            subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
+            if band_id:
+                meg_data = load.filtered_data(subject=subject, band_id=band_id, save_data=save_data)
             else:
-                # Load subject object
-                subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-        except:
-            if use_ica_data:
-                # Load subject object
-                subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
-                meg_data = load.ica_data(subject=subject, preload=True)
+                meg_data = load.ica_data(subject=subject)
+        else:
+            # Load subject object
+            subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
+            if band_id:
+                meg_data = load.filtered_data(subject=subject, band_id=band_id, use_ica_data=False, save_data=save_data)
             else:
-                # Load subject object
-                subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-                meg_data = subject.load_preproc_meg_data(preload=True)
+                meg_data = subject.load_preproc_meg_data()
 
-            # Band-pass filter
-            meg_filt = meg_data.filter(fmin, fmax, n_jobs=None, l_trans_bandwidth=1, h_trans_bandwidth=1)
-
-            # Apply hilbert and extract envelope
-            meg_env = meg_data.apply_hilbert(envelope=True)
-
-            # Save
-            os.makedirs(env_subj_path, exist_ok=True)
-            meg_env.save(env_subj_path + env_fname, overwrite=True)
+        # Apply hilbert and extract envelope
+        meg_env = meg_data.apply_hilbert(envelope=True)
 
         # Pick channels
         picks = functions_general.pick_chs(chs_id=chs_id, info=meg_env.info)
@@ -408,57 +405,87 @@ for subject_code in exp_info.subjects_ids:
         # Concatenate input arrays as one
         model_input = np.array([input_arrays[key] for key in input_arrays.keys()]).T
 
-        # Define mTRF model
-        rf = ReceptiveField(tmin, tmax, meg_sub.info['sfreq'], estimator=alpha, scoring='corrcoef', verbose=False)
-
-        # Fit TRF
-        rf.fit(model_input, meg_data_array)
-
+        # All regions or selected (multiple) regions
+        if chs_id == 'mag' or '_' in chs_id:
+            # rf as a dictionary containing the rf of each region
+            rf = {}
+            # iterate over regions
+            for chs_subset in all_chs_regions:
+                # Use only regions in channels id, or all in case of chs_id == 'mag'
+                if chs_subset in chs_id or chs_id == 'mag':
+                    rf[chs_subset] = functions_analysis.fit_mtrf(meg_data=meg_data, tmin=tmin, tmax=tmax, alpha=alpha,
+                                                                 model_input=model_input, chs_id=chs_subset, standarize=standarize,
+                                                                 n_jobs=4)
+        # One region
+        else:
+            rf = functions_analysis.fit_mtrf(meg_data=meg_data, tmin=tmin, tmax=tmax, alpha=alpha,
+                                             model_input=model_input, chs_id=chs_id, standarize=standarize, n_jobs=4)
         # Save TRF
         if save_data:
             save.var(var=rf, path=trf_path, fname=trf_fname)
 
-        # Get model coeficients as separate responses to target and items
+
+    # Get model coeficients as separate responses to target and items
+    trf = {}
+    evoked = {}
+    evoked_list = {}
     for i, var_name in enumerate(epoch_ids):
-        exec(f'{var_name}_trf = rf.coef_[:, i, :]')
-        # Define evoked objects from arrays of TRF
-        exec(
-            f'{var_name}_evoked = mne.EvokedArray(data={var_name}_trf, info=meg_sub.info, tmin=tmin, baseline=baseline)')
+
+        # All or multiple regions
+        if chs_id == 'mag' or '_' in chs_id:
+
+            # Define evoked from TRF list to concatenate all
+            evoked_list[var_name] = []
+
+            # iterate over regions
+            for chs_idx, chs_subset in enumerate(rf.keys()):
+                # Get channels subset info
+                picks = functions_general.pick_chs(chs_id=chs_subset, info=meg_data.info)
+                meg_sub = meg_data.copy().pick(picks)
+
+                # Get TRF coeficients from chs subset
+                trf[var_name] = rf[chs_subset].coef_[:, i, :]
+
+                if chs_idx == 0:
+                    # Define evoked object from arrays of TRF
+                    evoked[var_name] = mne.EvokedArray(data=trf[var_name], info=meg_sub.info, tmin=tmin, baseline=baseline)
+                else:
+                    # Append evoked object from arrays of TRF to list, to concatenate all
+                    evoked_list[var_name].append(mne.EvokedArray(data=trf[var_name], info=meg_sub.info, tmin=tmin, baseline=baseline))
+            # Concatenate evoked from al regions
+            evoked[var_name] = evoked[var_name].add_channels(evoked_list[var_name])
+        else:
+            trf[var_name] = rf.coef_[:, i, :]
+            # Define evoked objects from arrays of TRF
+            evoked[var_name] = mne.EvokedArray(data=trf[var_name], info=meg_sub.info, tmin=tmin, baseline=baseline)
+
         # Append for Grand average
-        exec(f'{var_name}_ga.append({var_name}_evoked)')
+        ga[var_name].append(evoked[var_name])
         # Plot
-        exec(f'fig = {var_name}_evoked.plot(spatial_colors=True, gfp=True, show=display_figs, '
-             f'xlim=(tmin+plot_edge, tmax-plot_edge))')
+        fig = evoked[var_name].plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(tmin + plot_edge, tmax - plot_edge))
 
         if save_fig:
             # Save
-            fig_path_subj = fig_path + f'{subject_code}/'
+            fig_path_subj = fig_path + f'{subject.subject_id}/'
             fname = f'{var_name}_{chs_id}'
-            exec('save.fig(fig=fig, fname=fname, path=fig_path_subj)')
+            save.fig(fig=fig, fname=fname, path=fig_path_subj)
 
 bads = []
-
+grand_avg = {}
 for var_name in epoch_ids:
     # Compute grand average
-    exec(f'{var_name}_grand_avg = mne.grand_average({var_name}_ga, interpolate_bads=True)')
+    grand_avg[var_name] = mne.grand_average(ga[var_name], interpolate_bads=True)
     # Append every subject bad channels
-    exec(f'{var_name}_grand_avg.info["bads"] = bads')
-
+    grand_avg[var_name].info['bads'] = 'bads'
     # Calculate max and min plot lims excluding bad channels
-    exec(
-        f'bad_ch_idx = np.where(np.array({var_name}_grand_avg.info["ch_names"]) == {var_name}_grand_avg.info["bads"])[0]')
-    exec(
-        f'plot_times_idx = np.where(({var_name}_grand_avg.times > tmin + plot_edge) & ({var_name}_grand_avg.times < tmax - plot_edge))[0]')
-    exec(f'data = {var_name}_grand_avg.get_data()[:, plot_times_idx]')
-    exec(
-        f'ylims = [(np.delete(data, bad_ch_idx, axis=0).min()*1.2)*1e15, (np.delete(data, bad_ch_idx, axis=0).max()*1.2)*1e15]')
-
+    bad_ch_idx = np.where(np.array(grand_avg[var_name].info["ch_names"]) == grand_avg[var_name].info["bads"])[0]
+    plot_times_idx = np.where((grand_avg[var_name].times > tmin + plot_edge) & (grand_avg[var_name].times < tmax - plot_edge))[0]
+    data = grand_avg[var_name].get_data()[:, plot_times_idx]
+    ylims = [(np.delete(data, bad_ch_idx, axis=0).min() * 1.2) * 1e15, (np.delete(data, bad_ch_idx, axis=0).max() * 1.2) * 1e15]
     # plot
-    exec(
-        f'fig = {var_name}_grand_avg.plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(tmin+plot_edge, tmax-plot_edge),'
-        f' ylim=dict(mag=ylims))')
+    fig = grand_avg[var_name].plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(tmin + plot_edge, tmax - plot_edge), ylim=dict(mag=ylims))
 
     if save_fig:
         # Save
         fname = f'{var_name}_GA_{chs_id}'
-        exec('save.fig(fig=fig, fname=fname, path=fig_path)')
+        save.fig(fig=fig, fname=fname, path=fig_path)
