@@ -25,7 +25,7 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'parietal_occipital'
+chs_id = 'frontal_central'
 # ICA / RAW
 use_ica_data = True
 corr_ans = None
@@ -39,11 +39,9 @@ evt_dur = None
 n_cycles_div = 2.
 l_freq = 1
 h_freq = 40
-log_bands = False
 run_itc = False
 return_average_tfr = True
 output = 'power'
-default_subject = exp_info.subjects_ids[0]
 
 # Baseline method
 # logratio: dividing by the mean of baseline values and taking the log
@@ -57,18 +55,6 @@ mss_duration = {1: 2, 2: 3.5, 4: 5, None: 0}
 cross1_dur = 0.75
 cross2_dur = 1
 vs_dur = 4
-if 'ms' in epoch_id:
-    dur = mss_duration[mss] + cross2_dur + vs_dur
-elif 'cross2' in epoch_id:
-    dur = cross2_dur + vs_dur  # seconds
-else:
-    dur = 0
-
-# freqs type
-if log_bands:
-    freqs_type = 'log'
-else:
-    freqs_type = 'lin'
 
 if use_ica_data:
     data_type = 'ICA'
@@ -114,7 +100,7 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
 
     # Grand Average
     try:
-        raise(ValueError)
+        raise ValueError
         # Load previous power data
         grand_avg_power_ms_diff = mne.time_frequency.read_tfrs(trf_diff_save_path + grand_avg_power_ms_fname)[0]
         grand_avg_power_cross2_diff = mne.time_frequency.read_tfrs(trf_diff_save_path + grand_avg_power_cross2_fname)[0]
@@ -190,20 +176,14 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
                                 meg_data = subject.load_preproc_meg_data()
 
                             # Epoch data
-                            epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans,
-                                                                           tgt_pres=tgt_pres, epoch_id=epoch_id, meg_data=meg_data,
-                                                                           tmin=tmin, tmax=tmax, save_data=save_data,
-                                                                           epochs_save_path=epochs_path,
+                            epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres, epoch_id=epoch_id,
+                                                                           meg_data=meg_data, tmin=tmin, tmax=tmax, save_data=save_data, epochs_save_path=epochs_path,
                                                                            epochs_data_fname=epochs_data_fname)
 
                         # Compute power and PLI over frequencies and save
-                        power = functions_analysis.time_frequency(epochs=epochs, l_freq=l_freq, h_freq=h_freq,
-                                                                         freqs_type=freqs_type, n_cycles_div=n_cycles_div,
-                                                                         average=return_average_tfr, return_itc=run_itc,
-                                                                         output=output, save_data=save_data,
-                                                                         trf_save_path=trf_save_path,
-                                                                         power_data_fname=power_data_fname,
-                                                                         itc_data_fname=itc_data_fname, n_jobs=4)
+                        power = functions_analysis.time_frequency(epochs=epochs, l_freq=l_freq, h_freq=h_freq, n_cycles_div=n_cycles_div, average=return_average_tfr,
+                                                                  return_itc=run_itc, output=output, save_data=save_data, trf_save_path=trf_save_path,
+                                                                  power_data_fname=power_data_fname, itc_data_fname=itc_data_fname, n_jobs=4)
 
                         if run_itc:
                             power, itc = power
@@ -383,9 +363,9 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
         # Permutation cluster test parameters
         n_permutations = 1024
         degrees_of_freedom = len(exp_info.subjects_ids) - 1
-        desired_pval = 0.01
-        # t_thresh = scipy.stats.t.ppf(1 - desired_pval / 2, df=degrees_of_freedom)
-        t_thresh = dict(start=0, step=0.2)
+        desired_tval = 0.01
+        t_thresh = scipy.stats.t.ppf(1 - desired_tval / 2, df=degrees_of_freedom)
+        # t_thresh = dict(start=0, step=0.2)
         # Get channel adjacency
         ch_adjacency_sparse = functions_general.get_channel_adjacency(info=meg_data.info, ch_type='mag', picks=picks, bads=all_bads_set)
         # Clusters out type
