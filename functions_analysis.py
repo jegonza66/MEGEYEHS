@@ -9,7 +9,9 @@ import save
 import load
 import setup
 from mne.decoding import ReceptiveField
-from scipy.signal import butter, lfilter
+from scipy import stats as stats
+from mne.stats import spatio_temporal_cluster_1samp_test, summarize_clusters_stc
+
 
 
 def define_events(subject, meg_data, epoch_id, trials=None, evt_dur=None, epoch_keys=None):
@@ -135,7 +137,7 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
     return epochs, events
 
 
-def time_frequency(epochs, l_freq, h_freq, freqs_type, n_cycles_div=4., average=True, return_itc=True, output='power',
+def time_frequency(epochs, l_freq, h_freq, freqs_type='lin', n_cycles_div=4., average=True, return_itc=True, output='power',
                    save_data=False, trf_save_path=None, power_data_fname=None, itc_data_fname=None, n_jobs=None):
 
     # Sanity check to save data
@@ -468,20 +470,60 @@ def fit_mtrf(meg_data, tmin, tmax, alpha, model_input, chs_id, standarize=True, 
     return rf
 
 
-def butter_bandpass_filter(data, band_id, sfreq=1200, order=3):
-    l_freq, h_freq = functions_general.get_freq_band(band_id=band_id)
-    b, a = butter(N=order, Wn=[l_freq, h_freq], fs=sfreq, btype='band')
-    y = lfilter(b, a, data)
-    return y
+def run_source_permutations_test(src, stc, source_data, subject, exp_info, save_regions, fig_path, p_threshold=0.05, n_permutations=1024, desired_tval='TFCE'):
 
+    # Return variables
+    significant_voxels, significance_mask, t_thresh_name, time_label = None, None, None, None
 
-def butter_lowpass_filter(data, h_freq, sfreq=1200, order=3):
-    b, a = butter(N=order, Wn=h_freq, fs=sfreq, btype='low')
-    y = lfilter(b, a, data)
-    return y
+    # Compute source space adjacency matrix
+    print("Computing adjacency matrix")
+    adjacency_matrix = mne.spatial_src_adjacency(src)
 
+    # Transpose source_fs_data from shape (subjects x space x time) to shape (subjects x time x space)
+    source_data_default = source_data.swapaxes(1, 2)
 
-def butter_highpass_filter(data, l_freq, sfreq=1200, order=3):
-    b, a = butter(N=order, Wn=l_freq, fs=sfreq, btype='high')
-    y = lfilter(b, a, data)
-    return y
+    # Define the t-value threshold for cluster formation
+    if desired_tval == 'TFCE':
+        t_thresh = dict(start=0, step=0.1)
+    else:
+        df = len(exp_info.subjects_ids) - 1  # degrees of freedom for the test
+        t_thresh = stats.distributions.t.ppf(1 - desired_tval / 2, df=df)
+
+    # Run permutations
+    T_obs, clusters, cluster_p_values, H0 = clu = spatio_temporal_cluster_1samp_test(X=source_data_default,
+                                                                                     n_permutations=n_permutations,
+                                                                                     adjacency=adjacency_matrix,
+                                                                                     n_jobs=4,
+                                                                                     threshold=t_thresh)
+
+    # Select the clusters that are statistically significant at p
+    good_clusters_idx = np.where(cluster_p_values < p_threshold)[0]
+    good_clusters = [clusters[idx] for idx in good_clusters_idx]
+    significant_pvalues = [cluster_p_values[idx] for idx in good_clusters_idx]
+
+    if len(good_clusters):
+
+        # variable for figure fnames and p_values as title
+        if type(t_thresh) == dict:
+            time_label = f'{np.round(np.mean(significant_pvalues), 4)} +- {np.round(np.std(significant_pvalues), 4)}'
+            t_thresh_name = 'TFCE'
+        else:
+            time_label = str(significant_pvalues)
+            t_thresh_name = round(t_thresh, 2)
+
+        # Get vertices from source space
+        fsave_vertices = [s["vertno"] for s in src]
+
+        # Select clusters for visualization
+        stc_all_cluster_vis = summarize_clusters_stc(clu=clu, p_thresh=p_threshold, tstep=stc.tstep, vertices=fsave_vertices, subject=subject)
+
+        # Get significant clusters
+        significance_mask = np.where(stc_all_cluster_vis.data[:, 0] == 0)[0]
+        significant_voxels = np.where(stc_all_cluster_vis.data[:, 0] != 0)[0]
+
+        # Get significant AAL and brodmann regions from mni space
+        if save_regions:
+            significant_regions_df = functions_general.get_regions_from_mni(src_default=src, significant_voxels=significant_voxels, save_path=fig_path,
+                                                                            t_thresh_name=t_thresh_name, p_threshold=p_threshold)
+
+    return significant_voxels, significance_mask, t_thresh_name, time_label, p_threshold
