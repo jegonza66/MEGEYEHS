@@ -565,11 +565,21 @@ corr_ans = True
 tgt_pres = True
 mss = None
 reject = None
-trial_dur = None
 evt_dur = None
 
+# Window durations
+cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
+if 'vs' in epoch_ids:
+    trial_dur = vs_dur[mss]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
+else:
+    trial_dur = None
+
 # Get time windows from epoch_id name
-tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
+map = dict(tgt_fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.1, 0.5)},
+           it_fix_subsampled={'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.1, 0.5)})
+tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=0, map=map)
+# tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
+
 # Baseline
 baseline = (tmin, -0.05)
 
