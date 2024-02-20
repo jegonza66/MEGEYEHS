@@ -816,7 +816,8 @@ def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, sub
         brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
 
 
-def sources(stc, src, subject , subjects_dir, ico, initial_time, surf_vol, force_fsaverage, estimate_covariance, save_fig, fig_path, fname, time_label='auto'):
+def sources(stc, src, subject , subjects_dir, ico, initial_time, surf_vol, force_fsaverage, estimate_covariance, save_fig, fig_path, fname,
+            alpha=1, mask_negatives=False, time_label='auto'):
 
     # Define clim
     if stc.data.min() >= 0:
@@ -832,15 +833,19 @@ def sources(stc, src, subject , subjects_dir, ico, initial_time, surf_vol, force
         if save_fig:
             if force_fsaverage:
                 fname += '_fsaverage'
+            if mask_negatives:
+                fname += '_masked'
             save.fig(fig=fig, path=fig_path, fname=fname)
 
         # 3D plot
-        brain = stc.plot_3d(src=src, subject=subject, subjects_dir=subjects_dir,  hemi='both', clim=clim,
+        brain = stc.plot_3d(src=src, subject=subject, subjects_dir=subjects_dir,  hemi='split', views='lateral', clim=clim, surface='pial', alpha=alpha,
                                spacing=f'ico{ico}', initial_time=initial_time, size=(1000, 500), time_label=time_label)
         if save_fig:
             fname += '_3D'
             if force_fsaverage:
                 fname += '_fsaverage'
+            if mask_negatives:
+                fname += '_masked'
             os.makedirs(fig_path + '/svg/', exist_ok=True)
             brain.save_image(filename=fig_path + fname + '.png')
             brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
@@ -849,12 +854,14 @@ def sources(stc, src, subject , subjects_dir, ico, initial_time, surf_vol, force
 
     elif surf_vol == 'surface':
         # 3D plot
-        brain = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, hemi='split', clim=clim,
+        brain = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, hemi='split', clim=clim, surface='pial', alpha=alpha,
                          spacing=f'ico{ico}', initial_time=initial_time, views='lateral', size=(1000, 500))
         if save_fig:
             fname += '_3D'
             if force_fsaverage:
                 fname += '_fsaverage'
+            if mask_negatives:
+                fname += '_masked'
             os.makedirs(fig_path + '/svg/', exist_ok=True)
             brain.save_image(filename=fig_path + fname + '.png')
             brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
