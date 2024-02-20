@@ -138,7 +138,7 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
 
 
 def time_frequency(epochs, l_freq, h_freq, freqs_type='lin', n_cycles_div=4., average=True, return_itc=True, output='power',
-                   save_data=False, trf_save_path=None, power_data_fname=None, itc_data_fname=None, n_jobs=None):
+                   save_data=False, trf_save_path=None, power_data_fname=None, itc_data_fname=None, n_jobs=4):
 
     # Sanity check to save data
     if save_data and (not trf_save_path or not power_data_fname) or (return_itc and not itc_data_fname):
@@ -305,7 +305,7 @@ def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', fi
     return ocular_components, sac_epochs, fix_epochs
 
 
-def noise_cov(exp_info, subject, bads, use_ica_data, reject=dict(mag=4e-12), rank=None):
+def noise_cov(exp_info, subject, bads, use_ica_data, reject=dict(mag=4e-12), rank=None, high_freq=False):
     '''
     Compute background noise covariance matrix for source estimation.
     :param exp_info:
@@ -342,6 +342,11 @@ def noise_cov(exp_info, subject, bads, use_ica_data, reject=dict(mag=4e-12), ran
 
     # Pick meg channels for source modeling
     raw_noise.pick('meg')
+
+    # Filter in high frequencies
+    if high_freq:
+        l_freq, h_freq = functions_general.get_freq_band(band_id='HGamma')
+        raw_noise = raw_noise.filter(l_freq=l_freq, h_freq=h_freq)
 
     # Compute covariance to withdraw from meg data
     noise_cov = mne.compute_raw_covariance(raw_noise, reject=reject, rank=rank)
@@ -446,7 +451,7 @@ def make_mtrf_input(input_arrays, var_name, subject, meg_data, evt_dur, cond_tri
     return input_arrays
 
 
-def fit_mtrf(meg_data, tmin, tmax, alpha, model_input, chs_id, standarize=True, n_jobs=1):
+def fit_mtrf(meg_data, tmin, tmax, alpha, model_input, chs_id, standarize=True, n_jobs=4):
 
     # Define mTRF model
     rf = ReceptiveField(tmin, tmax, meg_data.info['sfreq'], estimator=alpha, scoring='corrcoef', verbose=False, n_jobs=n_jobs)
@@ -470,7 +475,7 @@ def fit_mtrf(meg_data, tmin, tmax, alpha, model_input, chs_id, standarize=True, 
     return rf
 
 
-def run_source_permutations_test(src, stc, source_data, subject, exp_info, save_regions, fig_path, p_threshold=0.05, n_permutations=1024, desired_tval='TFCE'):
+def run_source_permutations_test(src, stc, source_data, subject, exp_info, save_regions, fig_path, p_threshold=0.05, n_permutations=1024, desired_tval='TFCE', mask_negatives=False):
 
     # Return variables
     significant_voxels, significance_mask, t_thresh_name, time_label = None, None, None, None
@@ -493,8 +498,7 @@ def run_source_permutations_test(src, stc, source_data, subject, exp_info, save_
     T_obs, clusters, cluster_p_values, H0 = clu = spatio_temporal_cluster_1samp_test(X=source_data_default,
                                                                                      n_permutations=n_permutations,
                                                                                      adjacency=adjacency_matrix,
-                                                                                     n_jobs=4,
-                                                                                     threshold=t_thresh)
+                                                                                     n_jobs=4, threshold=t_thresh)
 
     # Select the clusters that are statistically significant at p
     good_clusters_idx = np.where(cluster_p_values < p_threshold)[0]
@@ -524,6 +528,98 @@ def run_source_permutations_test(src, stc, source_data, subject, exp_info, save_
         # Get significant AAL and brodmann regions from mni space
         if save_regions:
             significant_regions_df = functions_general.get_regions_from_mni(src_default=src, significant_voxels=significant_voxels, save_path=fig_path,
-                                                                            t_thresh_name=t_thresh_name, p_threshold=p_threshold)
+                                                                            t_thresh_name=t_thresh_name, p_threshold=p_threshold, masked_negatves=mask_negatives)
 
     return significant_voxels, significance_mask, t_thresh_name, time_label, p_threshold
+
+
+def estimate_sources_cov(subject, baseline, band_id, filter_sensors, filter_method, use_ica_data, epoch_id, mss, corr_ans, tgt_pres, trial_dur, reject, tmin, tmax,
+                         filters, active_times, rank, bline_mode_subj, save_data, cov_save_path, cov_act_fname, cov_baseline_fname, epochs_save_path, epochs_data_fname):
+
+    try:
+        # Load covariance matrix
+        baseline_cov = mne.read_cov(fname=cov_save_path + cov_baseline_fname)
+    except:
+        # Load epochs
+        try:
+            epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+        except:
+            # Compute epochs
+            if use_ica_data:
+                if band_id and filter_sensors:
+                    meg_data = load.filtered_data(subject=subject, band_id=band_id, save_data=save_data,
+                                                  method=filter_method)
+                else:
+                    meg_data = load.ica_data(subject=subject)
+            else:
+                if band_id and filter_sensors:
+                    meg_data = load.filtered_data(subject=subject, band_id=band_id, use_ica_data=False,
+                                                  save_data=save_data, method=filter_method)
+                else:
+                    meg_data = subject.load_preproc_meg_data()
+
+            # Epoch data
+            epochs, events = epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
+                                                           epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, trial_dur=trial_dur,
+                                                           tmax=tmax, reject=reject, baseline=baseline,
+                                                           save_data=save_data, epochs_save_path=epochs_save_path,
+                                                           epochs_data_fname=epochs_data_fname)
+
+        # Compute covariance matrices
+        baseline_cov = mne.cov.compute_covariance(epochs=epochs, tmin=baseline[0], tmax=baseline[1], method="shrunk", rank=dict(mag=rank))
+        # Save
+        if save_data:
+            os.makedirs(cov_save_path, exist_ok=True)
+            baseline_cov.save(fname=cov_save_path + cov_baseline_fname, overwrite=True)
+
+    try:
+        # Load covariance matrix
+        active_cov = mne.read_cov(fname=cov_save_path + cov_act_fname)
+    except:
+        # Load epochs
+        try:
+            epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+        except:
+            # Compute epochs
+            if use_ica_data:
+                if band_id and filter_sensors:
+                    meg_data = load.filtered_data(subject=subject, band_id=band_id, save_data=save_data,
+                                                  method=filter_method)
+                else:
+                    meg_data = load.ica_data(subject=subject)
+            else:
+                if band_id and filter_sensors:
+                    meg_data = load.filtered_data(subject=subject, band_id=band_id, use_ica_data=False,
+                                                  save_data=save_data, method=filter_method)
+                else:
+                    meg_data = subject.load_preproc_meg_data()
+
+            # Epoch data
+            epochs, events = epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
+                                                           epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, trial_dur=trial_dur,
+                                                           tmax=tmax, reject=reject, baseline=baseline,
+                                                           save_data=save_data, epochs_save_path=epochs_save_path,
+                                                           epochs_data_fname=epochs_data_fname)
+
+        # Compute covariance matrices
+        active_cov = mne.cov.compute_covariance(epochs=epochs, tmin=active_times[0], tmax=active_times[1], method="shrunk", rank=dict(mag=rank))
+        # Save
+        if save_data:
+            os.makedirs(cov_save_path, exist_ok=True)
+            active_cov.save(fname=cov_save_path + cov_act_fname, overwrite=True)
+
+    # Compute sources and apply baseline
+    stc_base = mne.beamformer.apply_lcmv_cov(baseline_cov, filters)
+    stc_act = mne.beamformer.apply_lcmv_cov(active_cov, filters)
+
+    if bline_mode_subj == 'mean':
+        stc = stc_act - stc_base
+    elif bline_mode_subj == 'ratio':
+        stc = stc_act / stc_base
+    elif bline_mode_subj == 'db':
+        stc = stc_act / stc_base
+        stc.data = 10 * np.log10(stc.data)
+    else:
+        stc = stc_act
+
+    return stc
