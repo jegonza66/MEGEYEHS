@@ -15,12 +15,13 @@ exp_info = setup.exp_info()
 # --------- Setup ---------#
 
 # Define surface or volume source space
-surf_vol = 'surface'
+surf_vol = 'volume'
 use_ica_data = True
 force_fsaverage = False
-ico = 4
+ico = 5
 spacing = 10.
 pick_ori = None
+high_freq = True
 
 # Define Subjects_dir as Freesurfer output folder
 mri_path = paths().mri_path()
@@ -39,11 +40,17 @@ for subject_code in exp_info.subjects_ids:
     if use_ica_data:
         # Load subject and meg clean data
         subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
-        meg_data = subject.load_ica_meg_data()
+        if high_freq:
+            meg_data = load.filtered_data(subject=subject, band_id='HGamma', save_data=False)
+        else:
+            meg_data = load.ica_data(subject=subject)
         data_type = 'ICA'
     else:
         subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-        meg_data = subject.load_preproc_meg_data()
+        if high_freq:
+            meg_data = load.filtered_data(subject=subject, band_id='HGamma', use_ica_data=False,  save_data=False)
+        else:
+            meg_data = subject.load_preproc_meg_data()
         data_type = 'RAW'
 
     if force_fsaverage:
@@ -132,7 +139,7 @@ for subject_code in exp_info.subjects_ids:
         mne.write_bem_solution(fname_bem, bem, overwrite=True)
 
     # --------- Background noise covariance ---------#
-    noise_cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=meg_data.info['bads'], use_ica_data=use_ica_data)
+    noise_cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=meg_data.info['bads'], use_ica_data=use_ica_data, high_freq=high_freq)
 
     # # Extra
     # # Change head loc
@@ -177,7 +184,10 @@ for subject_code in exp_info.subjects_ids:
                                        noise_cov=noise_cov, pick_ori=pick_ori, rank=dict(mag=rank))
 
         # Save
-        fname_lmcv = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-lcmv.fif'
+        if high_freq:
+            fname_lmcv = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}_hfreq-lcmv.fif'
+        else:
+            fname_lmcv = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-lcmv.fif'
         filters.save(fname=fname_lmcv, overwrite=True)
 
     elif surf_vol == 'surface':
@@ -209,7 +219,10 @@ for subject_code in exp_info.subjects_ids:
                                        noise_cov=noise_cov, pick_ori=pick_ori, rank=dict(mag=rank))
 
         # Save
-        fname_lmcv = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-lcmv.fif'
+        if high_freq:
+            fname_lmcv = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}_hfreq-lcmv.fif'
+        else:
+            fname_lmcv = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-lcmv.fif'
         filters.save(fname=fname_lmcv, overwrite=True)
 
     elif surf_vol == 'mixed':
@@ -237,8 +250,7 @@ for subject_code in exp_info.subjects_ids:
                 src_vol = mne.read_source_spaces(fname_src_vol)
             except:
                 # Compute
-                src_vol = mne.setup_volume_source_space(subject=subject_code, subjects_dir=subjects_dir, bem=bem,
-                                                    pos=spacing, sphere_units='m', add_interpolator=True)
+                src_vol = mne.setup_volume_source_space(subject=subject_code, subjects_dir=subjects_dir, bem=bem, pos=spacing, sphere_units='m', add_interpolator=True)
                 # Save
                 mne.write_source_spaces(fname_src_vol, src_vol, overwrite=True)
 
@@ -263,5 +275,8 @@ for subject_code in exp_info.subjects_ids:
                                        noise_cov=noise_cov, pick_ori=pick_ori, rank=dict(mag=rank))
 
         # Save
-        fname_lmcv = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-lcmv.fif'
+        if high_freq:
+            fname_lmcv = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}_hfreq-lcmv.fif'
+        else:
+            fname_lmcv = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-lcmv.fif'
         filters.save(fname=fname_lmcv, overwrite=True)
