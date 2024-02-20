@@ -7,7 +7,9 @@ import save
 import setup
 from paths import paths
 import matplotlib.pyplot as plt
-import os
+import numpy as np
+import scipy
+from mne.stats import permutation_cluster_1samp_test
 
 
 #----- Path -----#
@@ -17,6 +19,7 @@ exp_info = setup.exp_info()
 save_data = True
 save_fig = True
 display_figs = False
+plot_individuals = True
 if display_figs:
     plt.ion()
 else:
@@ -24,14 +27,14 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'frontal_central'  # region_hemisphere
+chs_ids = ['frontal_central']  # region_hemisphere
 # ICA / RAW
 use_ica_data = True
 # Epochs
-epoch_id = 'vs'
+epoch_id = 'ms'
 corr_ans = None
 tgt_pres = None
-mss = 1
+mss = 4
 reject = None  # 'subject' for subject's default. False for no rejection, dict for specific values. None for default 5e-12 for magnetometers
 evt_dur = None
 
@@ -46,9 +49,8 @@ plot_edge = 0.15
 # Colorbar
 vmin_power, vmax_power = -0.2, 0.2
 vmin_itc, vmax_itc = None, None
-topo_vmin, topo_vmax = -0.2, 0.2
 # plot_joint max and min topoplots
-plot_max, plot_min = False, False
+plot_max, plot_min = True, True
 
 # Baseline method
 # logratio: dividing by the mean of baseline values and taking the log
@@ -58,11 +60,21 @@ bline_mode = 'logratio'
 
 # Topoplot bands
 topo_bands = ['Alpha', 'Alpha', 'Theta', 'Alpha']
-#----------#
 
 # Time Frequency config
 return_average_tfr = True
 output = 'power'
+
+# Permutations cluster test parameters
+run_permutations = True
+n_permutations = 1024
+degrees_of_freedom = len(exp_info.subjects_ids) - 1
+desired_tval = 0.01
+# t_thresh = scipy.stats.t.ppf(1 - desired_tval / 2, df=degrees_of_freedom)
+t_thresh = dict(start=0, step=0.2)
+pval_threshold = 0.05
+
+#---------- Setup ----------#
 
 # Windows durations
 cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
@@ -117,14 +129,17 @@ grand_avg_power_fname = f'Grand_Average_power_{l_freq}_{h_freq}_tfr.h5'
 grand_avg_itc_fname = f'Grand_Average_itc_{l_freq}_{h_freq}_tfr.h5'
 
 
+#------------ Run -------------#
 try:
+    # Raise error if run_permutations == True to load data from all subjects
+    if run_permutations:
+        raise ValueError
+
     # Load previous power data
     grand_avg_power = mne.time_frequency.read_tfrs(trf_save_path + grand_avg_power_fname)[0]
     if run_itc:
         # Load previous itc data
         grand_avg_itc = mne.time_frequency.read_tfrs(trf_save_path + grand_avg_itc_fname)[0]
-    # Pick plot channels
-    picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg_power.info)
 
 except:
 
@@ -175,7 +190,7 @@ except:
                                                       n_cycles_div=n_cycles_div, average=return_average_tfr,
                                                       return_itc=run_itc, output=output, save_data=save_data,
                                                       trf_save_path=trf_save_path, power_data_fname=power_data_fname,
-                                                      itc_data_fname=itc_data_fname, n_jobs=4)
+                                                      itc_data_fname=itc_data_fname, n_jobs=6)
             if run_itc:
                 power, itc = power
 
@@ -189,41 +204,33 @@ except:
         averages_power.append(power)
 
         # Plot power time-frequency
-        fname = f'Power_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-        plot_general.tfr_bands(subject=subject, tfr=power, chs_id=chs_id, plot_xlim=plot_xlim,
-                         baseline=plot_baseline, bline_mode=bline_mode,
-                         display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname,
-                         fontsize=16, ticksize=18)
+        if plot_individuals:
+            for chs_id in chs_ids:
+                fname = f'Power_plotjoint_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+                plot_general.tfr_plotjoint_picks(tfr=power, plot_baseline=plot_baseline, bline_mode=bline_mode, vlines_times=vlines_times,
+                                                 timefreqs=timefreqs_joint, chs_id=chs_id, plot_xlim=plot_xlim, plot_max=plot_max, plot_min=plot_min, vmin=None,
+                                                 vmax=None, display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path_subj, fname=fname)
 
-        # Power topoplot
-        fig = power.plot_topo(baseline=plot_baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet',
-                              show=display_figs, title='Power')
-        if save_fig:
-            fname = f'Power_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-            save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
+                if run_itc:
+                    averages_itc.append(itc)
 
-        if run_itc:
-            averages_itc.append(itc)
+                    # Plot ITC time-frequency
+                    fname = f'ITC_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+                    plot_general.tfr_bands(subject=subject, tfr=itc, chs_id=chs_id, plot_xlim=plot_xlim,
+                                     baseline=plot_baseline, bline_mode=bline_mode,
+                                     display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname,
+                                     fontsize=16, ticksize=18)
 
-            # Plot ITC time-frequency
-            fname = f'ITC_tf_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-            plot_general.tfr_bands(subject=subject, tfr=itc, chs_id=chs_id, plot_xlim=plot_xlim,
-                             baseline=plot_baseline, bline_mode=bline_mode,
-                             display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname,
-                             fontsize=16, ticksize=18)
+                    # ITC topoplot
+                    fig = itc.plot_topo(baseline=plot_baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
+                                        cmap='jet', show=display_figs, title='Inter-Trial coherence')
+                    if save_fig:
+                        fname = f'ITC_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+                        save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
 
-            # ITC topoplot
-            fig = itc.plot_topo(baseline=plot_baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
-                                cmap='jet', show=display_figs, title='Inter-Trial coherence')
-            if save_fig:
-                fname = f'ITC_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-                save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
-
-            # Free up memory
-            del itc
-
+                    # Free up memory
+                    del itc
         # Free up memory
-        plt.close('all')
         del power
 
     # Compute grand average
@@ -238,18 +245,84 @@ except:
             grand_avg_itc.save(trf_save_path + grand_avg_itc_fname, overwrite=True)
 
 
-# Plot Power time-frequency
-fname = f'Power_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-plot_general.tfr_times(tfr=grand_avg_power, chs_id=chs_id, timefreqs_tfr=timefreqs_tfr, baseline=plot_baseline, bline_mode=bline_mode,
-                       plot_xlim=plot_xlim, vlines_times=vlines_times, topo_vmin=topo_vmin, topo_vmax=topo_vmax, subject=None, display_figs=display_figs,
-                       save_fig=save_fig, fig_path=trf_fig_path, fname=fname, vmin=vmin_power, vmax=vmax_power, fontsize=16, ticksize=18)
+#--------- Permutation cluster test data -----------#
+for chs_id in chs_ids:
+    if run_permutations:
 
-# Power Plot joint
-fname = f'GA_Power_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-plot_general.tfr_plotjoint_picks(tfr=grand_avg_power, plot_baseline=plot_baseline, bline_mode=bline_mode, vlines_times=vlines_times,
-                                 timefreqs=timefreqs_joint, plot_xlim=plot_xlim, chs_id=chs_id, vmin=vmin_power, vmax=vmax_power,
-                                 plot_max=plot_max, plot_min=plot_min, display_figs=display_figs, save_fig=save_fig,
-                                 trf_fig_path=trf_fig_path, fname=fname)
+        # Pick plot channels
+        picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg_power.info)
+        permutations_test_data = [power.copy().apply_baseline(baseline=baseline, mode=bline_mode).crop(tmin=plot_xlim[0], tmax=plot_xlim[1]).pick(picks).data for power in averages_power]
+        permutations_test_data_array = np.array([data.mean(0) for data in permutations_test_data])
+
+        # Get channel adjacency
+        ch_adjacency_sparse = functions_general.get_channel_adjacency(info=grand_avg_power.info, ch_type='mag', picks=picks)
+        # Clusters out type
+        if type(t_thresh) == dict:
+            out_type = 'indices'
+        else:
+            out_type = 'mask'
+
+        # Permutations cluster test (TFCE if t_thresh as dict)
+        t_tfce, clusters, p_tfce, H0 = permutation_cluster_1samp_test(X=permutations_test_data_array, threshold=t_thresh, n_permutations=n_permutations, out_type=out_type,
+                                                                      n_jobs=4)
+
+        # Make clusters mask
+        if type(t_thresh) == dict:
+            # If TFCE use p-vaues of voxels directly
+            p_tfce = p_tfce.reshape(permutations_test_data_array.shape[-2:])
+
+            # Reshape to data's shape
+            clusters_mask = p_tfce < pval_threshold
+
+        else:
+            # Get significant clusters
+            good_clusters_idx = np.where(p_tfce < pval_threshold)[0]
+            significant_clusters = [clusters[idx] for idx in good_clusters_idx]
+
+            # Rehsape to data's shape by adding all clusters into one bool array
+            clusters_mask = np.zeros(permutations_test_data_array[0, :, :].shape)
+            if len(significant_clusters):
+                for significant_cluster in significant_clusters:
+                    clusters_mask += significant_cluster
+                # clusters_mask = clusters_mask.sum(axis=-1)
+                clusters_mask = clusters_mask.astype(bool)
+
+        # Cluster contour
+        image_args = {'mask': clusters_mask, 'mask_style': 'contour'}
+    else:
+        image_args = None
+
+    #--------- Plots ---------#
+    # Power Plotjoint
+    if type(t_thresh) == dict:
+        fname = f'GA_Power_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_tTFCE_pval{pval_threshold}'
+    else:
+        fname = f'GA_Power_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_t{round(t_thresh, 2)}_pval{pval_threshold}'
+
+    plot_general.tfr_plotjoint_picks(tfr=grand_avg_power, plot_baseline=plot_baseline, bline_mode=bline_mode, vlines_times=vlines_times, timefreqs=timefreqs_joint,
+                                     image_args=image_args, chs_id=chs_id, plot_xlim=plot_xlim, plot_max=plot_max, plot_min=plot_min, vmin=vmin_power, vmax=vmax_power,
+                                     display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path,
+                                     fname=fname)
+
+    # Plot Power time-frequency in time scalde axes
+    fname = f'Power_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+    plot_general.tfr_times(tfr=grand_avg_power, chs_id=chs_id, timefreqs_tfr=timefreqs_tfr, baseline=plot_baseline, bline_mode=bline_mode,
+                           plot_xlim=plot_xlim, vlines_times=vlines_times, topo_vmin=vmin_power, topo_vmax=vmax_power, subject=None, display_figs=display_figs,
+                           save_fig=save_fig, fig_path=trf_fig_path, fname=fname, vmin=vmin_power, vmax=vmax_power, fontsize=16, ticksize=18)
+
+    if run_itc:
+        # Plot ITC time-frequency
+        fname = f'ITC_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        plot_general.tfr_times(tfr=grand_avg_itc, chs_id=chs_id, timefreqs_tfr=None, baseline=plot_baseline, bline_mode=bline_mode,
+                               plot_xlim=plot_xlim, vlines_times=vlines_times, topo_vmin=vmin_itc, topo_vmax=vmax_itc, subject=None, display_figs=display_figs,
+                               save_fig=save_fig, fig_path=trf_fig_path, fname=fname, vmin=vmin_itc, vmax=vmax_itc, fontsize=16, ticksize=18)
+
+        # ITC Plot joint
+        fname = f'GA_ITC_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+        plot_general.tfr_plotjoint_picks(tfr=grand_avg_itc, plot_baseline=plot_baseline, bline_mode=bline_mode,
+                                         vlines_times=vlines_times, timefreqs=timefreqs_joint, plot_xlim=plot_xlim,
+                                         chs_id=chs_id, vmin=vmin_itc, vmax=vmax_itc, plot_max=plot_max, plot_min=plot_min,
+                                         display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
 
 # Power Plot joint
 fname = f'GA_Power_plotjoint_mag_{bline_mode}_{l_freq}_{h_freq}'
@@ -258,19 +331,6 @@ plot_general.tfr_plotjoint(tfr=grand_avg_power, plot_baseline=plot_baseline, bli
                            vlines_times=vlines_times, display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
 
 if run_itc:
-    # Plot ITC time-frequency
-    fname = f'ITC_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr_times(tfr=grand_avg_itc, chs_id=chs_id, timefreqs_tfr=None, baseline=plot_baseline, bline_mode=bline_mode,
-                           plot_xlim=plot_xlim, vlines_times=vlines_times, topo_vmin=topo_vmin, topo_vmax=topo_vmax, subject=None, display_figs=display_figs,
-                           save_fig=save_fig, fig_path=trf_fig_path, fname=fname, vmin=vmin_itc, vmax=vmax_itc, fontsize=16, ticksize=18)
-
-    # ITC Plot joint
-    fname = f'GA_ITC_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-    plot_general.tfr_plotjoint_picks(tfr=grand_avg_itc, plot_baseline=plot_baseline, bline_mode=bline_mode,
-                                     vlines_times=vlines_times, timefreqs=timefreqs_joint, plot_xlim=plot_xlim,
-                                     chs_id=chs_id, vmin=vmin_itc, vmax=vmax_itc, plot_max=plot_max, plot_min=plot_min,
-                                     display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
-
     # ITC Plot joint
     fname = f'GA_ITC_plotjoint_mag_{bline_mode}_{l_freq}_{h_freq}'
     plot_general.tfr_plotjoint(tfr=grand_avg_itc, plot_baseline=plot_baseline, bline_mode=bline_mode, plot_xlim=plot_xlim,
