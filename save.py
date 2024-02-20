@@ -78,7 +78,7 @@ def var(var, path, fname):
     f.close()
 
 
-def fig(fig, path, fname):
+def fig(fig, path, fname, save_svg=True):
     """
     Save figure fig with given filename to given path.
 
@@ -97,9 +97,10 @@ def fig(fig, path, fname):
     # Save
     fig.savefig(path + fname + '.png')
 
-    # Create svg directory
-    svg_path = path + '/svg/'
-    os.makedirs(svg_path, exist_ok=True)
-    # Save
-    fig.savefig(svg_path + fname + '.svg')
+    if save_svg:
+        # Create svg directory
+        svg_path = path + '/svg/'
+        os.makedirs(svg_path, exist_ok=True)
+        # Save
+        fig.savefig(svg_path + fname + '.svg')
 
