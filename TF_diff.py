@@ -25,7 +25,7 @@ else:
 
 #-----  Parameters -----#
 # Select channels
-chs_id = 'frontal_central'
+chs_id = 'central'
 # ICA / RAW
 use_ica_data = True
 corr_ans = None
@@ -364,8 +364,8 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
         n_permutations = 1024
         degrees_of_freedom = len(exp_info.subjects_ids) - 1
         desired_tval = 0.01
-        t_thresh = scipy.stats.t.ppf(1 - desired_tval / 2, df=degrees_of_freedom)
-        # t_thresh = dict(start=0, step=0.2)
+        # t_thresh = scipy.stats.t.ppf(1 - desired_tval / 2, df=degrees_of_freedom)
+        t_thresh = dict(start=0, step=0.2)
         # Get channel adjacency
         ch_adjacency_sparse = functions_general.get_channel_adjacency(info=meg_data.info, ch_type='mag', picks=picks, bads=all_bads_set)
         # Clusters out type
