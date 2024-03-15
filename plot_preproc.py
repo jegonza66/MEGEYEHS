@@ -1,7 +1,5 @@
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-plt.figure()
-plt.close()
 import numpy as np
 import matplotlib.image as mpimg
 import os
@@ -710,6 +708,140 @@ def scanpath(raw, subject, et_channels_meg, items_pos, trial_idx,
 
     if save_fig:
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + f'/Scanpaths/'
+        fname = f'Trial{trial}'
+        save.fig(fig=fig, path=save_path, fname=fname)
+
+
+def ms_scanpath(raw, subject, et_channels_meg, trial_idx, ms_items_pos, display_fig=False, save_fig=True):
+
+    # Clear all previous figures
+    plt.clf()
+    plt.close('all')
+
+    trial = trial_idx + 1
+
+    # Et tracker gaze data
+    gaze_x = et_channels_meg[0]
+    gaze_y = et_channels_meg[1]
+
+    # Get fixations and saccades for MS screen
+    fixations_ms = subject.fixations.loc[subject.fixations['screen'] == 'ms']
+    saccades_ms = subject.saccades.loc[subject.saccades['screen'] == 'ms']
+
+    # Path to psychopy data
+    exp_path = paths().experiment_path()
+
+    # Get fixations and saccades for corresponding trial
+    fixations_t = fixations_ms.loc[fixations_ms['trial'] == trial]
+    saccades_t = saccades_ms.loc[saccades_ms['trial'] == trial]
+
+    # Get items position information for trial
+    trial_info = ms_items_pos.iloc[trial_idx]
+    trial_items = {key: {'X': trial_info[f'X{idx + 1}'], 'Y': trial_info[f'Y{idx + 1}']} for idx, key in enumerate(trial_info.keys()) if
+                   'st' in key and trial_info[key] != 'blank.png'}
+    # Rename st5 as target
+    if 'st5' in trial_items.keys():
+        trial_items['target'] = trial_items.pop('st5')
+    # Make dataframe to iterate over rows
+    trial_items = pd.DataFrame(trial_items).transpose()
+
+    # Get vs from trial
+    ms_start_idx = functions_general.find_nearest(raw.times, subject.ms[trial_idx])[0]
+    ms_end_idx = functions_general.find_nearest(raw.times, subject.cross2[trial_idx])[0]
+
+    # Load targets
+    bh_data_trial = subject.bh_data.iloc[trial_idx]
+    items_keys = ['st1', 'st2', 'st3', 'st4', 'st5']
+    item_images = bh_data_trial[items_keys]
+    item_images['target'] = item_images.pop('st5')
+
+    # Load correct vs incorrect
+    correct_ans = subject.corr_ans[trial_idx]
+
+    # Colormap: Get fixation durations for scatter circle size
+    sizes = fixations_t['duration'] * 100
+    # Define rainwbow cmap for fixations
+    cmap = plt.cm.rainbow
+    # define the bins and normalize
+    if len(fixations_t):
+        fix_num = fixations_t['n_fix'].values.astype(int)
+        bounds = np.linspace(1, fix_num[-1] + 1, fix_num[-1] + 1)
+        norm = mpl.colors.BoundaryNorm(bounds, cmap.N)
+
+    # Display image True or False
+    if display_fig:
+        plt.ion()
+    else:
+        plt.ioff()
+
+    fig, axs = plt.subplots(2, 1, figsize=(10, 9), gridspec_kw={'height_ratios': [3, 1]})
+    plt.suptitle(f'Subject {subject.subject_id} - Trial {trial}')
+
+    # Remove ticks from items and image axes
+    for ax in plt.gcf().get_axes():
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    # Fixations
+    if len(fixations_t):
+        axs[0].scatter(fixations_t['mean_x'],
+                       fixations_t['mean_y'],
+                       c=fix_num, s=sizes, cmap=cmap, norm=norm, zorder=3)
+
+    gray_background_path = paths().experiment_path() + 'gray1920x1080.png'
+    gray_img = mpimg.imread(gray_background_path)
+    axs[0].imshow(gray_img, zorder=0)
+
+    from matplotlib.offsetbox import (OffsetImage, AnnotationBbox)
+    for item_name, item in trial_items.iterrows():
+        it_img = mpimg.imread(exp_path + item_images[item_name])
+
+        imagebox = OffsetImage(it_img, zoom=0.35)
+        ab = AnnotationBbox(imagebox, (item['X'],  item['Y']), frameon=False)
+        axs[0].add_artist(ab)
+
+        if item_name == 'target':
+            if correct_ans:
+                color = 'green'
+            else:
+                color = 'red'
+            circle = plt.Circle((item['X'], item['Y']), radius=70, color=color, fill=False)
+            axs[0].add_patch(circle)
+
+    # Scanpath
+    axs[0].plot(gaze_x[ms_start_idx:ms_end_idx],
+             gaze_y[ms_start_idx:ms_end_idx],
+             '--', color='black', zorder=2)
+
+    if len(fixations_t):
+        PCM = axs[0].get_children()[0]  # When the fixations dots for color mappable were ploted (first)
+        cb = plt.colorbar(PCM, ax=axs[0], ticks=[fix_num[0] + 1/2, fix_num[int(len(fix_num)/2)]+1/2, fix_num[-1]+1/2])
+        cb.ax.set_yticklabels([fix_num[0], fix_num[int(len(fix_num)/2)], fix_num[-1]])
+        cb.ax.tick_params(labelsize=10)
+        cb.set_label('# of fixation', fontsize=13)
+
+    # Gaze
+    axs[1].plot(raw.times[ms_start_idx:ms_end_idx], gaze_x[ms_start_idx:ms_end_idx], label='X')
+    axs[1].plot(raw.times[ms_start_idx:ms_end_idx], gaze_y[ms_start_idx:ms_end_idx], 'black', label='Y')
+
+    plot_min, plot_max = axs[1].get_ylim()
+
+    for sac_idx, saccade in saccades_t.iterrows():
+        axs[1].vlines(x=saccade['onset'], ymin=plot_min, ymax=plot_max, colors='red', linestyles='--', label='sac')
+
+    for fix_idx, fixation in fixations_t.iterrows():
+        color = cmap(norm(fixation['n_fix']))
+        axs[1].axvspan(ymin=0, ymax=1, xmin=fixation['onset'], xmax=fixation['onset'] + fixation['duration'],
+                    color=color, alpha=0.4, label='fix')
+
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    plt.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize=8)
+    axs[1].set_ylabel('Gaze')
+    axs[1].set_xlabel('Time [s]')
+
+    if save_fig:
+        save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + f'/MS_Scanpaths/'
         fname = f'Trial{trial}'
         save.fig(fig=fig, path=save_path, fname=fname)
 
