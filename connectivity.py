@@ -66,6 +66,7 @@ def run_connectivity(run_id='ms--cross1', band_id='Alpha', envelope_connectivity
         desired_sfreq = 10
     else:
         connectivity_method = 'pli'
+    standarize_con = True
 
     # Run on separate events based on epochs ids to compute difference
     epoch_ids = run_id.split('--')
@@ -82,7 +83,7 @@ def run_connectivity(run_id='ms--cross1', band_id='Alpha', envelope_connectivity
         if 'vs' in epoch_id:
             trial_dur = vs_dur[mss]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
         else:
-            trial_dur = None
+            trial_dur = vs_dur[mss]
 
         # Frequencies from band
         fmin, fmax = functions_general.get_freq_band(band_id=band_id)
@@ -138,6 +139,8 @@ def run_connectivity(run_id='ms--cross1', band_id='Alpha', envelope_connectivity
         else:
             main_path = 'Connectivity'
             final_path = f'{connectivity_method}'
+        if standarize_con:
+            final_path += '_std'
 
         if surf_vol == 'volume':
             fig_path = paths().plots_path() + f'{main_path}_{data_type}/' + run_path_plot + f'/{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{parcelation}_{final_path}/'
@@ -331,7 +334,11 @@ def run_connectivity(run_id='ms--cross1', band_id='Alpha', envelope_connectivity
                     con.save(fname_con)
 
             # Get connectivity matrix
-            con_matrix[subj_num] = con.get_data(output='dense')[:, :, 0]
+            con_subj = con.get_data(output='dense')[:, :, 0]
+            # Standarize
+            if standarize_con:
+                con_subj = (con_subj - np.mean(con_subj)) / np.std(con_subj)
+            con_matrix[subj_num] = con_subj
 
             if plot_individuals:
                 # Plot circle
@@ -407,8 +414,8 @@ def run_connectivity(run_id='ms--cross1', band_id='Alpha', envelope_connectivity
                                            subjects_dir=subjects_dir, save_fig=save_fig, fig_path=fig_path_diff, fname='GA_strength')
 
 
-band_ids = ['Gamma']
-run_ids = ['ms--cross1', 'cross2--cross1', 'vs--cross1']
+band_ids = ['Alpha']
+run_ids = ['vs']
 for band_id in band_ids:
     for run_id in run_ids:
-        run_connectivity(run_id=run_id, band_id=band_id, envelope_connectivity=False, downsample_ts=False)
+        run_connectivity(run_id=run_id, band_id=band_id, envelope_connectivity=False, downsample_ts=True)
