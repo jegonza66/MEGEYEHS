@@ -9,6 +9,7 @@ import functions_analysis
 import mne
 import mne_connectivity
 from nilearn import plotting
+from itertools import compress
 
 save_path = paths().save_path()
 plot_path = paths().plots_path()
@@ -500,7 +501,7 @@ def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, Non
         save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
 
-def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, image_args=None,
+def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, image_args=None, clusters_mask=None,
                         plot_max=True, plot_min=True, vmin=None, vmax=None, chs_id='mag', vlines_times=None,
                         display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
@@ -534,6 +535,18 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
     else:
         f'{bline_mode}'
 
+    # Get min and max from all topoplots and use in TF plot aswell
+    if vmin == None or vmax == None:
+        maxs = []
+        mins = []
+        for timefreq in timefreqs:
+            tfr_crop = tfr_topo.copy().crop(tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1])
+            data = tfr_crop.data.ravel()
+            mins.append(- 1.5 * data.std())
+            maxs.append(1.5 * data.std())
+        vmax = np.max(maxs)
+        vmin = np.min(mins)
+
     # Plot tf plot joint
     fig = tfr_plotjoint.plot_joint(timefreqs=timefreqs, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet', image_args=image_args,
                                    title=title, show=display_figs, vmin=vmin, vmax=vmax)
@@ -548,38 +561,27 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
         except:
             pass
 
-    # Overwrite topoplots
-    # Get min and max from all topoplots
-    if vmin == None and vmax == None:
-        maxs = []
-        mins = []
-        for timefreq in timefreqs:
-            tfr_crop = tfr_topo.copy().crop(tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1])
-            data = tfr_crop.data.ravel()
-            mins.append(- 1.5 * data.std())
-            maxs.append(1.5 * data.std())
-        vmax = np.max(maxs)
-        vmin = np.min(mins)
+    # Define Topo mask
+    if clusters_mask is not None:
+        # Define significant channels to mask in time freq interval around desired tf point
+        topo_mask = [clusters_mask[functions_general.find_nearest(tfr.freqs, timefreq[1] - 3)[0]:
+                                   functions_general.find_nearest(tfr.freqs, timefreq[1] + 1)[0],
+                     functions_general.find_nearest(tfr.copy().crop(tmin=plot_xlim[0], tmax=plot_xlim[1]).times, timefreq[0] - 0.25)[0]:
+                     functions_general.find_nearest(tfr.copy().crop(tmin=plot_xlim[0], tmax=plot_xlim[1]).times, timefreq[0] + 0.25)[0]].
+                     sum(axis=0).sum(axis=0).astype(bool) for timefreq in timefreqs]
+        masks = []
+        for topo in topo_mask:
+            mask = np.zeros(len(tfr_topo.copy().pick('mag').info.ch_names)).astype(bool)
+            mask[[idx for idx, channel in enumerate(tfr_topo.copy().pick('mag').info.ch_names) if channel in list(compress(tfr_plotjoint.info.ch_names, topo))]] = True
+            masks.append(mask)
+    else:
+        masks = [None]*len(timefreqs)
+    mask_params = dict(marker='o', markerfacecolor='white', markeredgecolor='k', linewidth=0, markersize=4, alpha=0.5)
 
-        # Old version
-        # maxs = []
-        # mins = []
-        # for timefreq in timefreqs:
-        #     tfr_crop = tfr_topo.copy().crop(tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1])
-        #     data = tfr_crop.data.ravel()
-        #     maxs.append(data.max())
-        #     mins.append(data.min())
-        # vmax = np.max(maxs)
-        # vmin = np.min(mins)
-        # vmin = - 1.5 * data.std()
-        # vmax = 1.5 * data.std()
-
-
-    # Get topo axes and overwrite
+    # Get topo axes and overwrite topoplots
     topo_axes = fig.axes[1:-1]
-    for ax, timefreq in zip(topo_axes, timefreqs):
-        topomap_kw = dict(ch_type='mag', tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1],
-                          colorbar=False, show=display_figs)
+    for i, (ax, timefreq) in enumerate(zip(topo_axes, timefreqs)):
+        topomap_kw = dict(ch_type='mag', tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1], mask=masks[i], mask_params=mask_params, colorbar=False, show=display_figs)
         tfr_topo.plot_topomap(axes=ax, cmap='jet', vlim=(vmin, vmax), **topomap_kw)
 
     norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
@@ -814,6 +816,8 @@ def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, sub
             fname += '_fsaverage'
         brain.save_image(filename=fig_path + fname + '.png')
         brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
+
+    brain.close()
 
 
 def sources(stc, src, subject , subjects_dir, ico, initial_time, surf_vol, force_fsaverage, estimate_covariance, save_fig, fig_path, fname,
