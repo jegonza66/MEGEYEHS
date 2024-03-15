@@ -169,9 +169,14 @@ for subject_code in exp_info.subjects_ids:
             mne.write_source_spaces(fname_src, src, overwrite=True)
 
         # Forward model
-        fwd = mne.make_forward_solution(meg_data.info, trans=trans_path, src=src, bem=bem)
         fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
-        mne.write_forward_solution(fname_fwd, fwd, overwrite=True)
+        try:
+            # Load
+            fwd = mne.read_forward_solution(fname=fname_fwd)
+        except:
+            # Compute
+            fwd = mne.make_forward_solution(meg_data.info, trans=trans_path, src=src, bem=bem)
+            mne.write_forward_solution(fname_fwd, fwd, overwrite=True)
 
         # Spatial filter
         rank = sum([ch_type == 'mag' for ch_type in meg_data.get_channel_types()]) - len(meg_data.info['bads'])
