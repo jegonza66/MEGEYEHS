@@ -47,7 +47,7 @@ def define_events(subject, meg_data, epoch_id, trials=None, evt_dur=None, epoch_
                 epoch_keys = [key for key in epoch_keys if 'fix' not in key]
             if trials != None and any('_t' in epoch_key for epoch_key in epoch_keys):
                 try:
-                    if 'vsend' in epoch_sub_id:
+                    if 'vsend' in epoch_sub_id or 'cross1' in epoch_sub_id:
                         epoch_keys = [epoch_key for epoch_key in epoch_keys if epoch_key.split('_t')[-1] in trials]
                     else:
                         epoch_keys = [epoch_key for epoch_key in epoch_keys if (epoch_key.split('_t')[-1].split('_')[0] in trials and 'end' not in epoch_key)]
@@ -79,7 +79,7 @@ def define_events(subject, meg_data, epoch_id, trials=None, evt_dur=None, epoch_
     return metadata, events, events_id, metadata_sup
 
 
-def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax, trial_dur=None, evt_dur=None,
+def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax, trial_num=None, trial_dur=None, evt_dur=None,
                baseline=(None, 0), reject=None, save_data=False, epochs_save_path=None, epochs_data_fname=None):
     '''
     :param subject:
@@ -106,7 +106,11 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
         raise ValueError('Please provide path and filename to save data. If not, set save_data to false.')
 
     # Trials
-    cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss, trial_dur=trial_dur, corr_ans=corr_ans, tgt_pres=tgt_pres)
+    if not trial_num:
+        cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss, trial_dur=trial_dur, corr_ans=corr_ans, tgt_pres=tgt_pres)
+    else:
+        cond_trials = trial_num
+
     # Define events
     metadata, events, events_id, metadata_sup = define_events(subject=subject, epoch_id=epoch_id, evt_dur=evt_dur, trials=cond_trials, meg_data=meg_data)
     # Reject based on channel amplitude
@@ -137,7 +141,7 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
     return epochs, events
 
 
-def time_frequency(epochs, l_freq, h_freq, freqs_type='lin', n_cycles_div=4., average=True, return_itc=True, output='power',
+def time_frequency(epochs, l_freq, h_freq, freqs_type='lin', n_cycles_div=2., average=True, return_itc=True, output='power',
                    save_data=False, trf_save_path=None, power_data_fname=None, itc_data_fname=None, n_jobs=4):
 
     # Sanity check to save data
@@ -166,6 +170,43 @@ def time_frequency(epochs, l_freq, h_freq, freqs_type='lin', n_cycles_div=4., av
     else:
         power = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True, average=average,
                                               output=output, return_itc=return_itc, decim=3, n_jobs=n_jobs, verbose=True)
+        if save_data:
+            # Save trf data
+            os.makedirs(trf_save_path, exist_ok=True)
+            power.save(trf_save_path + power_data_fname, overwrite=True)
+
+        return power
+
+
+def time_frequency_multitaper(epochs, l_freq, h_freq, freqs_type='lin', n_cycles_div=2., average=True, return_itc=True,
+                               save_data=False, trf_save_path=None, power_data_fname=None, itc_data_fname=None, n_jobs=4):
+
+    # Sanity check to save data
+    if save_data and (not trf_save_path or not power_data_fname) or (return_itc and not itc_data_fname):
+        raise ValueError('Please provide path and filename to save data. Else, set save_data to false.')
+
+    # Compute power over frequencies
+    print('Computing power and ITC')
+    if freqs_type == 'log':
+        freqs = np.logspace(np.log10([l_freq, h_freq]), num=40)
+    elif freqs_type == 'lin':
+        freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)  # 1 Hz bands
+    n_cycles = freqs / n_cycles_div  # different number of cycle per frequency
+    if return_itc:
+        power, itc = mne.time_frequency.tfr_multitaper(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
+                                                   average=average,
+                                                   return_itc=return_itc, decim=3, n_jobs=n_jobs, verbose=True)
+        if save_data:
+            # Save trf data
+            os.makedirs(trf_save_path, exist_ok=True)
+            power.save(trf_save_path + power_data_fname, overwrite=True)
+            itc.save(trf_save_path + itc_data_fname, overwrite=True)
+
+        return power, itc
+
+    else:
+        power = mne.time_frequency.tfr_multitaper(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True, average=average,
+                                              return_itc=return_itc, decim=3, n_jobs=n_jobs, verbose=True)
         if save_data:
             # Save trf data
             os.makedirs(trf_save_path, exist_ok=True)
