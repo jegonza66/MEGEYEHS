@@ -313,7 +313,7 @@ def pick_chs(chs_id, info):
     '''
 
     if chs_id == 'mag':
-        picks = 'mag'
+        picks = [ch_name for ch_name in info.ch_names if 'M' in ch_name]
     elif chs_id == 'sac_chs':
         picks = ['MLF14', 'MLF13', 'MLF12', 'MLF11', 'MRF11', 'MRF12', 'MRF13', 'MRF14', 'MZF01']
     elif chs_id == 'LR':
@@ -491,40 +491,37 @@ def get_duration():
     return cross1_dur, cross2_dur, mss_duration, vs_dur
 
 
-def get_baseline_duration(epoch_id, mss, tmin, tmax, cross1_dur, mss_duration, cross2_dur, map=None):
+def get_baseline_duration(epoch_id, mss, tmin, tmax, cross1_dur, mss_duration, cross2_dur, plot_edge=None, map=None):
     # Baseline duration
     if map and epoch_id in map.keys():
         baseline = (map[epoch_id]['baseline'][0], map[epoch_id]['baseline'][1])
         plot_baseline = (map[epoch_id]['plot_baseline'][0], map[epoch_id]['plot_baseline'][1])
 
-    elif 'sac' in epoch_id:
-        baseline = (tmin, 0)
-        plot_baseline = baseline
-        # baseline = None
-    elif 'fix' in epoch_id or 'fix' in epoch_id:
-        baseline = (tmin, -0.05)
-        plot_baseline = baseline
-    elif 'ms' in epoch_id:
-        baseline = (-cross1_dur, 0)
-        plot_baseline = baseline
-    elif 'cross2' in epoch_id and mss:
-        baseline = (-mss_duration[mss] - cross2_dur, -mss_duration[mss])
-        plot_baseline = baseline
-    elif 'vsend' in epoch_id:
-        baseline = (tmax -cross1_dur, tmax)
-        plot_baseline = baseline
-    elif 'vs' in epoch_id:
-        baseline = (-cross1_dur -cross2_dur - mss_duration[mss], -cross2_dur - mss_duration[mss])
-        plot_baseline = baseline
-    elif 'red' in epoch_id or 'blue' in epoch_id:
-        baseline = (tmin, -0.1)
-        plot_baseline = baseline
-
     else:
-        print(f'Using default baseline from tmin: {tmin} to 0')
-        baseline = (tmin, 0)
-        plot_baseline = baseline
+        if 'sac' in epoch_id:
+            baseline = (tmin, 0)
+        elif 'fix' in epoch_id or 'fix' in epoch_id:
+            baseline = (tmin, -0.05)
+        elif 'ms' in epoch_id:
+            baseline = (-cross1_dur, 0)
+        elif 'cross2' in epoch_id and mss:
+            baseline = (-mss_duration[mss] - cross2_dur, -mss_duration[mss])
+        elif 'vsend' in epoch_id:
+            baseline = (tmax -cross1_dur, tmax)
+        elif 'vs' in epoch_id:
+            baseline = (-cross1_dur -cross2_dur - mss_duration[mss], -cross2_dur - mss_duration[mss])
+        elif 'red' in epoch_id or 'blue' in epoch_id:
+            baseline = (tmin, -0.1)
+        else:
+            print(f'Using default baseline from tmin: {tmin} to 0')
+            baseline = (tmin, 0)
 
+        if plot_edge:
+            plot_baseline = (baseline[0] + plot_edge, baseline[1])
+        else:
+            plot_baseline = baseline
+
+    # Correct incongruencies
     if baseline[0] < tmin:
         baseline = (tmin, baseline[1])
     if baseline[1] > tmax:
@@ -577,7 +574,7 @@ def get_plots_timefreqs(epoch_id, mss, cross2_dur, mss_duration, topo_bands, plo
             fmin, fmax = get_freq_band(band_id=topo_bands[i])
             timefreqs_tfr[f'topo{i}'] = dict(title=topo_bands[i], tmin=time, tmax=time, fmin=fmin, fmax=fmax)
 
-        #TFR vlines
+        # TFR vlines
         vlines_times = [0, mss_duration[mss], mss_duration[mss] + 1]
 
     elif epoch_id == 'vs':
