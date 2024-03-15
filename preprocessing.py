@@ -52,8 +52,8 @@ for subject_code in exp_info.subjects_ids:
         raw, subject = functions_preproc.define_events_trials_trig(raw=raw, subject=subject, config=config, exp_info=exp_info)
 
     #---------------- Fixations and saccades detection ----------------#
-    fixations, saccades, subject = functions_preproc.fixations_saccades_detection(raw=raw, et_channels_meg=et_channels_meg,
-                                                                                  subject=subject, screen_size=exp_info.screen_distance[subject_code])
+    fixations, saccades, subject = functions_preproc.fixations_saccades_detection(raw=raw, et_channels_meg=et_channels_meg, subject=subject,
+                                                                                  screen_size=exp_info.screen_distance[subject_code])
 
     # ---------------- Saccades classification ----------------#
     saccades, raw, subject = functions_preproc.saccades_classification(subject=subject, saccades=saccades, raw=raw)
@@ -62,8 +62,8 @@ for subject_code in exp_info.subjects_ids:
     fixations, raw = functions_preproc.fixation_classification(subject=subject, fixations=fixations, raw=raw)
 
     #---------------- Items classification ----------------#
-    raw, subject, items_pos = functions_preproc.target_vs_distractor(fixations=fixations, subject=subject,
-                                                                     raw=raw, distance_threshold=70)
+    raw, subject, ms_items_pos = functions_preproc.ms_items_fixations(fixations=fixations, subject=subject, raw=raw, distance_threshold=70)
+    raw, subject, items_pos = functions_preproc.target_vs_distractor(fixations=fixations, subject=subject, raw=raw, distance_threshold=70)
 
     #---------------- Save fix time distribution, pupils size vs mss, scanpath and trial gaze figures ----------------#
     if plot:
@@ -78,6 +78,8 @@ for subject_code in exp_info.subjects_ids:
         print('Plotting scanpaths and trials gaze screens')
         for trial_idx in range(len(subject.bh_data)):
             print(f'\rTrial {trial_idx + 1}', end='')
+
+            plot_preproc.ms_scanpath(raw=raw, subject=subject, ms_items_pos=ms_items_pos, et_channels_meg=et_channels_meg, trial_idx=trial_idx)
 
             plot_preproc.scanpath(raw=raw, subject=subject, items_pos=items_pos, et_channels_meg=et_channels_meg, trial_idx=trial_idx)
 
