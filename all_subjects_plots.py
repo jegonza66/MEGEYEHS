@@ -167,15 +167,31 @@ ax.set_xlabel('Time (s)')
 
 
 
+## MS fixations heatmap
+import numpy as np
+import matplotlib.pyplot as plt
 
+ms_fixations = all_fixations.loc[all_fixations['screen'] == 'ms']
 
+# Plot heatmap
+fixations_x = ms_fixations['mean_x']
+fixations_y = ms_fixations['mean_y']
 
-##
+# items positions
+it_x = np.array([-300, -150, 0, 150, 300])
+it_y = np.array([-100, -50, 0, 50, 100])
 
-subject_code = exp_info.subjects_ids[-9]
+# Transform to pixels with origin in top left
+it_x_scaled = it_x + 1920 / 2
+it_y_scaled = - it_y + 1080 / 2  # Take negative of items y position due to different coordinate system between psychopy (<0 lower half of the screen) and ET data (<0 upper half of the screen)
 
-subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-rt = subject.rt
-plt.figure()
-plt.hist(rt, bins=40, range=(0, 10), edgecolor='black', linewidth=1.2, density=False, stacked=True)
-plt.title(subject_code)
+# Calculate the 2D histogram of fixations
+fig, ax = plt.subplots()
+h, xedged, yedges, im = plt.hist2d(fixations_x, -fixations_y, bins=(200, 200), cmap='hot', range=[[0, 1920], [-1024, 0]])
+for x in it_x_scaled:
+    for y in it_y_scaled:
+        plt.plot(x, -y, 'o', color='C0')
+
+ylabels = [str(item.get_text()).replace('−', '') for item in ax.get_yticklabels()]
+
+ax.set_yticklabels(ylabels)
