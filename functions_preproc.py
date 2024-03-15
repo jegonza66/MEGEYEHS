@@ -742,8 +742,8 @@ def define_events_trials_trig(raw, subject, config, exp_info):
             time_diff = vs_end_times_meg_block[trial] - meg_evt_time
             search_screen_dur = vs_end_times_meg_block[trial] - vs_times_meg_block[trial]
             late_ans_thr = -0.2
-            # Answer after a 10 search screen or time difference of 100 ms -> No answer
-            if (time_diff < 0) and (vs_end_times_meg_block[trial] - vs_times_meg_block[trial] > 9.9) or time_diff < late_ans_thr or time_diff > search_screen_dur:
+            # Answer after a 10 search screen or time difference of 200 ms -> No answer
+            if (time_diff < 0) and (search_screen_dur > 9.9) or time_diff < late_ans_thr or time_diff > search_screen_dur:
                 print(f'\nNo answer in Trial {total_trial}\n'
                       f' Time difference: {round((vs_end_times_meg_block[trial] - meg_evt_time) * 1000, 1)} ms\n'
                       f'Search duration: {search_screen_dur} s')
@@ -1043,16 +1043,16 @@ def saccades_classification(subject, saccades, raw):
         if -15 < deg < 15:
             dir = 'r'
         elif 75 < deg < 105:
-            dir = 'u'
+            dir = 'd'
         elif 165 < deg or deg < -165:
             dir = 'l'
         elif -75 > deg > -105:
-            dir = 'd'
+            dir = 'u'
         else:
             dir = 'none'
         sac_dir.append(dir)
 
-        # find saccades's block
+        # find saccades block
         emap_sac = False
         for (block_num, emap_start_time), emap_end_time in zip(enumerate(hl_start_times), bl_end_times):
             if emap_start_time < sac_time < emap_end_time:
@@ -1558,10 +1558,129 @@ def fixation_classification(subject, fixations, raw):
     return fixations, raw
 
 
+def ms_items_fixations(fixations, subject, raw, distance_threshold=70):
+
+    print('Identifying fixated items in MS screen')
+    # Load items data
+    items_pos_path = paths().bh_path() + subject.subject_id + '/'
+    items_pos = pd.read_csv(items_pos_path +'ms_items_pos.csv' )
+
+    # iterate over fixations checking for trial number, then check image used, then check in item_pos the position of items and mesure distance
+    fixations_ms = copy.copy(fixations.loc[fixations['screen'] == 'ms'])
+
+    # Define save data variables
+    items = []
+    fix_item_distance = []
+    fix_target = []
+    trials_image = []
+    fix_id = []
+
+    description = []
+    onset = []
+
+     # Iterate over fixations
+    for fix_idx, fix in fixations_ms.iterrows():
+
+        # Get fixation trial time, and n_fix
+        trial = fix['trial']
+        trial_idx = trial - 1
+
+        n_fix = fix['n_fix']
+        fix_time = fix['onset']
+
+        # Get fixations x and y
+        fix_x = fix['mean_x']
+        fix_y = fix['mean_y']
+
+        # Get trial image
+        trial_image = subject.trial_imgs[trial_idx]
+        trials_image.append(trial_image)
+
+        # Get items position information for trial
+        trial_info = items_pos.iloc[trial_idx]
+        trial_items = {key: {'X': trial_info[f'X{idx+1}'], 'Y': trial_info[f'Y{idx+1}']} for idx, key in enumerate(trial_info.keys()) if 'st' in key and trial_info[key] != 'blank.png'}
+        # Rename st5 as target
+        if 'st5' in trial_items.keys():
+            trial_items['target'] = trial_items.pop('st5')
+        # Make dataframe to iterate over rows
+        trial_items = pd.DataFrame(trial_items).transpose()
+
+        # Define trial save variables
+        distances = []
+        target = []
+
+        # Iterate over trial items
+        for item_idx, item in trial_items.iterrows():
+            # Item position
+            item_x = item['X']
+            item_y = item['Y']
+            item['istarget'] = int('target' == item.name)
+
+            # Fixations to item distance
+            x_dist = abs(fix_x - item_x)
+            y_dist = abs(fix_y - item_y)
+            distance = np.sqrt(x_dist ** 2 + y_dist ** 2)
+
+            distances.append(distance)
+            target.append(item['istarget'])
+
+        # Closest item to fixation
+        min_distance = np.min(np.array(distances))
+        min_distance_idx = np.argmin(np.array(distances))
+
+        if min_distance < distance_threshold:
+            item = trial_items.iloc[min_distance_idx].name
+            item_distance = min_distance
+            istarget = target[min_distance_idx]
+        else:
+            item = float('nan')
+            item_distance = float('nan')
+            istarget = float('nan')
+
+        # Save trial data
+        items.append(item)
+        fix_item_distance.append(item_distance)
+        fix_target.append(istarget)
+
+        if ~np.isnan(istarget) and istarget:
+            prefix = 'tgt'
+        elif ~np.isnan(istarget) and not istarget:
+            prefix = 'it'
+        else:
+            prefix = 'none'
+
+        id = f'{prefix}_fix_ms_t{trial}_{n_fix}'
+        fix_id.append(id)
+        description.append(id)
+        onset.append([fix_time])
+
+    # Save to fixations_vs df
+    fixations.loc[fixations['screen'] == 'ms', 'item'] = items
+    fixations.loc[fixations['screen'] == 'ms', 'fix_target'] = fix_target
+    fixations.loc[fixations['screen'] == 'ms', 'distance'] = fix_item_distance
+    fixations.loc[fixations['screen'] == 'ms', 'trial_image'] = trials_image
+    fixations.loc[fixations['screen'] == 'ms', 'id'] = fix_id
+
+    # Save to subject
+    subject.fixations = fixations
+
+    # Save to raw annotations
+    raw.annotations.description = np.concatenate((raw.annotations.description, np.array(description)))
+    raw.annotations.onset = np.concatenate((raw.annotations.onset, np.array(functions_general.flatten_list(onset))))
+
+    raw_annot = np.array([raw.annotations.onset, raw.annotations.description])
+    raw_annot = raw_annot[:, raw_annot[0].astype(float).argsort()]
+    raw.annotations.onset = raw_annot[0].astype(float)
+    raw.annotations.description = raw_annot[1]
+
+    raw.annotations.duration = np.zeros(len(raw.annotations.description))
+
+    return raw, subject, items_pos
+
 def target_vs_distractor(fixations, subject, raw, distance_threshold=70, screen_res_x=1920, screen_res_y=1080,
                          img_res_x=1280, img_res_y=1024):
 
-    print('Identifying fixated items')
+    print('Identifying fixated items in VS screen')
 
     # Load items data
     items_pos_path = paths().item_pos_path()
