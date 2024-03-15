@@ -20,7 +20,7 @@ exp_info = setup.exp_info()
 save_fig = True
 save_data = True
 display_figs = False
-plot_individuals = True
+plot_individuals = False
 if display_figs:
     plt.ion()
 else:
@@ -31,7 +31,7 @@ use_ica_data = True
 
 # Frequency band
 filter_sensors = True
-band_id = 'Alpha'
+band_id = None
 filter_method = 'iir'
 
 # Trial selection
@@ -71,7 +71,7 @@ initial_time = None
 run_permutations_GA = True
 run_permutations_diff = True
 desired_tval = 'TFCE'
-p_threshold = 0.005
+p_threshold = 0.05
 
 
 #--------- Setup ---------#
@@ -293,25 +293,8 @@ for run_id in run_ids:
                                                               save_data=save_data, cov_save_path=cov_save_path, cov_act_fname=cov_act_fname,
                                                               cov_baseline_fname=cov_baseline_fname, epochs_save_path=epochs_save_path, epochs_data_fname=epochs_data_fname)
 
-            # Estimate sources from evoked
-            elif not estimate_epochs:
-                # Apply filter and get source estimates
-                stc = beamformer.apply_lcmv(evoked=evoked, filters=filters)
-
-                if source_power:
-                    # Compute envelope in source space
-                    data = stc.data
-                    if band_id and not filter_sensors:
-                        # Filter source data
-                        data = functions_general.butter_bandpass_filter(data, band_id=band_id, sfreq=evoked.info['sfreq'], order=3)
-                    # Compute envelope
-                    analytic_signal = hilbert(data, axis=-1)
-                    signal_envelope = np.abs(analytic_signal)
-                    # Save envelope as data
-                    stc.data = signal_envelope
-
             # Estimate sources from epochs
-            elif not estimate_covariance:
+            elif estimate_epochs:
                 # Define sources estimated on epochs
                 stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
 
@@ -337,6 +320,23 @@ for run_id in run_ids:
                         stc.data += data
                     # Divide by epochs number
                     stc.data /= len(epochs)
+
+            # Estimate sources from evoked
+            else:
+                # Apply filter and get source estimates
+                stc = beamformer.apply_lcmv(evoked=evoked, filters=filters)
+
+                if source_power:
+                    # Compute envelope in source space
+                    data = stc.data
+                    if band_id and not filter_sensors:
+                        # Filter source data
+                        data = functions_general.butter_bandpass_filter(data, band_id=band_id, sfreq=evoked.info['sfreq'], order=3)
+                    # Compute envelope
+                    analytic_signal = hilbert(data, axis=-1)
+                    signal_envelope = np.abs(analytic_signal)
+                    # Save envelope as data
+                    stc.data = signal_envelope
 
             if source_power:
                 # Drop edges due to artifacts from power computation
