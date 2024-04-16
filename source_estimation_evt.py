@@ -10,6 +10,7 @@ import numpy as np
 import plot_general
 import matplotlib.pyplot as plt
 from scipy.signal import hilbert
+import itertools
 
 # Load experiment info
 exp_info = setup.exp_info()
@@ -20,7 +21,6 @@ exp_info = setup.exp_info()
 save_fig = True
 save_data = True
 display_figs = False
-plot_individuals = False
 if display_figs:
     plt.ion()
 else:
@@ -35,43 +35,45 @@ band_id = None
 filter_method = 'iir'
 
 # Trial selection
-corr_ans = None
-tgt_pres = None
-mss = None
-evt_dur = None
+trial_params = {'epoch_id': ['tgt_fix_vs', 'it_fix_vs_subsampled'],  # use'+' to mix conditions (red+blue)
+                'corrans': True,
+                'tgtpres': True,
+                'mss': None,
+                'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
+                'evtdur': None}
+
+# Compare features
+run_comparison = True
 
 # Baseline
-bline_mode_subj = 'db'
+bline_mode_subj = 'mean'
 bline_mode_ga = False
-plot_edge = 0.25
-
-# Epochs parameters
-reject = None  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
+plot_edge = 0.15
 
 # Source estimation parameters
 force_fsaverage = False
 model_name = 'lcmv'
 surf_vol = 'volume'
 ico = 5
-spacing = 10.
+spacing = 5.  # Only for volume source estimation
 pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
-source_power = True
+source_power = False
 estimate_epochs = False  # epochs and covariance cannot be both true (but they can be both false and estimate sources from evoked)
-estimate_covariance = True
-mask_negatives = False
-
-# Default source subject
-default_subject = exp_info.subjects_ids[0]  # Any subject or 'fsaverage'
+estimate_covariance = False
 visualize_alignment = False
 
 # Plot
-initial_time = None
+initial_time = 0.1
+positive_cbar = None  # None for free determination, False to include negative values
+plot_individuals = False
+plot_ga = True
 
 # Permutations test
 run_permutations_GA = True
 run_permutations_diff = True
-desired_tval = 'TFCE'
+desired_tval = 0.01
 p_threshold = 0.05
+mask_negatives = False
 
 
 #--------- Setup ---------#
@@ -90,57 +92,57 @@ elif estimate_epochs:
 else:
     source_computation = 'evk'
 
+# Windows durations
+cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
+
 
 # --------- Freesurfer Path ---------#
-
 # Define Subjects_dir as Freesurfer output folder
 subjects_dir = os.path.join(paths().mri_path(), 'FreeSurfer_out')
 os.environ["SUBJECTS_DIR"] = subjects_dir
 
-# Select epochs
-run_ids = ['cross2_mss4--cross2_mss1']  # use '--' to compute difference between 2 conditions ('tgt_fix--it_fix_subsampled'), '+' to mix conditions (red+blue)
+# Get param to compute difference from params dictionary
+param_values = {key: value for key, value in trial_params.items() if type(value) == list}
+# Exception in case no comparison
+if param_values == {}:
+    param_values = {list(trial_params.items())[0][0]: [list(trial_params.items())[0][1]]}
+
+# Save source estimates time courses on FreeSurfer
+stcs_default_dict = {}
+GA_stcs = {}
 
 # --------- Run ---------#
-for run_id in run_ids:
+for param in param_values.keys():
+    stcs_default_dict[param] = {}
+    GA_stcs[param] = {}
+    for param_value in param_values[param]:
 
-    # Save source estimates time courses on FreeSurfer
-    stcs_default_dict = {}
-    GA_stcs = {}
-
-    # Run on separate events based on epochs ids to compute difference
-    epoch_ids = run_id.split('--')
-
-    # Iterate over epoch ids (if applies)
-    for i, epoch_id in enumerate(epoch_ids):
-
-        if 'mss' in epoch_id:
-            mss = int(epoch_id.split('_mss')[-1][:1])
-            epoch_id = epoch_id.split('_mss')[0]
-
-        # Windows durations
-        cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
+        # Get run parameters from trial params including all comparison between different parameters
+        run_params = trial_params
+        # Set first value of parameters comparisons to avoid having lists in run params
+        if len(param_values.keys()) > 1:
+            for key in param_values.keys():
+                run_params[key] = param_values[key][0]
+        # Set comparison key value
+        run_params[param] = param_value
 
         # Define trial duration for VS screen analysis
-        if 'vs' in epoch_id:
-            trial_dur = vs_dur[mss]
+        if 'vs' in run_params['epoch_id'] and 'fix' not in run_params['epoch_id'] and 'sac' not in run_params['epoch_id']:
+            trial_dur = vs_dur[run_params['mss']]
         else:
-            trial_dur = None
-        trial_dur = vs_dur[mss]
+            trial_dur = None  # Change to trial_dur = None to use all trials for no 'vs' epochs
 
         # Get time windows from epoch_id name
-        map = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[mss], 'plot_xlim': (-cross1_dur + plot_edge, mss_duration[mss] - plot_edge)})
-        tmin, tmax, _ = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=plot_edge, map=map)
+        tmin, tmax, _ = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], plot_edge=plot_edge)
 
         # Get baseline duration for epoch_id
-        baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=epoch_id, mss=mss, tmin=tmin, tmax=tmax,
+        baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=run_params['epoch_id'], mss=run_params['mss'], tmin=tmin, tmax=tmax,
                                                                           cross1_dur=cross1_dur, mss_duration=mss_duration,
                                                                           cross2_dur=cross2_dur)
 
         # Paths
-        if filter_sensors:
-            run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
-        else:
-            run_path = f'/Band_None/{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
+        run_path = f"/Band_{band_id}/{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}_trialdur{trial_dur}" \
+                   f"_evtdur{run_params['evtdur']}_{tmin}_{tmax}_bline{baseline}/"
 
         # Data paths
         epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path
@@ -148,8 +150,8 @@ for run_id in run_ids:
         cov_save_path = paths().save_path() + f'Cov_Epochs_{data_type}/' + run_path
 
         # Source plots paths
-        if source_power:
-            run_path = run_path.replace(f'{epoch_id}_mss{mss}', f'{epoch_id}_mss{mss}_power')
+        if source_power or estimate_covariance:
+            run_path = run_path.replace(f"{run_params['epoch_id']}_", f"{run_params['epoch_id']}_power_")
         run_path = run_path.replace('Band_None', f'Band_{band_id}')
 
         # Define path
@@ -158,14 +160,8 @@ for run_id in run_ids:
         else:
             fig_path = paths().plots_path() + f'Source_Space_{data_type}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{bline_mode_subj}_{source_computation}/'
 
-        # Figure difference save path
-        if 'mss' in run_id:
-            fig_path_diff = fig_path.replace(f'{epoch_id}_mss{mss}', run_id)
-        else:
-            fig_path_diff = fig_path.replace(f'{epoch_id}_mss{mss}', f'{run_id}_mss{mss}')
-
         # Save source estimates time courses on default's subject source space
-        stcs_default_dict[epoch_ids[i]] = []
+        stcs_default_dict[param][param_value] = []
 
         # Iterate over participants
         for subject_code in exp_info.subjects_ids:
@@ -221,7 +217,7 @@ for run_id in run_ids:
             # Get epochs and evoked
             try:
                 # Load data
-                if not estimate_covariance or estimate_epochs:
+                if estimate_epochs:
                     epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
                     # Pick meg channels for source modeling
                     epochs.pick('meg')
@@ -248,9 +244,9 @@ for run_id in run_ids:
                         else:
                             meg_data = subject.load_preproc_meg_data()
                     # Epoch data
-                    epochs, events = functions_analysis.epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
-                                                                   epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, trial_dur=trial_dur,
-                                                                   tmax=tmax, reject=reject, baseline=baseline,
+                    epochs, events = functions_analysis.epoch_data(subject=subject, mss=run_params['mss'], corr_ans=run_params['corrans'], tgt_pres=run_params['tgtpres'],
+                                                                   epoch_id=run_params['epoch_id'], meg_data=meg_data, tmin=tmin, trial_dur=trial_dur,
+                                                                   tmax=tmax, reject=run_params['reject'], baseline=baseline,
                                                                    save_data=save_data, epochs_save_path=epochs_save_path,
                                                                    epochs_data_fname=epochs_data_fname)
 
@@ -287,9 +283,9 @@ for run_id in run_ids:
                 cov_act_fname = f'Subject_{subject.subject_id}_times{active_times}_{cov_method}_{rank}-cov.fif'
 
                 stc = functions_analysis.estimate_sources_cov(subject=subject, baseline=baseline, band_id=band_id, filter_sensors=filter_sensors,
-                                                              filter_method=filter_method, use_ica_data=use_ica_data, epoch_id=epoch_id, mss=mss, corr_ans=corr_ans,
-                                                              tgt_pres=tgt_pres, trial_dur=trial_dur, reject=reject, tmin=tmin, tmax=tmax,
-                                                              filters=filters, active_times=active_times, rank=rank, bline_mode_subj=bline_mode_subj,
+                                                              filter_method=filter_method, use_ica_data=use_ica_data, epoch_id=run_params['epoch_id'], mss=run_params['mss'],
+                                                              corr_ans=run_params['corrans'], tgt_pres=run_params['tgtpres'], trial_dur=trial_dur, reject=run_params['tgtpres'],
+                                                              tmin=tmin, tmax=tmax, filters=filters, active_times=active_times, rank=rank, bline_mode_subj=bline_mode_subj,
                                                               save_data=save_data, cov_save_path=cov_save_path, cov_act_fname=cov_act_fname,
                                                               cov_baseline_fname=cov_baseline_fname, epochs_save_path=epochs_save_path, epochs_data_fname=epochs_data_fname)
 
@@ -321,6 +317,10 @@ for run_id in run_ids:
                     # Divide by epochs number
                     stc.data /= len(epochs)
 
+                if source_power:
+                    # Drop edges due to artifacts from power computation
+                    stc.crop(tmin=stc.tmin + plot_edge, tmax=stc.times.max() - plot_edge)
+
             # Estimate sources from evoked
             else:
                 # Apply filter and get source estimates
@@ -338,20 +338,19 @@ for run_id in run_ids:
                     # Save envelope as data
                     stc.data = signal_envelope
 
-            if source_power:
-                # Drop edges due to artifacts from power computation
-                stc.crop(tmin=stc.tmin + plot_edge, tmax=stc.tmax - plot_edge)
+                    # Drop edges due to artifacts from power computation
+                    stc.crop(tmin=stc.tmin + plot_edge, tmax=stc.tmax - plot_edge)
 
             if bline_mode_subj and not estimate_covariance:
                 # Apply baseline correction
                 print(f'Applying baseline correction: {bline_mode_subj} from {baseline[0]} to {baseline[1]}')
                 # stc.apply_baseline(baseline=baseline)  # mean
                 if bline_mode_subj == 'db':
-                    stc.data = 10 * np.log10(stc.data / stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None])
+                    stc.data = 10 * np.log10(stc.data / np.expand_dims(stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=-1), axis=-1))
                 elif bline_mode_subj == 'ratio':
-                    stc.data = stc.data / stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None]
+                    stc.data = stc.data / np.expand_dims(stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=-1), axis=-1)
                 elif bline_mode_subj == 'mean':
-                    stc.data = stc.data - stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None]
+                    stc.data = stc.data - np.expand_dims(stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=-1), axis=-1)
 
             if band_id and source_power and not estimate_covariance:
                 # Filter higher frequencies than corresponding to nyquist of bandpass filter higher freq
@@ -359,41 +358,45 @@ for run_id in run_ids:
                 stc.data = functions_general.butter_lowpass_filter(data=stc.data, h_freq=h_freq/2, sfreq=evoked.info['sfreq'], order=3)
 
             # Morph to default subject
-            if subject_code != default_subject:
+            if subject_code != 'fsaverage':
                 # Get Source space for default subject
                 if surf_vol == 'volume':
-                    fname_src = paths().sources_path() + default_subject + f'/{default_subject}_volume_ico{ico}_{int(spacing)}-src.fif'
+                    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_volume_ico{ico}_{int(spacing)}-src.fif'
                 elif surf_vol == 'surface':
-                    fname_src = paths().sources_path() + default_subject + f'/{default_subject}_surface_ico{ico}-src.fif'
+                    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_surface_ico{ico}-src.fif'
                 elif surf_vol == 'mixed':
-                    fname_src = paths().sources_path() + default_subject + f'/{default_subject}_mixed_ico{ico}_{int(spacing)}-src.fif'
+                    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_mixed_ico{ico}_{int(spacing)}-src.fif'
 
                 src_default = mne.read_source_spaces(fname_src)
 
                 # Define morph function
-                morph = mne.compute_source_morph(src=src, subject_from=subject_code, subject_to=default_subject, src_to=src_default, subjects_dir=subjects_dir)
+                morph = mne.compute_source_morph(src=src, subject_from=subject_code, subject_to='fsaverage', src_to=src_default, subjects_dir=subjects_dir)
 
                 # Apply morph
                 stc_default = morph.apply(stc)
 
                 # Append to fs_stcs to make GA
-                stcs_default_dict[epoch_ids[i]].append(stc_default)
+                stcs_default_dict[param][param_value].append(stc_default)
 
             else:
+                src_default = src
+
+                stc_default = stc
+
                 # Append to fs_stcs to make GA
-                stcs_default_dict[epoch_ids[i]].append(stc)
+                stcs_default_dict[param][param_value].append(stc)
 
             # Plot
             if plot_individuals:
                 fname = f'{subject.subject_id}'
-                plot_general.sources(stc=stc, src=src, subject=subject_code, subjects_dir=subjects_dir, ico=ico, initial_time=initial_time, surf_vol=surf_vol,
-                                     force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, mask_negatives=mask_negatives, save_fig=save_fig,
-                                     fig_path=fig_path, fname=fname)
+                plot_general.sources(stc=stc, src=src, subject=subject_code, subjects_dir=subjects_dir, initial_time=initial_time, surf_vol=surf_vol,
+                                     force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, pick_ori=pick_ori, mask_negatives=mask_negatives,
+                                     positive_cbar=positive_cbar, views=['lat', 'med'], save_fig=save_fig, save_vid=False, fig_path=fig_path, fname=fname)
 
         # Grand Average: Average evoked stcs from this epoch_id
-        all_subj_source_data = np.zeros(tuple([len(stcs_default_dict[epoch_ids[i]])] + [size for size in stcs_default_dict[epoch_ids[i]][0].data.shape]))
-        for j, stc in enumerate(stcs_default_dict[epoch_ids[i]]):
-            all_subj_source_data[j] = stcs_default_dict[epoch_ids[i]][j].data
+        all_subj_source_data = np.zeros(tuple([len(stcs_default_dict[param][param_value])] + [size for size in stcs_default_dict[param][param_value][0].data.shape]))
+        for j, stc in enumerate(stcs_default_dict[param][param_value]):
+            all_subj_source_data[j] = stcs_default_dict[param][param_value][j].data
         if mask_negatives:
             all_subj_source_data[all_subj_source_data < 0] = 0
 
@@ -405,7 +408,7 @@ for run_id in run_ids:
 
         # Reeplace data
         GA_stc.data = GA_stc_data
-        GA_stc.subject = default_subject
+        GA_stc.subject = 'fsaverage'
 
         # Apply baseline on GA data
         if bline_mode_ga and not estimate_covariance:
@@ -419,78 +422,114 @@ for run_id in run_ids:
                 GA_stc.data = GA_stc.data - GA_stc.copy().crop(tmin=baseline[0], tmax=baseline[1]).data.mean(axis=1)[:, None]
 
         # Save GA from epoch id
-        GA_stcs[epoch_ids[i]] = GA_stc
+        GA_stcs[param][param_value] = GA_stc
 
-        #--------- Plot GA ---------#
-        fname = 'GA'
-        plot_general.sources(stc=GA_stc, src=src_default, subject=default_subject, subjects_dir=subjects_dir, ico=ico, initial_time=initial_time, surf_vol=surf_vol,
-                             force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, mask_negatives=mask_negatives, save_fig=save_fig, fig_path=fig_path, fname=fname)
+        # --------- Plot GA ---------#
+        if plot_ga:
+            fname = 'GA'
+            brain = plot_general.sources(stc=GA_stc, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=initial_time, surf_vol=surf_vol,
+                                         force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, pick_ori=pick_ori, mask_negatives=mask_negatives,
+                                         positive_cbar=positive_cbar, views=['lat', 'med'], save_fig=save_fig, save_vid=True, fig_path=fig_path, fname=fname)
 
-        # --------- Test significance compared to baseline ---------#
-        if run_permutations_GA:
-            significance_voxels, significance_mask, t_thresh_name, time_label, p_threshold = \
-                functions_analysis.run_source_permutations_test(src=src_default, stc=GA_stc, source_data=all_subj_source_data, subject=default_subject, exp_info=exp_info,
-                                                                save_regions=True, fig_path=fig_path, desired_tval=desired_tval, mask_negatives=mask_negatives,
+        # --------- Test significance compared to baseline --------- #
+        if run_permutations_GA and pick_ori != 'vector':
+            stc_all_cluster_vis, significance_voxels, significance_mask, t_thresh_name, time_label, p_threshold = \
+                functions_analysis.run_source_permutations_test(src=src_default, stc=GA_stc, source_data=all_subj_source_data, subject='fsaverage', exp_info=exp_info,
+                                                                save_regions=True, fig_path=fig_path, surf_vol=surf_vol, desired_tval=desired_tval, mask_negatives=mask_negatives,
                                                                 p_threshold=p_threshold)
-            if significance_mask is not None:
+
+            # If covariance estimation, no time variable. Clusters are static
+            if significance_mask is not None and estimate_covariance:
                 # Mask data
                 GA_stc_sig = GA_stc.copy()
                 GA_stc_sig.data[significance_mask] = 0
 
                 # --------- Plot GA significant clusters ---------#
                 fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
-                plot_general.sources(stc=GA_stc_sig, src=src_default, subject=default_subject, subjects_dir=subjects_dir, ico=ico, initial_time=initial_time, surf_vol=surf_vol,
-                                     time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance,
-                                     mask_negatives=mask_negatives, save_fig=save_fig, fig_path=fig_path, fname=fname)
+                brain = plot_general.sources(stc=GA_stc_sig, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0, surf_vol=surf_vol,
+                                     time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, pick_ori=pick_ori, views=['lat', 'med'],
+                                     mask_negatives=mask_negatives, positive_cbar=True, save_vid=False, save_fig=save_fig, fig_path=fig_path, fname=fname)
 
-
-    #----- Difference between conditions -----#
-
-    # Take difference of conditions if applies
-    if len(stcs_default_dict.keys()) > 1:
-        print(f'Taking difference between conditions: {epoch_ids[0]} - {epoch_ids[1]}')
-
-        # Get subjects difference
-        stcs_diff = []
-        for i in range(len(stcs_default_dict[epoch_ids[0]])):
-            stcs_diff.append(stcs_default_dict[epoch_ids[0]][i] - stcs_default_dict[epoch_ids[1]][i])
-
-        # Average evoked stcs
-        all_subj_diff_data = np.zeros(tuple([len(stcs_diff)]+[size for size in stcs_diff[0].data.shape]))
-        for i, stc in enumerate(stcs_diff):
-            all_subj_diff_data[i] = stcs_diff[i].data
-
-        if mask_negatives:
-            all_subj_diff_data[all_subj_diff_data < 0] = 0
-
-        GA_stc_diff_data = all_subj_diff_data.mean(0)
-
-        # Copy Source Time Course from default subject morph to define GA STC
-        GA_stc_diff = GA_stc.copy()
-
-        # Reeplace data
-        GA_stc_diff.data = GA_stc_diff_data
-        GA_stc_diff.subject = default_subject
-
-        # --------- Plots ---------#
-        fname = f'GA'
-        plot_general.sources(stc=GA_stc_diff, src=src_default, subject=default_subject, subjects_dir=subjects_dir, ico=ico, initial_time=initial_time, surf_vol=surf_vol,
-                             force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, mask_negatives=mask_negatives, save_fig=save_fig, fig_path=fig_path, fname=fname)
-
-        #--------- Cluster permutations test ---------#
-        if run_permutations_diff:
-            significance_voxels, significance_mask, t_thresh_name, time_label, p_threshold = \
-                functions_analysis.run_source_permutations_test(src=src_default, stc=GA_stc_diff, source_data=all_subj_diff_data, subject=default_subject,
-                                                                exp_info=exp_info, save_regions=True, fig_path=fig_path_diff, desired_tval=desired_tval,
-                                                                mask_negatives=mask_negatives, p_threshold=p_threshold)
-
-            if significance_mask is not None:
-                # Mask data
-                GA_stc_diff_sig = GA_stc_diff.copy()
-                GA_stc_diff_sig.data[significance_mask] = 0
-
-                # --------- Plots ---------#
+            # If time variable, visualize clusters using mne's function
+            elif significance_mask is not None:
                 fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
-                plot_general.sources(stc=GA_stc_diff_sig, src=src_default, subject=default_subject, subjects_dir=subjects_dir, ico=ico, initial_time=initial_time,
-                                     surf_vol=surf_vol, time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance,
-                                     mask_negatives=mask_negatives, save_fig=save_fig, fig_path=fig_path_diff, fname=fname)
+                brain = plot_general.sources(stc=stc_all_cluster_vis, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0,
+                                             surf_vol=surf_vol, time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance,
+                                             pick_ori=pick_ori, views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=True,
+                                             save_vid=False, save_fig=save_fig, fig_path=fig_path, fname=fname)
+
+
+#----- Difference between conditions -----#
+for param in param_values.keys():
+    if len(param_values[param]) > 1 and run_comparison:
+        for comparison in list(itertools.combinations(param_values[param], 2)):
+
+            if all(type(element) == int for element in comparison):
+                comparison = sorted(comparison, reverse=True)
+
+            # Figure difference save path
+            if param == 'epoch_id':
+                fig_path_diff = fig_path.replace(f'{param_values[param][-1]}', f'{comparison[0]}-{comparison[1]}')
+            else:
+                fig_path_diff = fig_path.replace(f'{param}{param_values[param][-1]}', f'{param}{comparison[0]}-{comparison[1]}')
+
+            print(f'Taking difference between conditions: {param} {comparison[0]} - {comparison[1]}')
+
+            # Get subjects difference
+            stcs_diff = []
+            for i in range(len(stcs_default_dict[param][comparison[np.argmax(comparison)]])):
+                stcs_diff.append(stcs_default_dict[param][comparison[0]][i] - stcs_default_dict[param][comparison[1]][i])
+
+            # Average evoked stcs
+            all_subj_diff_data = np.zeros(tuple([len(stcs_diff)]+[size for size in stcs_diff[0].data.shape]))
+            for i, stc in enumerate(stcs_diff):
+                all_subj_diff_data[i] = stcs_diff[i].data
+
+            if mask_negatives:
+                all_subj_diff_data[all_subj_diff_data < 0] = 0
+
+            GA_stc_diff_data = all_subj_diff_data.mean(0)
+
+            # Copy Source Time Course from default subject morph to define GA STC
+            GA_stc_diff = GA_stc.copy()
+
+            # Reeplace data
+            GA_stc_diff.data = GA_stc_diff_data
+            GA_stc_diff.subject = 'fsaverage'
+
+            # --------- Plots ---------#
+            if plot_ga:
+                fname = f'GA'
+                brain = plot_general.sources(stc=GA_stc_diff, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0.408, surf_vol=surf_vol,
+                                             pick_ori=pick_ori, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, mask_negatives=mask_negatives,
+                                             views=['cor'], save_vid=False, save_fig=False, fig_path=fig_path_diff, fname=fname, positive_cbar=True, hemi='both')
+
+            GA_stc_diff_crop = GA_stc_diff.copy().crop(tmin=0.2, tmax=0.4)
+            GA_stc_diff_crop_mean = GA_stc_diff_crop.mean()
+
+
+            #--------- Cluster permutations test ---------#
+            if run_permutations_diff and pick_ori != 'vector':
+                stc_all_cluster_vis, significance_voxels, significance_mask, t_thresh_name, time_label, p_threshold = \
+                    functions_analysis.run_source_permutations_test(src=src_default, stc=GA_stc_diff, source_data=all_subj_diff_data, subject='fsaverage',
+                                                                    exp_info=exp_info, save_regions=True, fig_path=fig_path_diff, surf_vol=surf_vol, desired_tval=desired_tval,
+                                                                    mask_negatives=mask_negatives, p_threshold=p_threshold)
+
+                if significance_mask is not None and estimate_covariance:
+                    # Mask data
+                    GA_stc_diff_sig = GA_stc_diff.copy()
+                    GA_stc_diff_sig.data[significance_mask] = 0
+
+                    # --------- Plots ---------#
+                    fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
+                    brain = plot_general.sources(stc=GA_stc_diff_sig, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0,
+                                                 surf_vol=surf_vol, time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance,
+                                                 pick_ori=pick_ori, views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=True,
+                                                 save_vid=False, save_fig=save_fig, fig_path=fig_path_diff, fname=fname)
+
+                elif significance_mask is not None:
+                    fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
+                    brain = plot_general.sources(stc=stc_all_cluster_vis, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0,
+                                                 surf_vol=surf_vol, time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance,
+                                                 pick_ori=pick_ori, views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=True,
+                                                 save_vid=False, save_fig=save_fig, fig_path=fig_path_diff, fname=fname)
