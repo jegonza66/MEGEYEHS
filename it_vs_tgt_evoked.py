@@ -28,7 +28,7 @@ use_ica_data = True
 run_tfce = True
 band_id = None
 # Id
-epoch_ids = ['it_fix_subsampled', 'tgt_fix']
+epoch_ids = ['it_fix_vs_subsampled', 'tgt_fix_vs']
 # Pick MEG chs (Select channels or set picks = 'mag')
 chs_id = 'temporal'
 chs_ids = [f'{chs_id}_L', f'{chs_id}_R']
@@ -71,22 +71,23 @@ for i, epoch_id in enumerate(epoch_ids):
     stds[epoch_id] = {}
     maxs[epoch_id] = {}
     mins[epoch_id] = {}
+
+    # Specific run path for saving data and plots
+    save_id = f'{epoch_id}_mss{mss}_corrans{corr_ans}_tgtpres{tgt_pres}_trialdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}'
+    run_path = f'Band_{band_id}/{save_id}/'
+
+    # Save data paths
+    epochs_save_path = save_path + f'Epochs_{data_type}/' + run_path
+    evoked_save_path = save_path + f'Evoked_{data_type}/' + run_path
+    grand_avg_data_fname = f'Grand_average_ave.fif'
+    # Save figures paths
+    epochs_fig_path = plot_path + f'Epochs_{data_type}/' + run_path
+    evoked_fig_path = plot_path + f'Evoked_{data_type}/' + run_path
+
     for j, lat_chs in enumerate(chs_ids):
 
         ga_dict[epoch_id] = []  # Save evokeds of all channels (not lateralized)
         evokeds[epoch_id][lat_chs] = []
-
-        # Specific run path for saving data and plots
-        save_id = f'{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}'
-        run_path = f'/Band_{band_id}/{save_id}/'
-
-        # Save data paths
-        epochs_save_path = save_path + f'Epochs_{data_type}/' + run_path
-        evoked_save_path = save_path + f'Evoked_{data_type}/' + run_path
-        grand_avg_data_fname = f'Grand_average_ave.fif'
-        # Save figures paths
-        epochs_fig_path = plot_path + f'Epochs_{data_type}/' + run_path
-        evoked_fig_path = plot_path + f'Evoked_{data_type}/' + run_path
 
         # Iterate over subjects
         for subject_code in exp_info.subjects_ids:
@@ -214,7 +215,7 @@ if save_fig:
 # Plot topographies
 topo_times = [0.1, 0.3]
 topo_times_span = [0.005, 0.1]
-grand_average = mne.grand_average(ga_dict['tgt_fix'], interpolate_bads=True)
+grand_average = mne.grand_average(ga_dict['tgt_fix_vs'], interpolate_bads=True)
 fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='jet', show=display_figs, vlim=(-60, 60))
 
 if save_fig:
@@ -290,7 +291,7 @@ stds = {}
 bads = []
 
 # Save path
-load_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}' \
+load_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_corrans{corr_ans}_tgtpres{tgt_pres}_trialdur{trial_dur}' \
                                   f'_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/mag/'
 fig_path = load_path.replace(paths().save_path(), paths().plots_path())
 
@@ -574,15 +575,6 @@ if 'vs' in epoch_ids:
 else:
     trial_dur = None
 
-# Get time windows from epoch_id name
-map = dict(tgt_fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.1, 0.5)},
-           it_fix_subsampled={'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.1, 0.5)})
-tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=0, map=map)
-# tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
-
-# Baseline
-baseline = (tmin, -0.05)
-
 # Data type
 if use_ica_data:
     data_type = 'ICA'
@@ -597,14 +589,24 @@ evokeds_data = {}
 observations = []
 
 for i, epoch_id in enumerate(epoch_ids):
+
+    # Get time windows from epoch_id name
+    map = dict(tgt_fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.1, 0.5)},
+               it_fix_subsampled={'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.1, 0.5)})
+    tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=0, map=map)
+    # tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
+
+    # Baseline
+    baseline = (tmin, -0.05)
+
     # list of evoked objects to make GA
     evokeds_ga[epoch_id] = []
     #" List of evoked data as array to compute TFCE
     evokeds_data[epoch_id] = []
 
     # Specific run path for saving data and plots
-    save_id = f'{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}'
-    run_path = f'/Band_{band_id}/{save_id}/'
+    save_id = f'{epoch_id}_mss{mss}_corrans{corr_ans}_tgtpres{tgt_pres}_trialdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}'
+    run_path = f'Band_{band_id}/{save_id}/'
 
     # Save data paths
     epochs_save_path = save_path + f'Epochs_{data_type}/' + run_path
@@ -759,7 +761,7 @@ else:
     data_type = 'RAW'
 
 # Save path
-save_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}' \
+save_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_corrans{corr_ans}_tgtpres{tgt_pres}_trialdur{trial_dur}' \
                                   f'_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/{chs_id}/'
 fig_path = save_path.replace(paths().save_path(), paths().plots_path()) + 'it_vs_tgt/'
 
