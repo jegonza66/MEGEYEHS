@@ -516,10 +516,11 @@ def fit_mtrf(meg_data, tmin, tmax, alpha, model_input, chs_id, standarize=True, 
     return rf
 
 
-def run_source_permutations_test(src, stc, source_data, subject, exp_info, save_regions, fig_path, p_threshold=0.05, n_permutations=1024, desired_tval='TFCE', mask_negatives=False):
+def run_source_permutations_test(src, stc, source_data, subject, exp_info, save_regions, fig_path, surf_vol, p_threshold=0.05, n_permutations=1024, desired_tval='TFCE',
+                                 mask_negatives=False):
 
     # Return variables
-    significant_voxels, significance_mask, t_thresh_name, time_label = None, None, None, None
+    stc_all_cluster_vis, significant_voxels, significance_mask, t_thresh_name, time_label = None, None, None, None, None
 
     # Compute source space adjacency matrix
     print("Computing adjacency matrix")
@@ -568,10 +569,11 @@ def run_source_permutations_test(src, stc, source_data, subject, exp_info, save_
 
         # Get significant AAL and brodmann regions from mni space
         if save_regions:
-            significant_regions_df = functions_general.get_regions_from_mni(src_default=src, significant_voxels=significant_voxels, save_path=fig_path,
+            os.makedirs(fig_path, exist_ok=True)
+            significant_regions_df = functions_general.get_regions_from_mni(src_default=src, significant_voxels=significant_voxels, save_path=fig_path, surf_vol=surf_vol,
                                                                             t_thresh_name=t_thresh_name, p_threshold=p_threshold, masked_negatves=mask_negatives)
 
-    return significant_voxels, significance_mask, t_thresh_name, time_label, p_threshold
+    return stc_all_cluster_vis, significant_voxels, significance_mask, t_thresh_name, time_label, p_threshold
 
 
 def estimate_sources_cov(subject, baseline, band_id, filter_sensors, filter_method, use_ica_data, epoch_id, mss, corr_ans, tgt_pres, trial_dur, reject, tmin, tmax,
