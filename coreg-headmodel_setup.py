@@ -19,9 +19,9 @@ surf_vol = 'volume'
 use_ica_data = True
 force_fsaverage = False
 ico = 5
-spacing = 10.
-pick_ori = None
-high_freq = True
+spacing = 5.
+pick_ori = 'vector'
+high_freq = False
 
 # Define Subjects_dir as Freesurfer output folder
 mri_path = paths().mri_path()
