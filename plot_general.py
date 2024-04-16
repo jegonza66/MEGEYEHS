@@ -231,9 +231,8 @@ def fig_tf_bands(fontsize=None, ticksize=None):
     return fig, axes_topo, ax1
 
 
-def tfr_bands(tfr, chs_id, plot_xlim=(None, None), baseline=None, bline_mode=None,
-        dB=False, vmin=None, vmax=None, subject=None, title=None, vlines_times=[0], topo_times=None, display_figs=False,
-        save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None):
+def tfr_bands(tfr, chs_id, plot_xlim=(None, None), baseline=None, bline_mode=None, dB=False, vmin=None, vmax=None, subject=None, title=None, vlines_times=[0],
+              topo_times=None, display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None, cmap='jet'):
 
     # Sanity check
     if save_fig and (not fname or not fig_path):
@@ -254,7 +253,7 @@ def tfr_bands(tfr, chs_id, plot_xlim=(None, None), baseline=None, bline_mode=Non
 
     # Plot time-frequency
     tfr.plot(picks=picks, baseline=baseline, mode=bline_mode, tmin=plot_xlim[0], tmax=plot_xlim[1],
-             combine='mean', cmap='jet', axes=ax_tf, show=display_figs, vmin=vmin, vmax=vmax, dB=dB)
+             combine='mean', cmap=cmap, axes=ax_tf, show=display_figs, vmin=vmin, vmax=vmax, dB=dB)
 
     # Plot time markers as vertical lines
     for t in vlines_times:
@@ -339,7 +338,7 @@ def fig_tf_times(time_len, timefreqs_tfr, fontsize=None, ticksize=None):
 
 
 def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=None, bline_mode=None, dB=False, vmin=None, vmax=None,
-              topo_vmin=None, topo_vmax=None, subject=None, title=None, vlines_times=None,
+              topo_vmin=None, topo_vmax=None, subject=None, title=None, vlines_times=None, cmap='jet',
               display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None):
 
     # Sanity check
@@ -362,7 +361,7 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
 
     # Plot time-frequency
     tfr_plot = tfr.copy().apply_baseline(baseline=baseline, mode=bline_mode)
-    tfr_plot.plot(picks=picks, tmin=plot_xlim[0], tmax=plot_xlim[1], combine='mean', cmap='jet', axes=ax_tf,
+    tfr_plot.plot(picks=picks, tmin=plot_xlim[0], tmax=plot_xlim[1], combine='mean', cmap=cmap, axes=ax_tf,
              show=display_figs, vmin=vmin, vmax=vmax, dB=dB)
 
     # Plot time markers as vertical lines
@@ -399,7 +398,7 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
                 # Topomaps parameters
                 topomap_kw = dict(ch_type='mag', tmin=topo_timefreqs['tmin'], tmax=topo_timefreqs['tmax'],
                                   fmin=topo_timefreqs['fmin'], fmax=topo_timefreqs['fmax'], vlim=(topo_vmin, topo_vmax),
-                                  cmap='jet', colorbar=False, baseline=baseline,  mode=bline_mode, show=display_figs)
+                                  cmap=cmap, colorbar=False, baseline=baseline,  mode=bline_mode, show=display_figs)
 
                 try:
                     tfr.plot_topomap(axes=ax, **topomap_kw)
@@ -413,7 +412,7 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
                 # Topomaps parameters
                 topomap_kw = dict(ch_type='mag', tmin=topo_timefreqs[0], tmax=topo_timefreqs[0],
                                   fmin=topo_timefreqs[1], fmax=topo_timefreqs[1], vlim=(topo_vmin, topo_vmax),
-                                  cmap='jet', colorbar=False, baseline=baseline, mode=bline_mode, show=display_figs)
+                                  cmap=cmap, colorbar=False, baseline=baseline, mode=bline_mode, show=display_figs)
 
                 try:
                     tfr.plot_topomap(axes=ax, **topomap_kw)
@@ -424,7 +423,7 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
 
         # Colorbar
         norm = matplotlib.colors.Normalize(vmin=topo_vmin, vmax=topo_vmax)
-        sm = matplotlib.cm.ScalarMappable(norm=norm, cmap='jet')
+        sm = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
         # Get colorbar axis
         fig.colorbar(sm, cax=ax_cbar)
 
@@ -437,15 +436,9 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
     else:
         topo_times = None
 
-    if title:
-        fig.suptitle(title)
-    elif subject:
-        fig.suptitle(subject.subject_id + f'_{fname.split("_")[0]}_{chs_id}_{bline_mode}_topotimes{topo_times}')
-    elif not subject:
-        fig.suptitle(f'Grand_average_{fname.split("_")[0]}_{chs_id}_{bline_mode}_topotimes{topo_times}')
-        fname = 'GA_' + fname
-
-    # fig.tight_layout()
+    if title is None:
+        title = fname + f'_topotimes_{topo_times}'
+    fig.suptitle(title)
 
     if save_fig:
         fname += f'_topotimes_{topo_times}'
@@ -453,7 +446,7 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, plot_max=True, plot_min=True, vlines_times=None,
+def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, plot_max=True, plot_min=True, vlines_times=None, cmap='jet',
                   vmin=None, vmax=None, display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fname or not trf_fig_path):
@@ -482,9 +475,9 @@ def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, Non
     if fname:
         title = f'{fname.split("_")[1]}_{bline_mode}'
     else:
-        f'{bline_mode}'
+        title = f'{bline_mode}'
 
-    fig = tfr_plotjoint.plot_joint(timefreqs=timefreqs, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet', vmin=vmin, vmax=vmax,
+    fig = tfr_plotjoint.plot_joint(timefreqs=timefreqs, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap=cmap, vmin=vmin, vmax=vmax,
                                    title=title, show=display_figs)
 
     # Plot vertical lines
@@ -502,7 +495,7 @@ def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, Non
 
 
 def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, image_args=None, clusters_mask=None,
-                        plot_max=True, plot_min=True, vmin=None, vmax=None, chs_id='mag', vlines_times=None,
+                        plot_max=True, plot_min=True, vmin=None, vmax=None, chs_id='mag', vlines_times=None, cmap='jet',
                         display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fname or not trf_fig_path):
@@ -533,7 +526,7 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
     if fname:
         title = f'{fname.split("_")[1]}_{bline_mode}'
     else:
-        f'{bline_mode}'
+        title = f'{bline_mode}'
 
     # Get min and max from all topoplots and use in TF plot aswell
     if vmin == None or vmax == None:
@@ -542,13 +535,13 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
         for timefreq in timefreqs:
             tfr_crop = tfr_topo.copy().crop(tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1])
             data = tfr_crop.data.ravel()
-            mins.append(- 1.5 * data.std())
-            maxs.append(1.5 * data.std())
+            mins.append(- 2 * data.std())
+            maxs.append(2 * data.std())
         vmax = np.max(maxs)
         vmin = np.min(mins)
 
     # Plot tf plot joint
-    fig = tfr_plotjoint.plot_joint(timefreqs=timefreqs, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap='jet', image_args=image_args,
+    fig = tfr_plotjoint.plot_joint(timefreqs=timefreqs, tmin=plot_xlim[0], tmax=plot_xlim[1], cmap=cmap, image_args=image_args,
                                    title=title, show=display_figs, vmin=vmin, vmax=vmax)
 
     # Plot vertical lines
@@ -566,8 +559,8 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
         # Define significant channels to mask in time freq interval around desired tf point
         topo_mask = [clusters_mask[functions_general.find_nearest(tfr.freqs, timefreq[1] - 3)[0]:
                                    functions_general.find_nearest(tfr.freqs, timefreq[1] + 1)[0],
-                     functions_general.find_nearest(tfr.copy().crop(tmin=plot_xlim[0], tmax=plot_xlim[1]).times, timefreq[0] - 0.25)[0]:
-                     functions_general.find_nearest(tfr.copy().crop(tmin=plot_xlim[0], tmax=plot_xlim[1]).times, timefreq[0] + 0.25)[0]].
+                     functions_general.find_nearest(tfr.copy().crop(tmin=plot_xlim[0], tmax=plot_xlim[1]).times, timefreq[0] - 0.05)[0]:
+                     functions_general.find_nearest(tfr.copy().crop(tmin=plot_xlim[0], tmax=plot_xlim[1]).times, timefreq[0] + 0.05)[0]].
                      sum(axis=0).sum(axis=0).astype(bool) for timefreq in timefreqs]
         masks = []
         for topo in topo_mask:
@@ -581,11 +574,12 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
     # Get topo axes and overwrite topoplots
     topo_axes = fig.axes[1:-1]
     for i, (ax, timefreq) in enumerate(zip(topo_axes, timefreqs)):
+        ax.clear()
         topomap_kw = dict(ch_type='mag', tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1], mask=masks[i], mask_params=mask_params, colorbar=False, show=display_figs)
-        tfr_topo.plot_topomap(axes=ax, cmap='jet', vlim=(vmin, vmax), **topomap_kw)
+        tfr_topo.plot_topomap(axes=ax, cmap=cmap, vlim=(vmin, vmax), **topomap_kw)
 
     norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
-    sm = matplotlib.cm.ScalarMappable(norm=norm, cmap='jet')
+    sm = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
     # Get colorbar axis
     cbar_ax = fig.axes[-1]
     fig.colorbar(sm, cax=cbar_ax)
@@ -820,54 +814,85 @@ def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, sub
     brain.close()
 
 
-def sources(stc, src, subject , subjects_dir, ico, initial_time, surf_vol, force_fsaverage, estimate_covariance, save_fig, fig_path, fname,
-            alpha=1, mask_negatives=False, time_label='auto'):
+def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsaverage, estimate_covariance, pick_ori, save_fig, fig_path, fname, hemi='split', views='lateral',
+            alpha=0.75, mask_negatives=False, time_label='auto', save_vid=True, positive_cbar=None, clim=None):
+
+    # Close all plot figures
+    try:
+        mne.viz.close_all_3d_figures()
+        plt.close('all')
+    except:
+        pass
+
+    # Convert view to list in case only 1 view as str
+    if type(views) == str:
+        views = [views]
 
     # Define clim
-    if stc.data.min() >= 0:
-        clim = {'kind': 'values', 'lims': (0, (abs(stc.data).max() - abs(stc.data).min()) / 2, stc.data.max())}
-    else:
-        clim = {'kind': 'values', 'pos_lims': (0, (abs(stc.data).max() - abs(stc.data).min()) / 2, abs(stc.data).max())}
+    if not clim:
+        clim = {'kind': 'values', 'lims': ((abs(stc.data).max() - abs(stc.data).min()) / 1.5,
+                                           (abs(stc.data).max() - abs(stc.data).min()) / 1.25,
+                                           (abs(stc.data).max() - abs(stc.data).min()))}
 
-
+        # Replace positive cbar for positive / negative
+        if positive_cbar == False or (stc.data.mean() - stc.data.std() <= 0 and positive_cbar != True):
+            clim['pos_lims'] = clim.pop('lims')
+    print(clim)
     if surf_vol == 'volume':
 
         # Nutmeg plot
-        fig = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, initial_time=initial_time, clim=clim)
+        if subject == 'fsaverage':
+            bg_img = paths().mri_path() + 'MNI_templates/tpl-MNI152NLin2009cAsym_res-01_T1w.nii.gz'
+        else:
+            bg_img = None
+        matplotlib.use('TkAgg')
+        fig = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, initial_time=initial_time, clim=clim, bg_img=bg_img)
         if save_fig:
             if force_fsaverage:
                 fname += '_fsaverage'
             if mask_negatives:
                 fname += '_masked'
+            os.makedirs(fig_path, exist_ok=True)
             save.fig(fig=fig, path=fig_path, fname=fname)
 
         # 3D plot
-        brain = stc.plot_3d(src=src, subject=subject, subjects_dir=subjects_dir,  hemi='split', views='lateral', clim=clim, surface='pial', alpha=alpha,
-                               spacing=f'ico{ico}', initial_time=initial_time, size=(1000, 500), time_label=time_label)
-        if save_fig:
-            fname += '_3D'
-            if force_fsaverage:
-                fname += '_fsaverage'
-            if mask_negatives:
-                fname += '_masked'
-            os.makedirs(fig_path + '/svg/', exist_ok=True)
-            brain.save_image(filename=fig_path + fname + '.png')
-            brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
-            if not estimate_covariance:
-                brain.save_movie(filename=fig_path + fname + '.mp4', time_dilation=12, framerate=30)
+        brain = stc.plot_3d(src=src, subject=subject, subjects_dir=subjects_dir, hemi=hemi, views=views, clim=clim,
+                            initial_time=initial_time, size=(1000, 500), time_label=time_label, brain_kwargs=dict(surf='pial', alpha=alpha))
 
-    elif surf_vol == 'surface':
-        # 3D plot
-        brain = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, hemi='split', clim=clim, surface='pial', alpha=alpha,
-                         spacing=f'ico{ico}', initial_time=initial_time, views='lateral', size=(1000, 500))
         if save_fig:
-            fname += '_3D'
+            view_fname = fname + f'_3D'
             if force_fsaverage:
-                fname += '_fsaverage'
+                view_fname += '_fsaverage'
             if mask_negatives:
-                fname += '_masked'
+                view_fname += '_masked'
             os.makedirs(fig_path + '/svg/', exist_ok=True)
-            brain.save_image(filename=fig_path + fname + '.png')
-            brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
-            if not estimate_covariance:
-              brain.save_movie(filename=fig_path + fname + '.mp4', time_dilation=12, framerate=30)
+            brain.save_image(filename=fig_path + view_fname + '.png')
+            brain.save_image(filename=fig_path + '/svg/' + view_fname + '.pdf')
+            if save_vid and not estimate_covariance:
+                try:
+                    brain.save_movie(filename=fig_path + view_fname + '.mp4', time_dilation=12, framerate=30)
+                except:
+                    pass
+
+    # 3D plot
+    elif surf_vol == 'surface':
+
+        brain = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, hemi=hemi, clim=clim, initial_time=initial_time, views=views, size=(1000, 500),
+                         brain_kwargs=dict(surf='pial', alpha=alpha))
+
+        if save_fig:
+            view_fname = fname + f'_3D'
+            if force_fsaverage:
+                view_fname += '_fsaverage'
+            if mask_negatives:
+                view_fname += '_masked'
+            os.makedirs(fig_path + '/svg/', exist_ok=True)
+            brain.save_image(filename=fig_path + view_fname + '.png')
+            brain.save_image(filename=fig_path + '/svg/' + view_fname + '.pdf')
+            if save_vid and not estimate_covariance:
+                try:
+                    brain.save_movie(filename=fig_path + view_fname + '.mp4', time_dilation=12, framerate=30)
+                except:
+                    pass
+
+    return brain
