@@ -379,11 +379,11 @@ for param in param_values.keys():
 
             # Compute subjects difference
             power_data_dif = []
-            for i in range(len(power_data[param][comparison[np.argmax(comparison)]])):
+            for i in range(len(power_data[param][comparison[0]])):
                 power_data_dif.append(power_data[param][comparison[0]][i] - power_data[param][comparison[1]][i])
             if run_itc:
                 itc_data_dif = []
-                for i in range(len(itc_data[param][comparison[np.argmax(comparison)]])):
+                for i in range(len(itc_data[param][comparison[0]])):
                     itc_data_dif.append(itc_data[param][comparison[0]][i] - itc_data[param][comparison[1]][i])
 
             # To use subjects difference
