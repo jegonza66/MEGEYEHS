@@ -390,7 +390,7 @@ for param in param_values.keys():
             if plot_individuals:
                 fname = f'{subject.subject_id}'
                 plot_general.sources(stc=stc, src=src, subject=subject_code, subjects_dir=subjects_dir, initial_time=initial_time, surf_vol=surf_vol,
-                                     force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, pick_ori=pick_ori, mask_negatives=mask_negatives,
+                                     force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, mask_negatives=mask_negatives,
                                      positive_cbar=positive_cbar, views=['lat', 'med'], save_fig=save_fig, save_vid=False, fig_path=fig_path, fname=fname)
 
         # Grand Average: Average evoked stcs from this epoch_id
@@ -428,7 +428,7 @@ for param in param_values.keys():
         if plot_ga:
             fname = 'GA'
             brain = plot_general.sources(stc=GA_stc, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=initial_time, surf_vol=surf_vol,
-                                         force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, pick_ori=pick_ori, mask_negatives=mask_negatives,
+                                         force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, mask_negatives=mask_negatives,
                                          positive_cbar=positive_cbar, views=['lat', 'med'], save_fig=save_fig, save_vid=True, fig_path=fig_path, fname=fname)
 
         # --------- Test significance compared to baseline --------- #
@@ -447,7 +447,7 @@ for param in param_values.keys():
                 # --------- Plot GA significant clusters ---------#
                 fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
                 brain = plot_general.sources(stc=GA_stc_sig, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0, surf_vol=surf_vol,
-                                     time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, pick_ori=pick_ori, views=['lat', 'med'],
+                                     time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, views=['lat', 'med'],
                                      mask_negatives=mask_negatives, positive_cbar=True, save_vid=False, save_fig=save_fig, fig_path=fig_path, fname=fname)
 
             # If time variable, visualize clusters using mne's function
@@ -455,7 +455,7 @@ for param in param_values.keys():
                 fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
                 brain = plot_general.sources(stc=stc_all_cluster_vis, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0,
                                              surf_vol=surf_vol, time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance,
-                                             pick_ori=pick_ori, views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=True,
+                                             views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=True,
                                              save_vid=False, save_fig=save_fig, fig_path=fig_path, fname=fname)
 
 
@@ -477,7 +477,7 @@ for param in param_values.keys():
 
             # Get subjects difference
             stcs_diff = []
-            for i in range(len(stcs_default_dict[param][comparison[np.argmax(comparison)]])):
+            for i in range(len(stcs_default_dict[param][comparison[0]])):
                 stcs_diff.append(stcs_default_dict[param][comparison[0]][i] - stcs_default_dict[param][comparison[1]][i])
 
             # Average evoked stcs
@@ -501,12 +501,8 @@ for param in param_values.keys():
             if plot_ga:
                 fname = f'GA'
                 brain = plot_general.sources(stc=GA_stc_diff, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0.408, surf_vol=surf_vol,
-                                             pick_ori=pick_ori, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, mask_negatives=mask_negatives,
-                                             views=['cor'], save_vid=False, save_fig=False, fig_path=fig_path_diff, fname=fname, positive_cbar=True, hemi='both')
-
-            GA_stc_diff_crop = GA_stc_diff.copy().crop(tmin=0.2, tmax=0.4)
-            GA_stc_diff_crop_mean = GA_stc_diff_crop.mean()
-
+                                             force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, mask_negatives=mask_negatives,
+                                             views=['lat', 'med'], save_vid=False, save_fig=save_fig, fig_path=fig_path_diff, fname=fname, positive_cbar=True)
 
             #--------- Cluster permutations test ---------#
             if run_permutations_diff and pick_ori != 'vector':
@@ -524,12 +520,12 @@ for param in param_values.keys():
                     fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
                     brain = plot_general.sources(stc=GA_stc_diff_sig, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0,
                                                  surf_vol=surf_vol, time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance,
-                                                 pick_ori=pick_ori, views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=True,
+                                                 views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=True,
                                                  save_vid=False, save_fig=save_fig, fig_path=fig_path_diff, fname=fname)
 
                 elif significance_mask is not None:
                     fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
                     brain = plot_general.sources(stc=stc_all_cluster_vis, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0,
                                                  surf_vol=surf_vol, time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance,
-                                                 pick_ori=pick_ori, views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=True,
+                                                 views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=True,
                                                  save_vid=False, save_fig=save_fig, fig_path=fig_path_diff, fname=fname)
