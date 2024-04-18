@@ -614,7 +614,7 @@ def mri_meg_alignment(subject, subject_code, dig, subjects_dir=os.path.join(path
                                      coord_frame='meg', mri_fiducials=fids_path)
 
 
-def connectivity_circle(subject, labels, con, surf_vol, connectivity_method='pli', subject_code=None, display_figs=False, save_fig=False,
+def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, connectivity_method='pli', subject_code=None, display_figs=False, save_fig=False,
                         fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fig_path):
@@ -666,7 +666,7 @@ def connectivity_circle(subject, labels, con, surf_vol, connectivity_method='pli
     fig, ax = plt.subplots(figsize=(8, 8), facecolor='black', subplot_kw=dict(polar=True))
 
     # Plot
-    mne_connectivity.viz.plot_connectivity_circle(con, label_names, n_lines=50,
+    mne_connectivity.viz.plot_connectivity_circle(con, label_names, n_lines=50, vmin=vmin, vmax=vmax,
                                                   node_angles=node_angles, node_colors=label_colors,
                                                   title=f'All-to-All Connectivity ({connectivity_method})', ax=ax,
                                                   show=display_figs)
@@ -681,8 +681,8 @@ def connectivity_circle(subject, labels, con, surf_vol, connectivity_method='pli
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_connectome', connections_num=.98,
-               node_size=10, node_color='k', linewidth=2):
+def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_connectome', connections_num=.99,
+               node_size=10, node_color='k', linewidth=2, cmap='bwr', edge_vmin=None, edge_vmax=None):
 
     # Sanity check
     if save_fig and (not fig_path):
@@ -700,50 +700,54 @@ def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, 
         label_zpos.append(np.mean(labels[idx].pos[:, 2]))
 
     # Make node position array and reescale
-    nodes_pos = np.array([label_xpos, label_ypos, label_zpos]).transpose() * 1000
+    nodes_pos = np.array([label_xpos, label_ypos, label_zpos]).transpose() * 1100
 
     # Make adjacency matrix symetric for two-way connectome
     adjacency_matrix = np.tril(adjacency_matrix) + np.tril(adjacency_matrix, -1).T
 
-    # Define edges to plot
-    if connections_num > 1:
-        edge_threshold = np.sort(adjacency_matrix, axis=None)[-int(connections_num * 2)]
-        edge_vmin = np.sort(adjacency_matrix, axis=None)[-int(connections_num * 10)]  # Set min as 10 times lower index than minimum plo
-        edge_vmax = np.sort(adjacency_matrix, axis=None)[-1]
-        if edge_vmin < 0:
-            edge_cmap = 'bwr'
+    # Plot only if at least 1 connection
+    if abs(adjacency_matrix).sum() > 0:
+        # Define edges to plot
+        if connections_num > 1:
+            edge_threshold = np.sort(adjacency_matrix, axis=None)[-int(connections_num * 2)]
+            # edge_vmin = np.sort(adjacency_matrix, axis=None)[-int(connections_num * 10)]  # Set min as 10 times lower index than minimum plo
+            # edge_vmax = np.sort(adjacency_matrix, axis=None)[-1]
+            # if edge_vmin < 0:
+            #     edge_cmap = 'bwr'
+            # else:
+            #     edge_cmap = 'Reds'
+
+        elif connections_num < 1:
+            edge_threshold = f'{connections_num*100}%'
+            # edge_vmax = adjacency_matrix.max()
+            #
+            # if adjacency_matrix.min() < 0:
+            #     edge_vmin = adjacency_matrix.min()
+            #     edge_cmap = 'bwr'
+            # else:
+            #     edge_vmin = np.sort(adjacency_matrix, axis=None)[-int((1 - connections_num * 2) * len(adjacency_matrix) ** 2)]  # set colorbar minimum as twice smaller than plot minimum
+            #     edge_cmap = 'Reds'
         else:
-            edge_cmap = 'Reds'
+            # edge_vmin = None
+            # edge_vmax = None
+            edge_threshold = None
 
-    elif connections_num < 1 :
-        edge_threshold = f'{connections_num*100}%'
-        edge_vmax = adjacency_matrix.max()
+        # Plot connectome
+        fig = plotting.plot_connectome(adjacency_matrix=adjacency_matrix, node_coords=nodes_pos, edge_threshold=edge_threshold, node_size=node_size, node_color=node_color,
+                                       edge_vmin=edge_vmin, edge_vmax=edge_vmax, edge_cmap=cmap, edge_kwargs=dict(linewidth=linewidth), colorbar=True)
 
-        if adjacency_matrix.min() < 0:
-            edge_vmin = adjacency_matrix.min()
-            edge_cmap = 'bwr'
-        else:
-            edge_vmin = np.sort(adjacency_matrix, axis=None)[-int((1 - connections_num * 2) * len(adjacency_matrix) ** 2)]  # set colorbar minimum as twice smaller than plot minimum
-            edge_cmap = 'Reds'
-    else:
-        edge_vmin = None
-        edge_vmax = None
-        edge_threshold = None
-
-    # Plot connectome
-    fig = plotting.plot_connectome(adjacency_matrix=adjacency_matrix, node_coords=nodes_pos, edge_threshold=edge_threshold, edge_vmin=edge_vmin, edge_vmax=edge_vmax,
-                                   edge_cmap=edge_cmap, node_size=node_size, node_color=node_color, edge_kwargs=dict(linewidth=linewidth))
-
-    # Save
-    if save_fig:
-        if not fname:
-            fname = f'{subject.subject_id}_connectome'
-        if subject_code == 'fsaverage' and 'fsaverage' not in fname:
-            fname += '_fsaverage'
-        save.fig(fig=fig, path=fig_path, fname=fname)
+        # Save
+        if save_fig:
+            if not fname:
+                fname = f'{subject.subject_id}_connectome'
+            if subject_code == 'fsaverage' and 'fsaverage' not in fname:
+                fname += '_fsaverage'
+            save.fig(fig=fig, path=fig_path, fname=fname)
 
 
 def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_matrix'):
+
+    matplotlib.use('TkAgg')
 
     # Sanity check
     if save_fig and (not fig_path):
@@ -757,13 +761,13 @@ def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, save_fig=Fa
         label_ypos.append(np.mean(labels[idx].pos[:, 1]))
 
     # Make adjacency matrix sorted from frontal to posterior
-    adjacency_matrix = np.maximum(adjacency_matrix, adjacency_matrix.transpose())
-    sort = np.argsort(label_ypos)
-    adjacency_matrix = np.maximum(adjacency_matrix, adjacency_matrix.transpose())
-    sorted_matrix = adjacency_matrix[sort[::-1]]
-    sorted_matrix = sorted_matrix[:, sort[::-1]]
+    sort = np.argsort(label_ypos)  # Get sorted indexes based on regions anterior-posterior order
+    adjacency_matrix = np.maximum(adjacency_matrix, adjacency_matrix.transpose())  # Make symetric
+    sorted_matrix = adjacency_matrix[sort[::-1]]  # Sort on one axis
+    sorted_matrix = sorted_matrix[:, sort[::-1]]  # Apply same sort on second axis
+    np.fill_diagonal(sorted_matrix, 0)  # Fill diagonal with 0
 
-    sorted_labels = [label_names[i] for i in sort][::-1]
+    sorted_labels = [label_names[i] for i in sort][::-1]  # Get labels in sorted order
 
     vmin = np.sort(sorted_matrix.ravel())[len(label_ypos)]
     vmax = np.sort(sorted_matrix.ravel())[-1]
@@ -786,23 +790,30 @@ def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, save_fig=Fa
             fname += '_fsaverage'
         save.fig(fig=fig, path=fig_path, fname=fname)
 
+    return sorted_matrix
 
-def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, subjects_dir, save_fig, fig_path, fname):
+
+def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, subjects_dir, save_fig, fig_path, fname, threshold=1):
+
+    try:
+        mne.viz.close_all_3d_figures()
+    except:
+        pass
 
     # Plot connectivity strength (connections from each region to other regions)
-    degree = mne_connectivity.degree(con)
+    degree = mne_connectivity.degree(connectivity=con, threshold_prop=threshold)
     if surf_vol == 'surface':
         stc = mne.labels_to_stc(labels, degree)
         stc = stc.in_label(mne.Label(src[0]["vertno"], hemi="lh") + mne.Label(src[1]["vertno"], hemi="rh"))
         hemi = 'split'
-        views = 'lateral'
+        views = ['lateral', 'med']
 
     if surf_vol == 'volume':
         stc = mne.VolSourceEstimate(degree, [src[0]["vertno"]], 0, 1, "bst_resting")
         hemi = 'both'
         views = 'dorsal'
 
-    brain = stc.plot(src=src, subject=subject_code, subjects_dir=subjects_dir, size=(1000, 500), clim=dict(kind="percent", lims=[75, 85, 95]), hemi=hemi, views=views)
+    brain = stc.plot(src=src, subject=subject_code, subjects_dir=subjects_dir, size=(1000, 500), clim=dict(kind="percent", lims=[50, 75, 95]), hemi=hemi, views=views)
     if save_fig:
         if not fname:
             fname = f'{subject.subject_id}_strength'
@@ -811,10 +822,8 @@ def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, sub
         brain.save_image(filename=fig_path + fname + '.png')
         brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
 
-    brain.close()
 
-
-def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsaverage, estimate_covariance, pick_ori, save_fig, fig_path, fname, hemi='split', views='lateral',
+def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsaverage, estimate_covariance, save_fig, fig_path, fname, hemi='split', views='lateral',
             alpha=0.75, mask_negatives=False, time_label='auto', save_vid=True, positive_cbar=None, clim=None):
 
     # Close all plot figures
@@ -837,7 +846,7 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
         # Replace positive cbar for positive / negative
         if positive_cbar == False or (stc.data.mean() - stc.data.std() <= 0 and positive_cbar != True):
             clim['pos_lims'] = clim.pop('lims')
-    print(clim)
+
     if surf_vol == 'volume':
 
         # Nutmeg plot
@@ -845,7 +854,10 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
             bg_img = paths().mri_path() + 'MNI_templates/tpl-MNI152NLin2009cAsym_res-01_T1w.nii.gz'
         else:
             bg_img = None
+
+        # Set backend
         matplotlib.use('TkAgg')
+
         fig = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, initial_time=initial_time, clim=clim, bg_img=bg_img)
         if save_fig:
             if force_fsaverage:
