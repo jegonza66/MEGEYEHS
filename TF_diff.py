@@ -30,7 +30,6 @@ chs_ids = ['parietal_occipital']
 use_ica_data = True
 corr_ans = None
 tgt_pres = None
-mss = None
 epoch_id = 'ms'
 trial_dur = None
 evt_dur = None
@@ -336,7 +335,7 @@ for mssh, mssl in [(2, 1), (4, 1), (4, 2)]:
             desired_tval = 0.01
             t_thresh = scipy.stats.t.ppf(1 - desired_tval / 2, df=degrees_of_freedom)
             # t_thresh = dict(start=0, step=0.2)
-            significant_channels = 30
+            significant_channels = 0.5
             pval_threshold = 0.05
 
             # Get channel adjacency
@@ -352,11 +351,14 @@ for mssh, mssl in [(2, 1), (4, 1), (4, 2)]:
 
             # Make clusters mask
             if type(t_thresh) == dict:
-                # If TFCE use p-vaues of voxels directly
+                # Reshape to data's shape
                 p_tfce = p_tfce.reshape(data.shape[-2:])
 
-                # Reshape to data's shape
-                clusters_mask = p_tfce < pval_threshold
+                clusters_mask_plot = p_tfce < pval_threshold
+                clusters_mask = None
+
+                # Cluster contour
+                image_args = {'mask': clusters_mask_plot, 'mask_style': 'contour'}
 
             else:
                 # Get significant clusters
@@ -368,13 +370,12 @@ for mssh, mssl in [(2, 1), (4, 1), (4, 2)]:
                 if len(significant_clusters):
                     for significant_cluster in significant_clusters:
                         clusters_mask += significant_cluster
-                    if significant_channels > 1:
-                        clusters_mask_plot = clusters_mask.sum(axis=-1) > significant_channels
-                    else:
                         clusters_mask_plot = clusters_mask.sum(axis=-1) > len(picks) * significant_channels
-                    clusters_mask_plot = clusters_mask_plot.astype(bool)
-
-            image_args = {'mask': clusters_mask_plot, 'mask_style': 'contour'}
+                        clusters_mask_plot = clusters_mask_plot.astype(bool)
+                    # Cluster contour
+                    image_args = {'mask': clusters_mask_plot, 'mask_style': 'contour'}
+                else:
+                    image_args = None
 
             # Power Plotjoint
             if type(t_thresh) == dict:
@@ -986,12 +987,12 @@ for mss in [1, 2, 4]:
                          display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path_subj, fname=fname)
 
         # Power topoplot
-        fig = power_diff.plot_topo(cmap='jet', show=display_figs, title='Power')
+        fig = power_diff.plot_topo(cmap='bwr', show=display_figs, title='Power')
         if save_fig:
             fname = f'Power_{epoch_id}_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
             save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
         # ITC topoplot
-        fig = itc_diff.plot_topo(cmap='jet', show=display_figs, title='Inter-Trial coherence')
+        fig = itc_diff.plot_topo(cmap='bwr', show=display_figs, title='Inter-Trial coherence')
         if save_fig:
             fname = f'ITC_{epoch_id}_topoch_{subject.subject_id}_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
             save.fig(fig=fig, path=trf_fig_path_subj, fname=fname)
@@ -1029,13 +1030,13 @@ for mss in [1, 2, 4]:
                      subject=None, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname)
 
     # Power topoplot
-    fig = grand_avg_power_diff.plot_topo(cmap='jet', show=display_figs, title='Power')
+    fig = grand_avg_power_diff.plot_topo(cmap='bwr', show=display_figs, title='Power')
     if save_fig:
         fname = f'GA_Power_{epoch_id}_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
         save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
     # ITC topoplot
-    fig = grand_avg_itc_diff.plot_topo(cmap='jet', show=display_figs, title='Inter-Trial coherence')
+    fig = grand_avg_itc_diff.plot_topo(cmap='bwr', show=display_figs, title='Inter-Trial coherence')
     if save_fig:
         fname = f'GA_ITC_{epoch_id}_topoch_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
         save.fig(fig=fig, path=trf_fig_path, fname=fname)

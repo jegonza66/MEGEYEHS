@@ -1,3 +1,4 @@
+import glob
 import functions_general
 import functions_analysis
 import load
@@ -28,17 +29,17 @@ else:
 #-----  Parameters -----#
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
-trial_params = {'epoch_id': 'tgt_fix_ms',
-                'corrans': [True, False],
-                'tgtpres': True,
-                'mss': None,
+trial_params = {'epoch_id': 'vs',
+                'corrans': None,
+                'tgtpres': None,
+                'mss': [1, 2, 4],
                 'reject': None,
                 'evtdur': None,
                 }
-run_comparison = True
+run_comparison = False
 
 # Select channels
-chs_ids = ['occipital']  # region_hemisphere
+chs_ids = ['parietal_occipital']  # region_hemisphere
 
 use_ica_data = True
 
@@ -46,22 +47,23 @@ use_ica_data = True
 n_cycles_div = 2.
 l_freq = 1
 h_freq = 40
-run_itc = True
+run_itc = False
 plot_edge = 0.15
 
 # Plots parameters
 # Colorbar
-vmax_power = 0.2
-vmin_power = -0.2
+vmax_power = 0.25
+vmin_power = -0.25
 vmin_itc, vmax_itc = None, None
 # plot_joint max and min topoplots
-plot_max, plot_min = True, True
+plot_max, plot_min = False, False
 
 # Baseline method
 # logratio: dividing by the mean of baseline values and taking the log
 # ratio: dividing by the mean of baseline values
 # mean: subtracting the mean of baseline values
 bline_mode = 'logratio'
+ga_plot_bline_mode = 'mean'
 
 # Topoplot bands
 topo_bands = ['Alpha', 'Alpha', 'Theta', 'Alpha']
@@ -73,7 +75,7 @@ output = 'power'
 
 # Permutations cluster test parameters
 run_permutations_ga = False
-run_permutations_dif = True
+run_permutations_dif = False
 n_permutations = 1024
 degrees_of_freedom = len(exp_info.subjects_ids) - 1
 desired_tval = 0.01
@@ -159,14 +161,37 @@ for param in param_values.keys():
         #------------ Run -------------#
         try:
             # Raise error if run_permutations == True to load data from all subjects
-            if run_permutations_ga or run_permutations_dif:
+            if run_permutations_ga or (run_comparison and run_permutations_dif):
                 raise ValueError
 
-            # Load previous power data
-            grand_avg_power = mne.time_frequency.read_tfrs(trf_save_path + grand_avg_power_fname)[0]
+            # Get files matching name with extended frequency range
+            matching_files = glob.glob(trf_save_path + grand_avg_power_fname.replace(f'{l_freq}_{h_freq}', '*'))
+            if len(matching_files):
+                for file in matching_files:
+                    l_freq_file = int(file.split('_')[-3])
+                    h_freq_file = int(file.split('_')[-2])
+                    if l_freq_file <= l_freq and h_freq_file >= h_freq:
+                        grand_avg_power = mne.time_frequency.read_tfrs(file)[0]
+
+                # Crop to desired frequencies
+                grand_avg_power = grand_avg_power.crop(fmin=l_freq, fmax=h_freq)
+            else:
+                raise ValueError
+
             if run_itc:
-                # Load previous itc data
-                grand_avg_itc = mne.time_frequency.read_tfrs(trf_save_path + grand_avg_itc_fname)[0]
+                # Get files matching name with extended frequency range
+                matching_files = glob.glob(trf_save_path + grand_avg_itc_fname.replace(f'{l_freq}_{h_freq}', '*'))
+                if len(matching_files):
+                    for file in matching_files:
+                        l_freq_file = int(file.split('_')[-3])
+                        h_freq_file = int(file.split('_')[-2])
+                        if l_freq_file <= l_freq and h_freq_file >= h_freq:
+                            grand_avg_itc = mne.time_frequency.read_tfrs(file)[0]
+
+                    # Crop to desired frequencies
+                    grand_avg_itc = grand_avg_itc.crop(fmin=l_freq, fmax=h_freq)
+                else:
+                    raise ValueError
 
         except:
             power_data[param][param_value] = []
@@ -190,10 +215,39 @@ for param in param_values.keys():
                 trf_fig_path_subj = trf_fig_path + f'{subject.subject_id}/'
 
                 try:
-                    # Load previous data
-                    power = mne.time_frequency.read_tfrs(trf_save_path + power_data_fname)[0]
+                    # Get files matching name with extended frequency range
+                    matching_files = glob.glob(trf_save_path + power_data_fname.replace(f'{l_freq}_{h_freq}', '*'))
+                    if len(matching_files):
+                        for file in matching_files:
+                            l_freq_file = int(file.split('_')[-3])
+                            h_freq_file = int(file.split('_')[-2])
+
+                            # If file contains desired frequencies, Load
+                            if l_freq_file <= l_freq and h_freq_file >= h_freq:
+                                power = mne.time_frequency.read_tfrs(file)[0]
+                                break
+                        # Crop to desired frequencies
+                        power = power.crop(fmin=l_freq, fmax=h_freq)
+                    else:
+                        raise ValueError
+
                     if run_itc:
-                        itc = mne.time_frequency.read_tfrs(trf_save_path + itc_data_fname)[0]
+                        # Get files matching name with extended frequency range
+                        matching_files = glob.glob(trf_save_path + itc_data_fname.replace(f'{l_freq}_{h_freq}', '*'))
+                        if len(matching_files):
+                            for file in matching_files:
+                                l_freq_file = int(file.split('_')[-3])
+                                h_freq_file = int(file.split('_')[-2])
+
+                                # If file contains desired frequencies, Load
+                                if l_freq_file <= l_freq and h_freq_file >= h_freq:
+                                    itc = mne.time_frequency.read_tfrs(file)[0]
+                                    break
+                            # Crop to desired frequencies
+                            itc = itc.crop(fmin=l_freq, fmax=h_freq)
+                        else:
+                            raise ValueError
+
                 except:
                     try:
                         # Load epoched data
@@ -211,7 +265,6 @@ for param in param_values.keys():
                                                                        epoch_id=run_params['epoch_id'], meg_data=meg_data, tmin=tmin, tmax=tmax,
                                                                        save_data=save_data, epochs_save_path=epochs_save_path,
                                                                        epochs_data_fname=epochs_data_fname)
-
                     # Compute power and PLI over frequencies
                     if tf_method == 'morlet':
                         power = functions_analysis.time_frequency(epochs=epochs, l_freq=l_freq, h_freq=h_freq,
@@ -281,14 +334,14 @@ for param in param_values.keys():
                 if run_permutations_ga:
                     subj_permutations_list = [power_data[param][param_value], itc_data[param][param_value]]
                 else:
-                    subj_permutations_list = []
+                    subj_permutations_list = [None] * len(titles_list)
             else:
                 ga_permutations_list = [grand_avg_power]
                 titles_list = ['Power']
                 if run_permutations_ga:
                     subj_permutations_list = [power_data[param][param_value]]
                 else:
-                    subj_permutations_list = []
+                    subj_permutations_list = [None] * len(titles_list)
 
             for grand_avg, subj_list, title in zip(ga_permutations_list, subj_permutations_list, titles_list):
 
@@ -349,13 +402,13 @@ for param in param_values.keys():
 
                 #--------- Plots ---------#
                 # Power Plotjoint
-                plot_general.tfr_plotjoint_picks(tfr=grand_avg, plot_baseline=None, bline_mode=bline_mode, vlines_times=vlines_times, timefreqs=timefreqs_joint,
+                plot_general.tfr_plotjoint_picks(tfr=grand_avg, plot_baseline=plot_baseline, bline_mode=ga_plot_bline_mode, vlines_times=vlines_times, timefreqs=timefreqs_joint,
                                                  image_args=image_args, clusters_mask=clusters_mask, chs_id=chs_id, plot_xlim=plot_xlim, plot_max=plot_max, plot_min=plot_min,
                                                  vmin=vmin_power, vmax=vmax_power, display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
 
                 # Plot Power time-frequency in time scalde axes
                 fname = f'GA_{title}_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-                plot_general.tfr_times(tfr=grand_avg, chs_id=chs_id, timefreqs_tfr=timefreqs_tfr, baseline=None, bline_mode=bline_mode,
+                plot_general.tfr_times(tfr=grand_avg, chs_id=chs_id, timefreqs_tfr=timefreqs_tfr, baseline=plot_baseline, bline_mode=ga_plot_bline_mode,
                                        plot_xlim=plot_xlim, vlines_times=vlines_times, topo_vmin=vmin_power, topo_vmax=vmax_power, subject=None, display_figs=display_figs,
                                        save_fig=save_fig, fig_path=trf_fig_path, fname=fname, vmin=vmin_power, vmax=vmax_power, fontsize=16, ticksize=18)
 

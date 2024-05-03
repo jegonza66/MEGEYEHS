@@ -153,25 +153,33 @@ if run_tfce:
     # t_thresh = dict(start=0, step=0.2)
 
     # Left
-    t_tfce_left, clusters_left, p_tfce_left, H0_left = permutation_cluster_test(X=obs_left, threshold=t_thresh,
-                                                                                n_permutations=n_permutations)
+    t_tfce_left, clusters_left, p_tfce_left, H0_left = permutation_cluster_test(X=obs_left, threshold=t_thresh, n_permutations=n_permutations)
 
     good_clusters_left_idx = np.where(p_tfce_left < pval_threshold)[0]
     significant_clusters_left = [clusters_left[i][0] for i in good_clusters_left_idx]
     # Plot significant clusters
     if len(significant_clusters_left):
         for cluster in significant_clusters_left:
-            axs[0].axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], color='green', alpha=0.3, label='Signif.')
+            xmin = (evoked.times[cluster[0]] - evoked.times[0])/(evoked.times[-1] - evoked.times[0])
+            xmax = (evoked.times[cluster[-1]] - evoked.times[0])/(evoked.times[-1] - evoked.times[0])
+            xmid = evoked.times[cluster[0]] + (evoked.times[cluster[-1]] - evoked.times[cluster[0]])/2
+            axs[0].axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], ymin=0.95, ymax=0.95, color='k')
+            # axs[0].axhline(y=axs[0].get_ylim()[1] - 5, xmin=xmin, xmax=xmax, color='k')
+            axs[0].text(x=xmid, y=axs[0].get_ylim()[1], s='*')
 
     # Right
-    t_tfce_right, clusters_right, p_tfce_right, H0_right = permutation_cluster_test(X=obs_right, threshold=t_thresh,
-                                                                                    n_permutations=n_permutations)
+    t_tfce_right, clusters_right, p_tfce_right, H0_right = permutation_cluster_test(X=obs_right, threshold=t_thresh, n_permutations=n_permutations)
     good_clusters_right_idx = np.where(p_tfce_right < 0.05)[0]
     significant_clusters_right = [clusters_right[i][0] for i in good_clusters_right_idx]
     # Plot significant clusters
     if len(significant_clusters_right):
         for cluster in significant_clusters_right:
-            axs[1].axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], color='green', alpha=0.3, label='Signif.')
+            xmin = (evoked.times[cluster[0]] - evoked.times[0]) / (evoked.times[-1] - evoked.times[0])
+            xmax = (evoked.times[cluster[-1]] - evoked.times[0]) / (evoked.times[-1] - evoked.times[0])
+            xmid = evoked.times[cluster[0]] + (evoked.times[cluster[-1]] - evoked.times[cluster[0]]) / 2
+            axs[1].axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], ymin=0.95, ymax=0.95, color='k')
+            # axs[1].axhline(y=axs[1].get_ylim()[1] - 5, xmin=xmin, xmax=xmax, color='k')
+            axs[1].text(x=xmid, y=axs[1].get_ylim()[1], s='*')
 
 
 # Put legend to 2nd ax
@@ -216,7 +224,19 @@ if save_fig:
 topo_times = [0.1, 0.3]
 topo_times_span = [0.005, 0.1]
 grand_average = mne.grand_average(ga_dict['tgt_fix_vs'], interpolate_bads=True)
-fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='jet', show=display_figs, vlim=(-60, 60))
+
+# Mascara en temporales
+picks = functions_general.pick_chs(chs_id='temporal', info=grand_average.info)
+mask = np.zeros(grand_average.data.shape)
+for ch in picks:
+    try:
+        mask[grand_average.ch_names.index(ch), :] = 1
+    except:
+        pass
+mask = mask.astype(bool)
+mask_params = dict(markersize=10, markerfacecolor="gray", alpha=0.65)
+fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='bwr', show=display_figs, vlim=(-60, 60),
+                                      mask=mask, mask_params=mask_params)
 
 if save_fig:
     fig_path = paths().plots_path() + f'Evoked_{data_type}/it_vs_tgt/'
@@ -517,11 +537,11 @@ grand_average = mne.grand_average(ga_dict['tgt_fix'], interpolate_bads=True)
 #         pass
 # mask = mask.astype(bool)
 # mask_params = dict(markersize=10, markerfacecolor="g", alpha=0.65)
-# fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='jet', show=display_figs,
+# fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='bwr', show=display_figs,
 #                                       mask=mask, mask_params=mask_params, units='a.u.', scalings=1)
 
 
-fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='jet', show=display_figs,
+fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='bwr', show=display_figs,
                                       units='a.u.', scalings=1)
 
 if save_fig:
@@ -696,7 +716,7 @@ if type(t_thresh) == dict:
 else:
      title = f'{chs_id}_t{round(t_thresh, 2)}_p{pval_threshold}'
 
-fig = grand_avg.plot_image(cmap='jet', mask=clusters_mask, mask_style='mask', mask_alpha=0.5,
+fig = grand_avg.plot_image(cmap='bwr', mask=clusters_mask, mask_style='mask', mask_alpha=0.5,
                            titles=title, axes=ax, show=display_figs)
 
 if save_fig:
@@ -890,7 +910,7 @@ if type(t_thresh) == dict:
 else:
     title = f'{chs_id}_tthresh{round(t_thresh, 2)}_pthresh{pval_threshold}'
 
-fig = grand_avg.plot_image(cmap='jet', mask=clusters_mask, mask_style='mask', mask_alpha=0.5,
+fig = grand_avg.plot_image(cmap='bwr', mask=clusters_mask, mask_style='mask', mask_alpha=0.5,
                            titles=title, axes=ax, show=display_figs)
 
 if save_fig:

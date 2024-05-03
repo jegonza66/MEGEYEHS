@@ -14,6 +14,7 @@ import itertools
 import save
 import mne_rsa
 from scipy.stats import ttest_ind, wilcoxon
+from statsmodels.stats.multitest import fdrcorrection
 
 
 # --------- Define Parameters ---------#
@@ -40,7 +41,7 @@ trial_params = {'epoch_id': ['vs', 'cross1'],
 run_comparison = True
 
 use_ica_data = True
-band_id = 'HGamma'  # Frequency band (filter sensor space)
+band_id = 'Theta'  # Frequency band (filter sensor space)
 filter_method = 'iir'  # Only for envelope connectivity
 
 # Source estimation parameters
@@ -73,7 +74,6 @@ cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
 subj_matrices = {}
 ga_matrices = {}
 
-
 # Get param to compute difference from params dictionary
 param_values = {key: value for key, value in trial_params.items() if type(value) == list}
 # Exception in case no comparison
@@ -98,16 +98,16 @@ for param in param_values.keys():
         if 'vs' in run_params['epoch_id'] and 'fix' not in run_params['epoch_id'] and 'sac' not in run_params['epoch_id']:
             trialdur = vs_dur[run_params['mss']]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
         else:
-            trialdur = None
+            trialdur = vs_dur[run_params['mss']]
 
         # Frequencies from band
         fmin, fmax = functions_general.get_freq_band(band_id=band_id)
 
         # Get time windows from epoch_id name
         map = dict(cross1={'tmin': 0, 'tmax': cross1_dur, 'plot_xlim': (None, None)},
-                   ms={'tmin': 0, 'tmax': mss_duration[None], 'plot_xlim': (None, None)},
+                   ms={'tmin': 0, 'tmax': mss_duration[run_params['mss']], 'plot_xlim': (None, None)},
                    cross2={'tmin': 0, 'tmax': cross2_dur, 'plot_xlim': (None, None)},
-                   vs={'tmin': 0, 'tmax': vs_dur[None][0], 'plot_xlim': (None, None)})
+                   vs={'tmin': 0, 'tmax': vs_dur[run_params['mss']][0], 'plot_xlim': (None, None)})
 
         tmin, tmax, _ = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], map=map)
 
@@ -136,9 +136,9 @@ for param in param_values.keys():
             band_path = 'None'
 
         run_path_data = f"Band_{band_path}/{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}" \
-                        f"_trialdur{trialdur}_evtdur{run_params['evtdur']}"
+                        f"_trialdur{trialdur}_evtdur{run_params['evtdur']}_{tmin}_{tmax}"
 
-        epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path_data + f'_{tmin}_{tmax}_bline{baseline}/'
+        epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path_data + f'_bline{baseline}/'
 
         # Source plots and data paths
         run_path_plot = run_path_data.replace('Band_None', f'Band_{band_id}')  # Replace band id for None because Epochs are the same on all bands
@@ -155,15 +155,17 @@ for param in param_values.keys():
         else:
             main_path = 'Connectivity'
             final_path = f'{connectivity_method}'
-        if standarize_con:
-            final_path += '_std'
 
         if surf_vol == 'volume':
-            fig_path = paths().plots_path() + f'{main_path}_{data_type}/' + run_path_plot + f'/{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{parcelation}_{final_path}/'
-            save_path = paths().save_path() + f'{main_path}_{data_type}/' + run_path_plot + f'/{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{parcelation}_{final_path}/'
+            fig_path = paths().plots_path() + f'{main_path}_{data_type}/' + run_path_plot + \
+                       f'/{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{parcelation}_{final_path}_std{standarize_con}/'
+            save_path = paths().save_path() + f'{main_path}_{data_type}/' + run_path_plot + \
+                        f'/{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{parcelation}_{final_path}/'
         elif surf_vol == 'surface':
-            fig_path = paths().plots_path() + f'{main_path}_{data_type}/' + run_path_plot + f'/{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{parcelation}_{final_path}/'
-            save_path = paths().save_path() + f'{main_path}_{data_type}/' + run_path_plot + f'/{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{parcelation}_{final_path}/'
+            fig_path = paths().plots_path() + f'{main_path}_{data_type}/' + run_path_plot + \
+                       f'/{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{parcelation}_{final_path}_std{standarize_con}/'
+            save_path = paths().save_path() + f'{main_path}_{data_type}/' + run_path_plot + \
+                        f'/{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{parcelation}_{final_path}/'
 
         # Save conectivity matrices
         subj_matrices[param][param_value] = []
@@ -199,7 +201,6 @@ for param in param_values.keys():
                 subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
             else:
                 subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-
 
             # --------- Coord systems alignment ---------#
             if force_fsaverage:
@@ -288,7 +289,6 @@ for param in param_values.keys():
                 # Apply filter and get source estimates
                 stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
 
-
                 # --------- Connectivity ---------#
                 if surf_vol == 'volume':
                     labels = subjects_dir + f'/{subject_code}/mri/aparc+aseg.mgz'
@@ -335,9 +335,13 @@ for param in param_values.keys():
 
             # Get connectivity matrix
             con_subj = con.get_data(output='dense')[:, :, 0]
+            con_subj = np.maximum(con_subj, con_subj.transpose())  # make symetric
+
             # Standarize
             if standarize_con:
                 con_subj = (con_subj - np.mean(con_subj)) / np.std(con_subj)
+
+            # Save for GA
             con_matrix[subj_num] = con_subj
 
             if plot_individuals:
@@ -360,13 +364,16 @@ for param in param_values.keys():
         # --------- Grand Average ---------#
         # Get connectivity matrix for GA
         ga_con_matrix = con_matrix.mean(0)
+        # Fill diagonal with 0
+        np.fill_diagonal(ga_con_matrix, 0)
 
         # Plot circle
         plot_general.connectivity_circle(subject='GA', labels=labels, surf_vol=surf_vol, con=ga_con_matrix, connectivity_method=connectivity_method, subject_code='fsaverage',
                                          display_figs=display_figs, save_fig=save_fig, fig_path=fig_path, fname='GA_circle')
 
         # Plot connectome
-        plot_general.connectome(subject='GA', labels=labels, adjacency_matrix=ga_con_matrix, subject_code='fsaverage', save_fig=save_fig, fig_path=fig_path, fname='GA_connectome')
+        plot_general.connectome(subject='GA', labels=labels, adjacency_matrix=ga_con_matrix, subject_code='fsaverage', save_fig=save_fig, fig_path=fig_path,
+                                fname='GA_connectome')
 
         # Plot matrix
         ga_sorted_matrix = plot_general.plot_con_matrix(subject='GA', labels=labels, adjacency_matrix=ga_con_matrix, subject_code='fsaverage',
@@ -410,51 +417,51 @@ for param in param_values.keys():
             #------ t-test ------#
             # Connectivity t-values variable
             t_values, p_values = wilcoxon(x=subj_matrices[param][comparison[0]], y=subj_matrices[param][comparison[1]], axis=0)
-            # Make symetric
-            t_values = np.maximum(t_values, t_values.transpose())
-            p_values = np.maximum(p_values, p_values.transpose())
 
-            # # Sort from front to back
-            # t_values = t_values[sort[::-1]]
-            # t_values = t_values[:, sort[::-1]]
-            # p_values = p_values[sort[::-1]]
-            # p_values = p_values[:, sort[::-1]]
-            #
-            # # Plot t-values and p-values
-            # fig = mne_rsa.plot_rdms([t_values, p_values], names=['t-value', 'p-value'])
-            # # Save
-            # if save_fig:
-            #     fname = f'GA_t_p'
-            #     save.fig(fig=fig, path=fig_path_diff, fname=fname)
-
-            np.fill_diagonal(p_values, 1)  # Fill diagonal with 0
             # Significance thresholds
             p_threshold = 0.05
-            t_threshold = 0.01
-            # Mask p-values
-            p_values[p_values > p_threshold] = 1
-            # Log p-values
-            log_p_values = - np.log10(p_values)
 
-            if log_p_values.any() > 0:
-                min_pvalue = sorted(set(np.sort(log_p_values, axis=None)))[1]
-                max_pvalue = sorted(set(np.sort(log_p_values, axis=None)))[-1]
+            # Make 1D arrays to run FDR correction
+            ravel_p_values = p_values.ravel()
+            rejected, corrected_pval = fdrcorrection(pvals=ravel_p_values, alpha=p_threshold)
+
+            # Reshape to regions x regions array
+            corrected_pval = np.reshape(corrected_pval, newshape=p_values.shape)
+            rejected = np.reshape(rejected, newshape=p_values.shape)
+
+            # Take significant links (in case asymetric results)
+            rejected = np.maximum(rejected, rejected.transpose())
+
+            # Discard diagonal
+            np.fill_diagonal(rejected, False)
+
+            # Mask p-values by significance
+            corrected_pval[~rejected.astype(bool)] = 1
+            log_p_values = -np.log10(corrected_pval)
+
+            # Mask t-values by significance
+            t_values[~rejected] = 0
+
+            # Plot significant t-values
+            if t_values.any() > 0:
+                min_value = sorted(set(np.sort(t_values, axis=None)))[0]/2
+                max_value = sorted(set(np.sort(t_values, axis=None)))[-1]
 
                 # Plot matrix
-                plot_general.plot_con_matrix(subject='GA', labels=labels, adjacency_matrix=log_p_values, subject_code='fsaverage',
-                                             save_fig=save_fig, fig_path=fig_path_diff, fname='GA_matrix_p')
+                plot_general.plot_con_matrix(subject='GA', labels=labels, adjacency_matrix=t_values, subject_code='fsaverage',
+                                             save_fig=save_fig, fig_path=fig_path_diff, fname='GA_matrix_t')
 
                 # Plot circle
-                plot_general.connectivity_circle(subject='GA', labels=labels, surf_vol=surf_vol, con=log_p_values, connectivity_method=connectivity_method, vmin=min_pvalue,
-                                                 vmax=max_pvalue, subject_code='fsaverage', display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_diff, fname='GA_circle_p')
+                plot_general.connectivity_circle(subject='GA', labels=labels, surf_vol=surf_vol, con=t_values, connectivity_method=connectivity_method, vmin=min_value,
+                                                 vmax=max_value, subject_code='fsaverage', display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_diff, fname='GA_circle_t')
 
                 # Plot p-values connectome
-                plot_general.connectome(subject='GA', labels=labels, adjacency_matrix=log_p_values, subject_code='fsaverage', save_fig=save_fig, fig_path=fig_path_diff,
-                                        fname=f'GA_p_con', cmap='Reds', edge_vmin=min_pvalue, edge_vmax=max_pvalue, connections_num=(log_p_values > 0).sum())
+                plot_general.connectome(subject='GA', labels=labels, adjacency_matrix=t_values, subject_code='fsaverage', save_fig=save_fig, fig_path=fig_path_diff,
+                                        fname=f'GA_t_con', cmap='Reds', edge_vmin=min_value, edge_vmax=max_value, connections_num=(log_p_values > 0).sum())
 
                 # Plot connectivity strength (connections from each region to other regions)
-                plot_general.connectivity_strength(subject='GA', subject_code='fsaverage', con=log_p_values, src=src, labels=labels, surf_vol=surf_vol,
-                                                   subjects_dir=subjects_dir, save_fig=save_fig, fig_path=fig_path_diff, fname=f'GA_strength_p')
+                plot_general.connectivity_strength(subject='GA', subject_code='fsaverage', con=t_values, src=src, labels=labels, surf_vol=surf_vol,
+                                                   subjects_dir=subjects_dir, save_fig=save_fig, fig_path=fig_path_diff, fname=f'GA_strength_t')
 
             #----- Difference -----#
             con_diff = []
@@ -467,6 +474,9 @@ for param in param_values.keys():
 
             # Take Grand Average of connectivity differences
             con_diff_ga = con_diff.mean(0)
+
+            # Fill diagonal with 0
+            np.fill_diagonal(con_diff_ga, 0)
 
             # Plot circle
             plot_general.connectivity_circle(subject='GA', labels=labels, surf_vol=surf_vol, con=con_diff_ga, connectivity_method=connectivity_method, subject_code='fsaverage',

@@ -15,7 +15,7 @@ save_path = paths().save_path()
 plot_path = paths().plots_path()
 
 
-def epochs(subject, epochs, picks, order=None, overlay=None, combine='mean', sigma=5, group_by=None, cmap='jet',
+def epochs(subject, epochs, picks, order=None, overlay=None, combine='mean', sigma=5, group_by=None, cmap='bwr',
            vmin=None, vmax=None, display_figs=True, save_fig=None, fig_path=None, fname=None):
 
     if save_fig and (not fname or not fig_path):
@@ -232,7 +232,7 @@ def fig_tf_bands(fontsize=None, ticksize=None):
 
 
 def tfr_bands(tfr, chs_id, plot_xlim=(None, None), baseline=None, bline_mode=None, dB=False, vmin=None, vmax=None, subject=None, title=None, vlines_times=[0],
-              topo_times=None, display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None, cmap='jet'):
+              topo_times=None, display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None, cmap='bwr'):
 
     # Sanity check
     if save_fig and (not fname or not fig_path):
@@ -338,7 +338,7 @@ def fig_tf_times(time_len, timefreqs_tfr, fontsize=None, ticksize=None):
 
 
 def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=None, bline_mode=None, dB=False, vmin=None, vmax=None,
-              topo_vmin=None, topo_vmax=None, subject=None, title=None, vlines_times=None, cmap='jet',
+              topo_vmin=None, topo_vmax=None, subject=None, title=None, vlines_times=None, cmap='bwr',
               display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None):
 
     # Sanity check
@@ -446,7 +446,7 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, plot_max=True, plot_min=True, vlines_times=None, cmap='jet',
+def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, plot_max=True, plot_min=True, vlines_times=None, cmap='bwr',
                   vmin=None, vmax=None, display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fname or not trf_fig_path):
@@ -495,7 +495,7 @@ def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, Non
 
 
 def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, image_args=None, clusters_mask=None,
-                        plot_max=True, plot_min=True, vmin=None, vmax=None, chs_id='mag', vlines_times=None, cmap='jet',
+                        plot_max=True, plot_min=True, vmin=None, vmax=None, chs_id='mag', vlines_times=None, cmap='bwr',
                         display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fname or not trf_fig_path):
@@ -659,8 +659,7 @@ def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, co
     node_order.extend(lh_labels[::-1])  # reverse the order
     node_order.extend(rh_labels)
 
-    node_angles = mne.viz.circular_layout(label_names, node_order, start_pos=90,
-                                          group_boundaries=[0, len(label_names) / 2])
+    node_angles = mne.viz.circular_layout(label_names, node_order, start_pos=90, group_boundaries=[0, len(label_names) / 2])
 
     # Plot the graph using node colors from the FreeSurfer parcellation
     fig, ax = plt.subplots(figsize=(8, 8), facecolor='black', subplot_kw=dict(polar=True))
@@ -682,12 +681,13 @@ def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, co
 
 
 def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_connectome', connections_num=.99,
-               node_size=10, node_color='k', linewidth=2, cmap='bwr', edge_vmin=None, edge_vmax=None):
+               node_size=10, node_color='k', linewidth=2, cmap=None, edge_vmin=None, edge_vmax=None):
 
     # Sanity check
     if save_fig and (not fig_path):
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
+    # Get parcelation labels positions
     label_names = [label.name for label in labels]
     # Get the y-location of the label
     label_xpos = list()
@@ -702,35 +702,33 @@ def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, 
     # Make node position array and reescale
     nodes_pos = np.array([label_xpos, label_ypos, label_zpos]).transpose() * 1100
 
-    # Make adjacency matrix symetric for two-way connectome
-    adjacency_matrix = np.tril(adjacency_matrix) + np.tril(adjacency_matrix, -1).T
-
     # Plot only if at least 1 connection
     if abs(adjacency_matrix).sum() > 0:
         # Define edges to plot
-        if connections_num > 1:
-            edge_threshold = np.sort(adjacency_matrix, axis=None)[-int(connections_num * 2)]
-            # edge_vmin = np.sort(adjacency_matrix, axis=None)[-int(connections_num * 10)]  # Set min as 10 times lower index than minimum plo
-            # edge_vmax = np.sort(adjacency_matrix, axis=None)[-1]
-            # if edge_vmin < 0:
-            #     edge_cmap = 'bwr'
-            # else:
-            #     edge_cmap = 'Reds'
+        if connections_num >= 1:
+            edge_threshold = sorted(np.sort(adjacency_matrix, axis=None))[-int(connections_num * 2)]
+            if not edge_vmin:
+                edge_vmin = edge_threshold
+            if not edge_vmax:
+                edge_vmax = np.sort(adjacency_matrix, axis=None)[-1]
+            if edge_vmin < 0:
+                cmap = 'bwr'
+            else:
+                cmap = 'Reds'
 
         elif connections_num < 1:
             edge_threshold = f'{connections_num*100}%'
-            # edge_vmax = adjacency_matrix.max()
-            #
-            # if adjacency_matrix.min() < 0:
-            #     edge_vmin = adjacency_matrix.min()
-            #     edge_cmap = 'bwr'
-            # else:
-            #     edge_vmin = np.sort(adjacency_matrix, axis=None)[-int((1 - connections_num * 2) * len(adjacency_matrix) ** 2)]  # set colorbar minimum as twice smaller than plot minimum
-            #     edge_cmap = 'Reds'
-        else:
-            # edge_vmin = None
-            # edge_vmax = None
-            edge_threshold = None
+            if not edge_vmax:
+                edge_vmax = adjacency_matrix.max()
+
+            if adjacency_matrix.min() < 0:
+                if not edge_vmin:
+                    edge_vmin = adjacency_matrix.min()
+                cmap = 'bwr'
+            else:
+                if not edge_vmin:
+                    edge_vmin = sorted(np.sort(adjacency_matrix, axis=None))[-int((1 - connections_num) * len(np.sort(adjacency_matrix, axis=None))**2)]  # set colorbar minimum as twice smaller than plot minimum
+                cmap = 'Reds'
 
         # Plot connectome
         fig = plotting.plot_connectome(adjacency_matrix=adjacency_matrix, node_coords=nodes_pos, edge_threshold=edge_threshold, node_size=node_size, node_color=node_color,
@@ -762,10 +760,9 @@ def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, save_fig=Fa
 
     # Make adjacency matrix sorted from frontal to posterior
     sort = np.argsort(label_ypos)  # Get sorted indexes based on regions anterior-posterior order
-    adjacency_matrix = np.maximum(adjacency_matrix, adjacency_matrix.transpose())  # Make symetric
+    # adjacency_matrix = np.maximum(adjacency_matrix, adjacency_matrix.transpose())  # Make symetric
     sorted_matrix = adjacency_matrix[sort[::-1]]  # Sort on one axis
     sorted_matrix = sorted_matrix[:, sort[::-1]]  # Apply same sort on second axis
-    np.fill_diagonal(sorted_matrix, 0)  # Fill diagonal with 0
 
     sorted_labels = [label_names[i] for i in sort][::-1]  # Get labels in sorted order
 
@@ -823,7 +820,7 @@ def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, sub
         brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
 
 
-def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsaverage, estimate_covariance, save_fig, fig_path, fname, hemi='split', views='lateral',
+def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsaverage, estimate_covariance, save_fig, fig_path, fname, surface='pial', hemi='split', views='lateral',
             alpha=0.75, mask_negatives=False, time_label='auto', save_vid=True, positive_cbar=None, clim=None):
 
     # Close all plot figures
@@ -869,7 +866,7 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
 
         # 3D plot
         brain = stc.plot_3d(src=src, subject=subject, subjects_dir=subjects_dir, hemi=hemi, views=views, clim=clim,
-                            initial_time=initial_time, size=(1000, 500), time_label=time_label, brain_kwargs=dict(surf='pial', alpha=alpha))
+                            initial_time=initial_time, size=(1000, 500), time_label=time_label, brain_kwargs=dict(surf=surface, alpha=alpha))
 
         if save_fig:
             view_fname = fname + f'_3D'
@@ -890,7 +887,7 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
     elif surf_vol == 'surface':
 
         brain = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, hemi=hemi, clim=clim, initial_time=initial_time, views=views, size=(1000, 500),
-                         brain_kwargs=dict(surf='pial', alpha=alpha))
+                         brain_kwargs=dict(surf=surface, alpha=alpha))
 
         if save_fig:
             view_fname = fname + f'_3D'
