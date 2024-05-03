@@ -7,6 +7,7 @@ import mne
 import functions_general
 
 
+
 def config(path, fname):
     """
     Try and load the run configuration and setup information.
