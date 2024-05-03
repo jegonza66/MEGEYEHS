@@ -11,6 +11,7 @@ import mne_connectivity
 from nilearn import plotting
 from itertools import compress
 
+
 save_path = paths().save_path()
 plot_path = paths().plots_path()
 
