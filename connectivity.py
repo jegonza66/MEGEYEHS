@@ -74,6 +74,7 @@ cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
 subj_matrices = {}
 ga_matrices = {}
 
+
 # Get param to compute difference from params dictionary
 param_values = {key: value for key, value in trial_params.items() if type(value) == list}
 # Exception in case no comparison
