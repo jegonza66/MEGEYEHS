@@ -216,10 +216,11 @@ def fig_psd():
 def fig_tf_bands(fontsize=None, ticksize=None):
 
     if fontsize:
-        matplotlib.rc({'font.size': fontsize})
+        params = {'axes.titlesize': fontsize}
+        plt.rcParams.update(params)
     if ticksize:
-        matplotlib.rc({'xtick.labelsize': ticksize})
-        matplotlib.rc({'ytick.labelsize': ticksize})
+        params = {'axes.labelsize': ticksize, 'legend.fontsize': ticksize, 'xtick.labelsize': ticksize, 'ytick.labelsize': ticksize}
+        plt.rcParams.update(params)
 
     fig, axes_topo = plt.subplots(3, 3, figsize=(15, 8), gridspec_kw={'width_ratios': [5, 1, 1]})
 
@@ -297,24 +298,18 @@ def tfr_bands(tfr, chs_id, plot_xlim=(None, None), baseline=None, bline_mode=Non
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def fig_tf_times(time_len, timefreqs_tfr, fontsize=None, ticksize=None):
+def fig_tf_times(time_len, figsize=(18, 5), ax_len_div=12, timefreqs_tfr=None, fontsize=None, ticksize=None):
 
     if fontsize:
-        matplotlib.rc({'font.size': fontsize})
+        params = {'axes.titlesize': fontsize}
+        plt.rcParams.update(params)
     if ticksize:
-        matplotlib.rc({'xtick.labelsize': ticksize})
-        matplotlib.rc({'ytick.labelsize': ticksize})
+        params = {'axes.labelsize': ticksize, 'legend.fontsize': ticksize, 'xtick.labelsize': ticksize, 'ytick.labelsize': ticksize}
+        plt.rcParams.update(params)
 
-    figsize = (18, 5)
-    # width_ratios = [1 for timefreq in timefreqs_tfr]
-    # height_ratios = [3.5, 2]
-    # fig, axes = plt.subplots(2, len(timefreqs_tfr), figsize=figsize, gridspec_kw={'width_ratios': width_ratios, 'height_ratios':height_ratios})
+
     fig = plt.figure(figsize=figsize)
 
-    # # Remove first row axes to adapt length
-    # for ax in axes[0, :]:
-    #     ax.remove()
-    #
     # # Define axes for topomaps
     if timefreqs_tfr:
         axes_topo = []
@@ -326,21 +321,21 @@ def fig_tf_times(time_len, timefreqs_tfr, fontsize=None, ticksize=None):
 
         # Define axis for colorbar
         start_pos = 0.075 + (i + 1) * width
-        ax_cbar = fig.add_axes([start_pos, 0.05, 0.005, 0.25])
+        ax_topo_cbar = fig.add_axes([start_pos, 0.05, 0.005, 0.25])
     else:
         axes_topo = None
-        ax_cbar = None
+        ax_topo_cbar = None
 
     # Define TFR axis
-    ax_len = time_len/12
-    ax_tfr = fig.add_axes([0.075, 0.55, ax_len, 0.3])
+    ax_tfr_len = time_len/ax_len_div
+    ax_tfr = fig.add_axes([0.075, 0.55, ax_tfr_len, 0.3])
+    ax_tfr_cbar = fig.add_axes([0.9, 0.05, 0.005, 0.3])
 
-    return fig, axes_topo, ax_tfr, ax_cbar
+    return fig, axes_topo, ax_tfr, ax_topo_cbar, ax_tfr_cbar
 
 
 def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=None, bline_mode=None, dB=False, vmin=None, vmax=None,
-              topo_vmin=None, topo_vmax=None, subject=None, title=None, vlines_times=None, cmap='bwr',
-              display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None):
+              topo_vmin=None, topo_vmax=None, title=None, vlines_times=None, cmap='bwr', display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None):
 
     # Sanity check
     if save_fig and (not fname or not fig_path):
@@ -353,24 +348,48 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
     if dB and bline_mode in ['mean', 'logratio']:
         dB = False
 
-    # Define figure
-    time_len = plot_xlim[1] - plot_xlim[0]
-    fig, axes_topo, ax_tf, ax_cbar = fig_tf_times(time_len=time_len, timefreqs_tfr=timefreqs_tfr, fontsize=fontsize, ticksize=ticksize)
+    # Apply baseline to tf plot data
+    tfr_plot = tfr.copy().apply_baseline(baseline=baseline, mode=bline_mode)
 
     # Pick plot channels
     picks = functions_general.pick_chs(chs_id=chs_id, info=tfr.info)
 
+    # Define colorbar limits if any missing
+    if (vmax != None and vmin == None):
+        vmin = -vmax
+    elif (vmin != None and vmax == None):
+        vmax = -vmin
+    elif (vmin == None and vmax == None):
+        vmin = tfr_plot.copy().pick(picks).data.mean(0).min()
+        vmax = tfr_plot.copy().pick(picks).data.mean(0).max()
+    
+    if (topo_vmax != None and topo_vmin == None):
+        topo_vmin = -topo_vmax
+    elif (topo_vmin != None and topo_vmax == None):
+        topo_vmax = -topo_vmin
+
+    # Define figure
+    time_len = plot_xlim[1] - plot_xlim[0]
+    fig, axes_topo, ax_tf, ax_topo_cbar, ax_tfr_cbar = fig_tf_times(time_len=time_len, timefreqs_tfr=timefreqs_tfr, fontsize=fontsize, ticksize=ticksize)
+
     # Plot time-frequency
-    tfr_plot = tfr.copy().apply_baseline(baseline=baseline, mode=bline_mode)
-    tfr_plot.plot(picks=picks, tmin=plot_xlim[0], tmax=plot_xlim[1], combine='mean', cmap=cmap, axes=ax_tf,
-             show=display_figs, vmin=vmin, vmax=vmax, dB=dB)
+    tfr_plot.plot(picks=picks, tmin=plot_xlim[0], tmax=plot_xlim[1], combine='mean', cmap=cmap, axes=ax_tf, show=display_figs, vmin=vmin, vmax=vmax, dB=dB, colorbar=False)
+
+    # Plot TF colorbar
+    norm = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax)
+    sm = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
+    # Get colorbar axis
+    fig.colorbar(sm, cax=ax_tfr_cbar)
+    ax_tfr_cbar.set_ylabel('Power (dB)')
 
     # Plot time markers as vertical lines
     if not vlines_times:
         vlines_times = [0]
+    ymin = ax_tf.get_ylim()[0]
+    ymax = ax_tf.get_ylim()[1]
     for t in vlines_times:
         try:
-            ax_tf.vlines(x=t, ymin=ax_tf.get_ylim()[0], ymax=ax_tf.get_ylim()[1], linestyles='--', colors='gray')
+            ax_tf.vlines(x=t, ymin=ymin, ymax=ymax, linestyles='--', colors='gray')
         except:
             pass
 
@@ -426,7 +445,8 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
         norm = matplotlib.colors.Normalize(vmin=topo_vmin, vmax=topo_vmax)
         sm = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
         # Get colorbar axis
-        fig.colorbar(sm, cax=ax_cbar)
+        fig.colorbar(sm, cax=ax_topo_cbar)
+        ax_topo_cbar.set_ylabel('Power (dB)')
 
     # Figure title
     if timefreqs_tfr:
@@ -446,6 +466,8 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
         os.makedirs(fig_path, exist_ok=True)
         save.fig(fig=fig, path=fig_path, fname=fname)
 
+    return fig, ax_tf
+
 
 def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, plot_max=True, plot_min=True, vlines_times=None, cmap='bwr',
                   vmin=None, vmax=None, display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
@@ -454,10 +476,11 @@ def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, Non
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
     if fontsize:
-        matplotlib.rc({'font.size': fontsize})
+        params = {'axes.titlesize': fontsize}
+        plt.rcParams.update(params)
     if ticksize:
-        matplotlib.rc({'xtick.labelsize': ticksize})
-        matplotlib.rc({'ytick.labelsize': ticksize})
+        params = {'axes.labelsize': ticksize, 'legend.fontsize': ticksize, 'xtick.labelsize': ticksize, 'ytick.labelsize': ticksize}
+        plt.rcParams.update(params)
 
     if plot_baseline:
         tfr_plotjoint = tfr.copy().apply_baseline(baseline=plot_baseline, mode=bline_mode)
@@ -503,10 +526,11 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
     if fontsize:
-        matplotlib.rc({'font.size': fontsize})
+        params = {'axes.titlesize': fontsize}
+        plt.rcParams.update(params)
     if ticksize:
-        matplotlib.rc({'xtick.labelsize': ticksize})
-        matplotlib.rc({'ytick.labelsize': ticksize})
+        params = {'axes.labelsize': ticksize, 'legend.fontsize': ticksize, 'xtick.labelsize': ticksize, 'ytick.labelsize': ticksize}
+        plt.rcParams.update(params)
 
     if plot_baseline:
         tfr_plotjoint = tfr.copy().apply_baseline(baseline=plot_baseline, mode=bline_mode)
@@ -623,10 +647,11 @@ def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, co
 
     # Plot fonsize params
     if fontsize:
-        matplotlib.rc({'font.size': fontsize})
+        params = {'axes.titlesize': fontsize}
+        plt.rcParams.update(params)
     if ticksize:
-        matplotlib.rc({'xtick.labelsize': ticksize})
-        matplotlib.rc({'ytick.labelsize': ticksize})
+        params = {'axes.labelsize': ticksize, 'legend.fontsize': ticksize, 'xtick.labelsize': ticksize, 'ytick.labelsize': ticksize}
+        plt.rcParams.update(params)
 
     # Get colors for each label
     if surf_vol == 'surface':

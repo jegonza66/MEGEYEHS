@@ -72,7 +72,7 @@ def var(var, path, fname):
     os.makedirs(path, exist_ok=True)
 
     # Save
-    file_path = path + fname
+    file_path = path + '/' + fname
     f = open(file_path, 'wb')
     pickle.dump(var, f)
     f.close()
@@ -95,7 +95,7 @@ def fig(fig, path, fname, save_svg=True):
     # Make dir
     os.makedirs(path, exist_ok=True)
     # Save
-    fig.savefig(path + fname + '.png')
+    fig.savefig(path + '/' + fname + '.png')
 
     if save_svg:
         # Create svg directory

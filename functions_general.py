@@ -443,8 +443,8 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
                        vs={'tmin': -cross1_dur - mss_duration[mss] - cross2_dur, 'tmax': vs_dur[mss][0],
                            'plot_xlim': (-cross1_dur - mss_duration[mss] - cross2_dur + plot_edge, vs_dur[mss][0] - plot_edge)},
                        vsend={'tmin': -2, 'tmax': cross1_dur + 1, 'plot_xlim': (-2 + plot_edge, cross1_dur + 1 - plot_edge)},
-                       sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.1, 0.25)},
-                       fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.25, 0.55)},
+                       sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.2 + plot_edge, 0.3 - plot_edge)},
+                       fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
                        blue={'tmin': -0.5, 'tmax': 5, 'plot_xlim': (-0.5 + plot_edge, 5 - plot_edge)},
                        red={'tmin': -0.5, 'tmax': 5, 'plot_xlim': (-0.5 + plot_edge, 5 - plot_edge)})
             if 'fix' in epoch_id:
@@ -470,23 +470,11 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
 
 
 def get_duration():
+
     mss_duration = {1: 2, 2: 3.5, 4: 5, None: 2}
     vs_dur = {1: (2, 9.8), 2: (3, 9.8), 4: (3.5, 9.8), None: (2, 9.8)}
     cross2_dur = 1
     cross1_dur = 0.75
-
-    # # Duration
-    # if epoch_id:
-    #     if 'ms' in epoch_id:
-    #         dur = mss_duration[mss] + cross2_dur + vs_dur[mss][0]
-    #     elif 'cross2' in epoch_id:
-    #         dur = cross2_dur + vs_dur[mss][0]  # seconds
-    #     elif 'vs' in epoch_id:
-    #         dur = vs_dur[mss][0]  # seconds
-    #     else:
-    #         dur = 0
-    # else:
-    #     dur = None
 
     return cross1_dur, cross2_dur, mss_duration, vs_dur
 

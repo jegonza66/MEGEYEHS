@@ -3,6 +3,7 @@ import functions_analysis
 import functions_general
 import mne
 import mne.beamformer as beamformer
+import save
 from paths import paths
 import load
 import setup
@@ -31,23 +32,24 @@ use_ica_data = True
 
 # Frequency band
 filter_sensors = True
-band_id = None
+band_id = 'HGamma'
+l_freq, h_freq = functions_general.get_freq_band(band_id=band_id)
 filter_method = 'iir'
 
 # Trial selection
-trial_params = {'epoch_id': ['tgt_fix_vs', 'it_fix_vs_subsampled'],  # use'+' to mix conditions (red+blue)
-                'corrans': True,
-                'tgtpres': True,
-                'mss': None,
+trial_params = {'epoch_id': ['vs'],  # use'+' to mix conditions (red+blue)
+                'corrans': None,
+                'tgtpres': None,
+                'mss': [1, 2, 4],
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
                 'evtdur': None}
 
 # Compare features
-run_comparison = True
+run_comparison = False
 
 # Baseline
-bline_mode_subj = 'mean'
-bline_mode_ga = False
+bline_mode_subj = 'db'
+bline_mode_ga = 'mean'
 plot_edge = 0.15
 
 # Source estimation parameters
@@ -58,19 +60,20 @@ ico = 5
 spacing = 5.  # Only for volume source estimation
 pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
 source_power = False
-estimate_epochs = False  # epochs and covariance cannot be both true (but they can be both false and estimate sources from evoked)
-estimate_covariance = False
+estimate_epochs = True  # epochs and covariance cannot be both true (but they can be both false and estimate sources from evoked)
+estimate_source_tf = False  #
+estimate_covariance = True
 visualize_alignment = False
 
 # Plot
 initial_time = 0.1
 positive_cbar = None  # None for free determination, False to include negative values
-plot_individuals = False
+plot_individuals = True
 plot_ga = True
 
 # Permutations test
 run_permutations_GA = True
-run_permutations_diff = True
+run_permutations_diff = False
 desired_tval = 0.01
 p_threshold = 0.05
 mask_negatives = False
@@ -95,11 +98,26 @@ else:
 # Windows durations
 cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
 
+# Adapt to hfreq model
+if band_id == 'HGamma' or band_id[0] > 40:
+    model_name = 'hfreq-' + model_name
+
 
 # --------- Freesurfer Path ---------#
 # Define Subjects_dir as Freesurfer output folder
 subjects_dir = os.path.join(paths().mri_path(), 'FreeSurfer_out')
 os.environ["SUBJECTS_DIR"] = subjects_dir
+
+# Get Source space for default subject
+if surf_vol == 'volume':
+    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_volume_ico{ico}_{int(spacing)}-src.fif'
+elif surf_vol == 'surface':
+    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_surface_ico{ico}-src.fif'
+elif surf_vol == 'mixed':
+    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_mixed_ico{ico}_{int(spacing)}-src.fif'
+
+src_default = mne.read_source_spaces(fname_src)
+
 
 # Get param to compute difference from params dictionary
 param_values = {key: value for key, value in trial_params.items() if type(value) == list}
@@ -138,7 +156,7 @@ for param in param_values.keys():
         # Get baseline duration for epoch_id
         baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=run_params['epoch_id'], mss=run_params['mss'], tmin=tmin, tmax=tmax,
                                                                           cross1_dur=cross1_dur, mss_duration=mss_duration,
-                                                                          cross2_dur=cross2_dur)
+                                                                          cross2_dur=cross2_dur, plot_edge=plot_edge)
 
         # Paths
         run_path = f"/Band_{band_id}/{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}_trialdur{trial_dur}" \
@@ -220,10 +238,10 @@ for param in param_values.keys():
                 if estimate_epochs:
                     epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
                     # Pick meg channels for source modeling
-                    epochs.pick('meg')
+                    epochs.pick('mag')
                 evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
                 # Pick meg channels for source modeling
-                evoked.pick('meg')
+                evoked.pick('mag')
             except:
                 # Get epochs
                 try:
@@ -259,12 +277,11 @@ for param in param_values.keys():
                     evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
 
                 # Pick meg channels for source modeling
-                evoked.pick('meg')
-                epochs.pick('meg')
+                evoked.pick('mag')
+                epochs.pick('mag')
 
 
             # --------- Source estimation ---------#
-
             # Estimate sources from covariance matrix
             if estimate_covariance:
                 # Covariance method
@@ -359,15 +376,6 @@ for param in param_values.keys():
 
             # Morph to default subject
             if subject_code != 'fsaverage':
-                # Get Source space for default subject
-                if surf_vol == 'volume':
-                    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_volume_ico{ico}_{int(spacing)}-src.fif'
-                elif surf_vol == 'surface':
-                    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_surface_ico{ico}-src.fif'
-                elif surf_vol == 'mixed':
-                    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_mixed_ico{ico}_{int(spacing)}-src.fif'
-
-                src_default = mne.read_source_spaces(fname_src)
 
                 # Define morph function
                 morph = mne.compute_source_morph(src=src, subject_from=subject_code, subject_to='fsaverage', src_to=src_default, subjects_dir=subjects_dir)
@@ -380,16 +388,79 @@ for param in param_values.keys():
 
             else:
                 src_default = src
-
                 stc_default = stc
 
                 # Append to fs_stcs to make GA
                 stcs_default_dict[param][param_value].append(stc)
 
+            # # Source TF
+            # if estimate_source_tf:
+            #     max_gamma_box = {'x': (-10, 10), 'y': (-95, -70), 'z': (-5, 30)}
+            #
+            #     # Extract time series from mni coords
+            #     used_voxels_mm = src_default[0]['rr'][src_default[0]['inuse'].astype(bool)] * 1000
+            #
+            #     # Get voxels in box
+            #     voxel_idx = np.where((used_voxels_mm[:, 0] > max_gamma_box['x'][0]) & (used_voxels_mm[:, 0] < max_gamma_box['x'][1]) &
+            #                          (used_voxels_mm[:, 1] > max_gamma_box['y'][0]) & (used_voxels_mm[:, 1] < max_gamma_box['y'][1]) &
+            #                          (used_voxels_mm[:, 2] > max_gamma_box['z'][0]) & (used_voxels_mm[:, 2] < max_gamma_box['z'][1]))[0]
+            #
+            #     max_gamma_voxels = src_default[0]['vertno'][voxel_idx]
+            #
+            #     # Redefine stc epochs to iterate over
+            #     stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=False)
+            #
+            #     # Morph to default subject
+            #     if subject_code != 'fsaverage':
+            #         # Define morph function
+            #         morph = mne.compute_source_morph(src=src, subject_from=subject_code, subject_to='fsaverage', src_to=src_default, subjects_dir=subjects_dir)
+            #
+            #     max_gamma_epochs = []
+            #     for stc_epoch in stc_epochs:
+            #         if subject_code:
+            #             # Apply morph
+            #             stc_default = morph.apply(stc_epoch)
+            #         epoch_stc = stc_epoch.to_data_frame()
+            #         voxels_columns = [f'VOL_{max_gamma_voxel}' for max_gamma_voxel in max_gamma_voxels]
+            #         max_gamma_epoch = epoch_stc.loc[:, epoch_stc.columns.isin(voxels_columns)].values
+            #         max_gamma_epochs.append(max_gamma_epoch)
+            #
+            #     max_gamma_array = np.array(max_gamma_epochs)
+            #     max_gamma_array = np.expand_dims(max_gamma_array, axis=1)
+            #     freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)
+            #     n_cycles = freqs / 2.
+            #     source_tf_array = mne.time_frequency.tfr_array_morlet(max_gamma_array, sfreq=epochs.info['sfreq'], freqs=freqs, n_cycles=n_cycles, output='avg_power')
+            #     source_tf = mne.time_frequency.AverageTFR(info=epochs.copy().pick(epochs.ch_names[:len(max_gamma_voxels)]).info, data=source_tf_array,
+            #                                               times=epochs.times, freqs=freqs, nave=len(max_gamma_epochs))
+            #
+            #     source_tf.crop(tmin=epochs.tmin + plot_edge, tmax=epochs.tmax - plot_edge)
+            #
+            #     if bline_mode_subj == 'db':
+            #         source_tf.data = 10 * np.log10(
+            #             source_tf.data / np.expand_dims(source_tf.copy().crop(tmin=plot_baseline[0], tmax=plot_baseline[1]).data.mean(axis=-1), axis=-1))
+            #     elif bline_mode_subj == 'ratio':
+            #         source_tf.data = source_tf.data / np.expand_dims(source_tf.copy().crop(tmin=plot_baseline[0], tmax=plot_baseline[1]).data.mean(axis=-1), axis=-1)
+            #     elif bline_mode_subj == 'mean':
+            #         source_tf.data = source_tf.data - np.expand_dims(source_tf.copy().crop(tmin=plot_baseline[0], tmax=plot_baseline[1]).data.mean(axis=-1), axis=-1)
+            #
+            #     # Save to variable
+            #     # sources_tf[param][param_value].append(source_tf)
+            #
+            #     if plot_individuals:
+            #         # Plot
+            #         fig, ax = plt.subplots(figsize=(15, 5))
+            #         source_tf.plot(axes=ax)
+            #         for t in [-cross2_dur - mss_duration[run_params['mss']], -cross2_dur, 0]:
+            #             ax.vlines(x=t, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyles='--', colors='gray')
+            #
+            #         if save_fig:
+            #             fname = f'{subject.subject_id}'
+            #         save.fig(fig=fig, path=fig_path, fname=fname)
+
             # Plot
             if plot_individuals:
                 fname = f'{subject.subject_id}'
-                plot_general.sources(stc=stc, src=src, subject=subject_code, subjects_dir=subjects_dir, initial_time=initial_time, surf_vol=surf_vol,
+                plot_general.sources(stc=stc_default, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=initial_time, surf_vol=surf_vol,
                                      force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, mask_negatives=mask_negatives,
                                      positive_cbar=positive_cbar, views=['lat', 'med'], save_fig=save_fig, save_vid=False, fig_path=fig_path, fname=fname)
 

@@ -20,8 +20,8 @@ use_ica_data = True
 force_fsaverage = False
 ico = 5
 spacing = 5.
-pick_ori = 'vector'
-high_freq = False
+pick_ori = None
+high_freq = True
 
 # Define Subjects_dir as Freesurfer output folder
 mri_path = paths().mri_path()
@@ -190,7 +190,7 @@ for subject_code in exp_info.subjects_ids:
 
         # Save
         if high_freq:
-            fname_lmcv = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}_hfreq-lcmv.fif'
+            fname_lmcv = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-hfreq-lcmv.fif'
         else:
             fname_lmcv = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-lcmv.fif'
         filters.save(fname=fname_lmcv, overwrite=True)

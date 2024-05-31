@@ -4,6 +4,7 @@ import functions_analysis
 import load
 import mne
 import plot_general
+import save
 import setup
 from paths import paths
 import matplotlib.pyplot as plt
@@ -46,18 +47,19 @@ use_ica_data = True
 
 # Power time frequency params
 n_cycles_div = 2.
-l_freq = 1
-h_freq = 40
+l_freq = 40
+h_freq = 100
 run_itc = False
 plot_edge = 0.15
 
 # Plots parameters
 # Colorbar
-vmax_power = 0.25
-vmin_power = -0.25
+vmax_power = 0.05
+vmin_power = -0.05
 vmin_itc, vmax_itc = None, None
 # plot_joint max and min topoplots
-plot_max, plot_min = False, False
+plot_max, plot_min = True, True
+overlay_broadband_power = True
 
 # Baseline method
 # logratio: dividing by the mean of baseline values and taking the log
@@ -95,6 +97,7 @@ param_values = {key: value for key, value in trial_params.items() if type(value)
 if param_values == {}:
     param_values = {list(trial_params.items())[0][0]: [list(trial_params.items())[0][1]]}
 
+
 # --------- Run ---------#
 for param in param_values.keys():
     power_data[param] = {}
@@ -112,7 +115,7 @@ for param in param_values.keys():
         #---------- Setup ----------#
         # Windows durations
         cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
-        if 'vs' in run_params['epoch_id']:
+        if 'vs' in run_params['epoch_id'] and 'fix' not in run_params['epoch_id']:
             trial_dur = vs_dur[run_params['mss']]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
         else:
             trial_dur = None
@@ -124,7 +127,7 @@ for param in param_values.keys():
                    tgt_fix_vs={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
                    sac_emap={'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.3, 2.5)},
                    hl_start={'tmin': -3, 'tmax': 35, 'plot_xlim': (-2.5, 33)})
-        tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], plot_edge=plot_edge, map=map)
+        tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], plot_edge=plot_edge)
 
         # Define time-frequency bands to plot in plot_joint
         timefreqs_joint, timefreqs_tfr, vlines_times = functions_general.get_plots_timefreqs(epoch_id=run_params['epoch_id'], mss=run_params['mss'], cross2_dur=cross2_dur,
@@ -173,6 +176,7 @@ for param in param_values.keys():
                     h_freq_file = int(file.split('_')[-2])
                     if l_freq_file <= l_freq and h_freq_file >= h_freq:
                         grand_avg_power = mne.time_frequency.read_tfrs(file)[0]
+                        break
 
                 # Crop to desired frequencies
                 grand_avg_power = grand_avg_power.crop(fmin=l_freq, fmax=h_freq)
@@ -188,6 +192,7 @@ for param in param_values.keys():
                         h_freq_file = int(file.split('_')[-2])
                         if l_freq_file <= l_freq and h_freq_file >= h_freq:
                             grand_avg_itc = mne.time_frequency.read_tfrs(file)[0]
+                            break
 
                     # Crop to desired frequencies
                     grand_avg_itc = grand_avg_itc.crop(fmin=l_freq, fmax=h_freq)
@@ -326,6 +331,7 @@ for param in param_values.keys():
                 if run_itc:
                     grand_avg_itc.save(trf_save_path + grand_avg_itc_fname, overwrite=True)
 
+
         #--------- Permutation cluster test data -----------#
         # for chs_id, timefreqs_joint in zip(chs_ids, [[(1.25, 12)], [(0.6, 10)]]):
         for chs_id in chs_ids:
@@ -344,11 +350,13 @@ for param in param_values.keys():
                 else:
                     subj_permutations_list = [None] * len(titles_list)
 
+            # Define selected channels list
+            picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg_power.info)
+
             for grand_avg, subj_list, title in zip(ga_permutations_list, subj_permutations_list, titles_list):
 
                 if run_permutations_ga:
 
-                    picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg.info)
                     permutations_test_data = [data.copy().crop(tmin=plot_xlim[0], tmax=plot_xlim[1]).pick(picks).data for data in subj_list]
                     # permutations_test_data_array = np.array([data.mean(0) for data in permutations_test_data])
                     permutations_test_data_array = np.array([data for data in permutations_test_data])
@@ -401,6 +409,7 @@ for param in param_values.keys():
                     else:
                         fname = f'GA_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
 
+
                 #--------- Plots ---------#
                 # Power Plotjoint
                 plot_general.tfr_plotjoint_picks(tfr=grand_avg, plot_baseline=plot_baseline, bline_mode=ga_plot_bline_mode, vlines_times=vlines_times, timefreqs=timefreqs_joint,
@@ -409,9 +418,33 @@ for param in param_values.keys():
 
                 # Plot Power time-frequency in time scalde axes
                 fname = f'GA_{title}_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-                plot_general.tfr_times(tfr=grand_avg, chs_id=chs_id, timefreqs_tfr=timefreqs_tfr, baseline=plot_baseline, bline_mode=ga_plot_bline_mode,
-                                       plot_xlim=plot_xlim, vlines_times=vlines_times, topo_vmin=vmin_power, topo_vmax=vmax_power, subject=None, display_figs=display_figs,
-                                       save_fig=save_fig, fig_path=trf_fig_path, fname=fname, vmin=vmin_power, vmax=vmax_power, fontsize=16, ticksize=18)
+                fig, ax_tf = plot_general.tfr_times(tfr=grand_avg, chs_id=chs_id, timefreqs_tfr=timefreqs_tfr, baseline=plot_baseline, bline_mode=ga_plot_bline_mode,
+                                                    plot_xlim=plot_xlim, vlines_times=vlines_times, vmin=vmin_power, vmax=vmax_power, topo_vmin=vmin_power, topo_vmax=vmax_power,
+                                                    display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname, fontsize=18, ticksize=18)
+
+
+                if overlay_broadband_power:
+
+                    # Crop to plot times and selected channels
+                    broadband_power = grand_avg.copy().crop(tmin=plot_xlim[0], tmax=plot_xlim[1]).pick(picks)
+
+                    # Select time index of baseline period end
+                    idx0, value0 = functions_general.find_nearest(broadband_power.times, values=grand_avg.times[0] + cross1_dur)
+
+                    # Apply mean baseline
+                    baseline_power = broadband_power.data.mean(0).mean(0) - np.mean(broadband_power.data.mean(0).mean(0)[:idx0])
+
+                    # Define axes on right side of TF plot
+                    ax_tf_r = ax_tf.twinx()
+
+                    # Plot
+                    ax_tf_r.plot(broadband_power.times, baseline_power, color=f'k', linewidth=3)
+                    ax_tf_r.set_ylabel('Average Power (dB)')
+
+                    fig.tight_layout()
+
+                    if save_fig:
+                        save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
 
 # --------- Permutation cluster test on difference between conditions -----------#
@@ -460,6 +493,7 @@ for param in param_values.keys():
                         subj_permutations_list = [power_data_dif]
                     else:
                         subj_permutations_list = []
+
 
                 for grand_avg, subj_list, title in zip(ga_permutations_list, subj_permutations_list, titles_list):
 

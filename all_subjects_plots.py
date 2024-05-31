@@ -1,4 +1,5 @@
 import pandas as pd
+import functions_general
 import plot_preproc
 from paths import paths
 import setup
@@ -11,6 +12,8 @@ save_path = paths().save_path()
 plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
+cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
+
 all_fixations = pd.DataFrame()
 all_saccades = pd.DataFrame()
 all_bh_data = pd.DataFrame()
@@ -22,6 +25,7 @@ all_corr_ans = pd.DataFrame()
 all_saccades_end = pd.DataFrame()
 all_fixations_target = pd.DataFrame()
 all_response_times_end = pd.DataFrame()
+
 
 for subject_code in exp_info.subjects_ids:
 
@@ -42,7 +46,17 @@ for subject_code in exp_info.subjects_ids:
     bh_data = subject.bh_data
     rt = pd.DataFrame(subject.rt)
     corr_ans = pd.DataFrame(subject.corr_ans)
-    mss = pd.DataFrame(subject.bh_data['Nstim'])
+    trial_mss = pd.DataFrame(subject.bh_data['Nstim'])
+
+    cross1_fixations = fixations.loc[fixations['screen'] == 'cross1']
+    ms_fixations = fixations.loc[fixations['screen'] == 'ms']
+    cross2_fixations = fixations.loc[fixations['screen'] == 'cross2']
+    vs_fixations = fixations.loc[fixations['screen'] == 'vs']
+
+    cross1_saccades = saccades.loc[saccades['screen'] == 'cross1']
+    ms_saccades = saccades.loc[saccades['screen'] == 'ms']
+    cross2_saccades = saccades.loc[saccades['screen'] == 'cross2']
+    vs_saccades = saccades.loc[saccades['screen'] == 'vs']
 
     # Saccades times distributions
     saccades_vs = saccades.loc[saccades['screen'] == 'vs']
@@ -74,12 +88,229 @@ for subject_code in exp_info.subjects_ids:
     all_saccades = pd.concat([all_saccades, saccades])
     all_bh_data = pd.concat([all_bh_data, bh_data])
     all_rt = pd.concat([all_rt, rt])
-    all_mss = pd.concat([all_mss, mss])
+    all_mss = pd.concat([all_mss, trial_mss])
     all_corr_ans = pd.concat([all_corr_ans, corr_ans])
 
+# Define all subjects class instance
+subjects = setup.all_subjects(all_fixations, all_saccades, all_bh_data, all_rt, all_corr_ans, all_mss)
 
-# Relative to end time plots
+plot_preproc.first_fixation_delay(subject=subjects)
+plot_preproc.pupil_size_increase(subject=subjects)
 
+plt.rcParams.update({'font.size': 12})
+fig, axs = plt.subplots(2, 2, figsize=(12, 7))
+
+plot_preproc.fixation_duration(subject=subjects, ax=axs[0, 0])
+plot_preproc.saccades_amplitude(subject=subjects, ax=axs[0, 1])
+plot_preproc.saccades_dir_hist(subject=subjects, fig=fig, ax=axs[1, 0])
+plot_preproc.sac_main_seq(subject=subjects, ax=axs[1, 1])
+
+fig.tight_layout()
+
+if save_fig:
+    save_path = paths().plots_path() + 'Preprocessing/' + subjects.subject_id + '/'
+    fname = f'{subjects.subject_id} Multipanel'
+    save.fig(fig=fig, path=save_path, fname=fname)
+
+
+## Fixation and saccade rates
+
+import numpy as np
+import load
+import plot_general
+import functions_general
+import setup
+import save
+import matplotlib.pyplot as plt
+from paths import paths
+
+save_fig = False
+display_figs = True
+if display_figs:
+    plt.ion()
+else:
+    plt.ioff()
+
+save_path = paths().save_path()
+plot_path = paths().plots_path()
+exp_info = setup.exp_info()
+cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
+
+# All subjects fixation and saccades rate
+all_fixations_rate = {}
+all_saccades_rate = {}
+
+for mss in [1, 2, 4]:
+    all_fixations_rate[mss] = []
+    all_saccades_rate[mss] = []
+
+    for subject_code in exp_info.subjects_ids:
+
+        subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
+        print(f'\nSubject {subject.subject_id}')
+
+        print(f'Total fixations: {subject.len_all_fix}')
+        print(f'Total saccades: {subject.len_all_sac}')
+
+        print(f'Drop fixations: {subject.len_fix_drop}')
+        print(f'Drop saccades: {subject.len_sac_drop}')
+
+        print(f'Final fixations: {len(subject.fixations)}')
+        print(f'Final saccades: {len(subject.saccades)}')
+
+        fixations = subject.fixations
+        saccades = subject.saccades
+        bh_data = subject.bh_data
+
+        mss_trials_idx = bh_data.loc[bh_data['Nstim'] == mss].index
+
+        fixations_mss = fixations.loc[fixations['mss'] == mss]
+        saccades_mss = saccades.loc[saccades['mss'] == mss]
+
+        # Consider delay since trial onset
+        fixations_mss.loc[(fixations_mss['mss'] == mss) & (fixations_mss['screen'] == 'ms'), 'delay'] += cross1_dur
+        saccades_mss.loc[(saccades_mss['mss'] == mss) & (saccades_mss['screen'] == 'ms'), 'delay'] += cross1_dur
+
+        fixations_mss.loc[(fixations_mss['mss'] == mss) & (fixations_mss['screen'] == 'cross2'), 'delay'] += cross1_dur + mss_duration[mss]
+        saccades_mss.loc[(saccades_mss['mss'] == mss) & (saccades_mss['screen'] == 'cross2'), 'delay'] += cross1_dur + mss_duration[mss]
+
+        fixations_mss.loc[(fixations_mss['mss'] == mss) & (fixations_mss['screen'] == 'vs'), 'delay'] += cross1_dur + mss_duration[mss] + cross2_dur
+        saccades_mss.loc[(saccades_mss['mss'] == mss) & (saccades_mss['screen'] == 'vs'), 'delay'] += cross1_dur + mss_duration[mss] + cross2_dur
+
+        # Sliding window
+        time_window = 0.3
+        time_step = 0.01
+        total_trial_length = cross1_dur + mss_duration[mss] + cross2_dur + vs_dur[4][0]
+
+        fixations_num = []
+        saccades_num = []
+        trials_num = []
+
+        t = 0
+        while t <= total_trial_length - time_window:
+
+            fixations_num.append(len(fixations_mss.loc[(fixations_mss['delay'] >= t) & (fixations_mss['delay'] <= t + time_window)]))
+            saccades_num.append(len(saccades_mss.loc[(saccades_mss['delay'] >= t) & (saccades_mss['delay'] <= t + time_window)]))
+
+            trials_dur = cross1_dur + mss_duration[mss] + cross2_dur + (subject.vsend - subject.vs)
+            trials_num.append(sum(trials_dur[mss_trials_idx] >= t))
+
+            t += time_step
+
+        if len(trials_num) == len(fixations_num) == len(saccades_num):
+            fixations_rate = [fixations_num[i] / trials_num[i] / time_window for i in range(len(trials_num))]
+            saccades_rate = [saccades_num[i] / trials_num[i] / time_window for i in range(len(trials_num))]
+
+        all_fixations_rate[mss].append(fixations_rate)
+        all_saccades_rate[mss].append(saccades_rate)
+
+    fixations_rate_mean = np.nanmean(all_fixations_rate[mss], axis=0)
+    fixations_rate_std = np.nanstd(all_fixations_rate[mss], axis=0)
+
+    saccades_rate_mean = np.nanmean(all_saccades_rate[mss], axis=0)
+    saccades_rate_std = np.nanstd(all_saccades_rate[mss], axis=0)
+
+    # Plot Fixations
+    fig, axes_topo, ax_tf, ax_cbar = plot_general.fig_tf_times(time_len=total_trial_length, ax_len_div=23)
+    title = f'Mean fixation rate (MSS= {mss} - Window= {int(time_window * 1000)} ms)'
+    fig.suptitle(title)
+    ax_tf.plot(np.linspace(0, total_trial_length, len(fixations_rate_mean)), fixations_rate_mean)
+    ax_tf.fill_between(x=np.linspace(0, total_trial_length, len(fixations_rate_mean)), y1=fixations_rate_mean - fixations_rate_std, y2=fixations_rate_mean + fixations_rate_std, alpha=0.5)
+
+    # Plot vlines
+    ymin = ax_tf.get_ylim()[0]
+    ymax = ax_tf.get_ylim()[1]
+    for t in [cross1_dur, cross1_dur + mss_duration[mss], cross1_dur + mss_duration[mss] + cross2_dur]:
+        ax_tf.vlines(x=t, ymin=ymin, ymax=ymax, linestyles='--', colors='gray')
+
+    # Labels
+    ax_tf.set_xlabel('Time (s)')
+    ax_tf.set_ylabel('Saccade rate (saccades/s)')
+
+    if save_fig:
+        fig_path = paths().plots_path() + 'Preprocessing/All_Subjects/'
+        save.fig(fig=fig, path=fig_path, fname=title)
+
+    # Plot Saccades
+    fig, axes_topo, ax_tf, ax_cbar = plot_general.fig_tf_times(time_len=total_trial_length, ax_len_div=23)
+    title = f'Mean saccades rate (MSS= {mss} - Window= {int(time_window * 1000)} ms)'
+    fig.suptitle(title)
+    ax_tf.plot(np.linspace(0, total_trial_length, len(fixations_rate_mean)), fixations_rate_mean)
+    ax_tf.fill_between(x=np.linspace(0, total_trial_length, len(fixations_rate_mean)), y1=fixations_rate_mean - fixations_rate_std,
+                       y2=fixations_rate_mean + fixations_rate_std, alpha=0.5)
+
+    # Plot vlines
+    ymin = ax_tf.get_ylim()[0]
+    ymax = ax_tf.get_ylim()[1]
+    for t in [cross1_dur, cross1_dur + mss_duration[mss], cross1_dur + mss_duration[mss] + cross2_dur]:
+        ax_tf.vlines(x=t, ymin=ymin, ymax=ymax, linestyles='--', colors='gray')
+
+    # Labels
+    ax_tf.set_xlabel('Time (s)')
+    ax_tf.set_ylabel('Saccade rate (saccades/s)')
+
+    if save_fig:
+        fig_path = paths().plots_path() + 'Preprocessing/All_Subjects/'
+        save.fig(fig=fig, path=fig_path, fname=title)
+
+
+# All MSS plots
+plot_edge = 0.15
+x_drop_size = int(plot_edge / time_step)
+fig1, axes_topo1, ax1, ax_cbar1 = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge*2, ax_len_div=24)
+fig2, axes_topo2, ax2, ax_cbar2 = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge*2, ax_len_div=24)
+
+for mss in [1, 2, 4]:
+
+    fixations_rate_mean = np.nanmean(all_fixations_rate[mss], axis=0)
+    fixations_rate_std = np.nanstd(all_fixations_rate[mss], axis=0)
+
+    saccades_rate_mean = np.nanmean(all_saccades_rate[mss], axis=0)
+    saccades_rate_std = np.nanstd(all_saccades_rate[mss], axis=0)
+
+    plot_x_axis = np.linspace(- cross1_dur - mss_duration[mss] - cross2_dur + plot_edge, vs_dur[4][0] - plot_edge, len(fixations_rate_mean) - x_drop_size * 2)
+
+    # Plot Fixations
+    title1 = f'Mean fixation rate (Window= {int(time_window * 1000)} ms)'
+    fig1.suptitle(title1)
+    ax1.plot(plot_x_axis, fixations_rate_mean[x_drop_size:-x_drop_size], label=f'MSS: {mss}')
+    ax1.fill_between(x=plot_x_axis, y1=fixations_rate_mean[x_drop_size:-x_drop_size] - fixations_rate_std[x_drop_size:-x_drop_size],
+                     y2=fixations_rate_mean[x_drop_size:-x_drop_size] + fixations_rate_std[x_drop_size:-x_drop_size], alpha=0.5)
+    ax1.legend()
+
+    # Labels
+    ax1.set_xlabel('Time (s)')
+    ax1.set_ylabel('Saccade rate (saccades/s)')
+
+    # Plot Saccades
+    title2 = f'Mean saccades rate (Window= {int(time_window * 1000)} ms)'
+    fig2.suptitle(title2)
+    ax2.plot(plot_x_axis, fixations_rate_mean[x_drop_size:-x_drop_size], label=f'MSS: {mss}')
+    ax2.fill_between(x=plot_x_axis, y1=fixations_rate_mean[x_drop_size:-x_drop_size] - fixations_rate_std[x_drop_size:-x_drop_size],
+                     y2=fixations_rate_mean[x_drop_size:-x_drop_size] + fixations_rate_std[x_drop_size:-x_drop_size], alpha=0.5)
+    ax2.legend()
+
+    # Labels
+    ax2.set_xlabel('Time (s)')
+    ax2.set_ylabel('Saccade rate (saccades/s)')
+
+# Plot vlines
+ymin1 = ax2.get_ylim()[0]
+ymin2 = ax2.get_ylim()[0]
+ymax1 = ax2.get_ylim()[1]
+ymax2 = ax2.get_ylim()[1]
+
+for t in [0, - cross2_dur, - mss_duration[mss] - cross2_dur]:
+    ax1.vlines(x=t, ymin=ymin1, ymax=ymax1, linestyles='--', colors='gray')
+    ax2.vlines(x=t, ymin=ymin2, ymax=ymax2, linestyles='--', colors='gray')
+
+if save_fig:
+    fig_path = paths().plots_path() + 'Preprocessing/All_Subjects/'
+    save.fig(fig=fig1, path=fig_path, fname=title1)
+    save.fig(fig=fig2, path=fig_path, fname=title2)
+
+
+## Relative to end time plots
 # Saccades
 fig, ax = plt.subplots()
 all_saccades_end.hist(range=[-2, 0], edgecolor='black', linewidth=1.2, density=True, stacked=True, ax=ax)
@@ -108,26 +339,7 @@ fname = f'Response trime trial end'
 save.fig(fig=fig, path=save_path, fname=fname)
 
 
-# Define all subjects class instance
-subjects = setup.all_subjects(all_fixations, all_saccades, all_bh_data, all_rt, all_corr_ans, all_mss)
 
-plot_preproc.first_fixation_delay(subject=subjects)
-plot_preproc.pupil_size_increase(subject=subjects)
-
-plt.rcParams.update({'font.size': 12})
-fig, axs = plt.subplots(2, 2, figsize=(12, 7))
-
-plot_preproc.fixation_duration(subject=subjects, ax=axs[0, 0])
-plot_preproc.saccades_amplitude(subject=subjects, ax=axs[0, 1])
-plot_preproc.saccades_dir_hist(subject=subjects, fig=fig, ax=axs[1, 0])
-plot_preproc.sac_main_seq(subject=subjects, ax=axs[1, 1])
-
-fig.tight_layout()
-
-if save_fig:
-    save_path = paths().plots_path() + 'Preprocessing/' + subjects.subject_id + '/'
-    fname = f'{subjects.subject_id} Multipanel'
-    save.fig(fig=fig, path=save_path, fname=fname)
 
 ## VS duration
 

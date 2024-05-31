@@ -492,7 +492,7 @@ def make_mtrf_input(input_arrays, var_name, subject, meg_data, evt_dur, cond_tri
     return input_arrays
 
 
-def fit_mtrf(meg_data, tmin, tmax, alpha, model_input, chs_id, standarize=True, n_jobs=4):
+def fit_mtrf(meg_data, tmin, tmax, model_input, chs_id, standarize=True, fit_power=False, alpha=0, n_jobs=4):
 
     # Define mTRF model
     rf = ReceptiveField(tmin, tmax, meg_data.info['sfreq'], estimator=alpha, scoring='corrcoef', verbose=False, n_jobs=n_jobs)
@@ -500,7 +500,13 @@ def fit_mtrf(meg_data, tmin, tmax, alpha, model_input, chs_id, standarize=True, 
     # Get subset channels data as array
     picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
     meg_sub = meg_data.copy().pick(picks)
+
+    # Apply hilbert and extract envelope
+    if fit_power:
+        meg_sub = meg_sub.apply_hilbert(envelope=True)
+
     meg_data_array = meg_sub.get_data()
+
     if standarize:
         # Standarize data
         print('Computing z-score...')

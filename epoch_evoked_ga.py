@@ -31,21 +31,21 @@ use_ica_data = True
 # Frequency band
 band_id = None
 # Id
-epoch_id = 'it_fix'
+epoch_id = 'it_fix_vs+tgt_fix_vs'
 # Plot channels
-chs_id = 'mag'
+chs_id = 'parietal_occipital'
 # PLots
 plot_epochs = True
-plot_gaze = True
-corr_ans = True
-tgt_pres = True
+plot_gaze = False
+corr_ans = None
+tgt_pres = None
 mss = None
-reject = None  # None to use defalt {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
+reject = None  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
 evt_dur = None
 
 # Windows durations
 cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
-if 'vs' in epoch_id:
+if 'vs' in epoch_id  and 'fix' not in epoch_id:
     trial_dur = vs_dur[mss]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
 else:
     trial_dur = None
@@ -56,15 +56,12 @@ map_times = dict(l_sac={'tmin': -0.05, 'tmax': 0.1, 'plot_xlim': (-0.05, 0.05)},
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, map=map_times)
 
 # Baseline duration
-if 'sac' in epoch_id:
-    baseline = (tmin, 0)
-elif 'fix' in epoch_id or 'fix' in epoch_id:
-    baseline = (tmin, -0.05)
-else:
-    baseline = (tmin, 0)
+baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=epoch_id, mss=mss, tmin=tmin, tmax=tmax,
+                                                                  cross1_dur=cross1_dur, mss_duration=mss_duration,
+                                                                  cross2_dur=cross2_dur)
 
 # Specific run path for saving data and plots
-run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
+run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_corrans{corr_ans}_tgtpres{tgt_pres}_trialdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
 
 # Data type
 if use_ica_data:
@@ -128,7 +125,7 @@ for subject_code in exp_info.subjects_ids:
         else:
             order = None
         sigma = 5
-        combine = 'std'
+        combine = 'gfp'
         group_by = {}
 
         # Figure file name
