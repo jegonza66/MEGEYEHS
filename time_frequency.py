@@ -31,10 +31,10 @@ else:
 #-----  Parameters -----#
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
-trial_params = {'epoch_id': 'vs',
+trial_params = {'epoch_id': 'it_fix_vs+tgt_fix_vs',
                 'corrans': None,
                 'tgtpres': None,
-                'mss': [1, 2, 4],
+                'mss': None,
                 'reject': None,
                 'evtdur': None,
                 }
@@ -46,9 +46,9 @@ chs_ids = ['parietal_occipital']  # region_hemisphere
 use_ica_data = True
 
 # Power time frequency params
-n_cycles_div = 2.
-l_freq = 40
-h_freq = 100
+n_cycles_div = None
+l_freq = 20
+h_freq = 80
 run_itc = False
 plot_edge = 0.15
 
@@ -103,7 +103,8 @@ for param in param_values.keys():
     power_data[param] = {}
     itc_data[param] = {}
     for param_value in param_values[param]:
-        # Get run parameters from
+
+        # Get run parameters from trial params
         run_params = trial_params
         # Set first value of parameters comparisons to avoid having lists in run params
         if len(param_values.keys()) > 1:
@@ -119,6 +120,12 @@ for param in param_values.keys():
             trial_dur = vs_dur[run_params['mss']]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
         else:
             trial_dur = None
+
+        # morlet wavelet n_cycles divisor based on epochs duration
+        if not n_cycles_div and 'fix' in run_params['epoch_id']:
+            n_cycles_div = 4.
+        else:
+            n_cycles_div = 2.
 
         # Get time windows from epoch_id name
         map = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[run_params['mss']], 'plot_xlim': (-cross1_dur + plot_edge, mss_duration[run_params['mss']] - plot_edge)},
