@@ -16,7 +16,7 @@ exp_info = setup.exp_info()
 
 
 #----- Save data and display figures -----#
-save_data = True
+save_data = False
 save_fig = True
 display_figs = False
 if display_figs:
@@ -29,13 +29,13 @@ else:
 # ICA vs raw data
 use_ica_data = True
 # Frequency band
-band_id = None
+band_id = 'HGamma'
 # Id
-epoch_id = 'it_fix_vs+tgt_fix_vs'
+epoch_id = 'it_fix_ms+tgt_fix_ms'
 # Plot channels
 chs_id = 'parietal_occipital'
 # PLots
-plot_epochs = True
+plot_epochs = False
 plot_gaze = False
 corr_ans = None
 tgt_pres = None
