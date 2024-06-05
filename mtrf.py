@@ -23,10 +23,10 @@ else:
 #-----  Parameters -----#
 
 # Select features (events)
-input_features = ['it_fix_vs+tgt_fix_vs', 'it_fix_ms+tgt_fix_ms', 'sac_ms+sac_vs']
+input_features = ['sac_ms', 'sac_vs']
 
 # Select channels and frequency band
-chs_id = 'mag'  # region_hemisphere (frontal_L)
+chs_id = 'parietal_occipital'  # region_hemisphere (frontal_L)
 band_id = 'HGamma'
 
 # Select trials
@@ -35,8 +35,14 @@ tgt_pres = None
 mss = None
 evt_dur = None
 
-# Use MEG power
-fit_power = True
+# TRF parameters
+standarize = True  # Standarize MEG signal
+fit_power = False  # Compute MEG power with apply_hilbert
+alpha = None  # Regularization parameter
+tmin = -0.3
+tmax = 0.6
+baseline = (tmin, -0.05)
+
 
 # Window durations
 cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
@@ -47,13 +53,6 @@ else:
 
 # ICA / RAW
 use_ica_data = True
-standarize = True
-
-# TRF parameters
-tmin = -0.3
-tmax = 0.6
-alpha = None
-baseline = (tmin, -0.05)
 
 # Specific run path for saving data and plots
 if use_ica_data:
@@ -249,20 +248,16 @@ for subject_code in exp_info.subjects_ids:
             fname = f'{feature}_{chs_id}'
             save.fig(fig=fig, fname=fname, path=fig_path_subj)
 
-bads = []
+
 grand_avg = {}
 for feature in input_features:
     # Compute grand average
     grand_avg[feature] = mne.grand_average(ga[feature], interpolate_bads=True)
-    # Append every subject bad channels
-    grand_avg[feature].info["bads"] = bads
-    # Calculate max and min plot lims excluding bad channels
-    bad_ch_idx = np.where(np.array(grand_avg[feature].info["ch_names"]) == grand_avg[feature].info["bads"])[0]
     plot_times_idx = np.where((grand_avg[feature].times > tmin) & (grand_avg[feature].times < tmax))[0]
     data = grand_avg[feature].get_data()[:, plot_times_idx]
-    ylims = [(np.delete(data, bad_ch_idx, axis=0).min() * 1.2) * 1e15, (np.delete(data, bad_ch_idx, axis=0).max() * 1.2) * 1e15]
+
     # Plot
-    fig = grand_avg[feature].plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(tmin, tmax), ylim=dict(mag=ylims), titles=feature)
+    fig = grand_avg[feature].plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(tmin, tmax), titles=feature)
 
     if save_fig:
         # Save
