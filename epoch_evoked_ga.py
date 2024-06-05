@@ -45,7 +45,7 @@ evt_dur = None
 
 # Windows durations
 cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
-if 'vs' in epoch_id  and 'fix' not in epoch_id:
+if 'vs' in epoch_id and 'fix' not in epoch_id:
     trial_dur = vs_dur[mss]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
 else:
     trial_dur = None
