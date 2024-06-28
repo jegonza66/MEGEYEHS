@@ -15,7 +15,7 @@ exp_info = setup.exp_info()
 # --------- Setup ---------#
 
 # Define surface or volume source space
-surf_vol = 'volume'
+surf_vol = 'surface'
 use_ica_data = True
 force_fsaverage = False
 ico = 5
@@ -225,7 +225,7 @@ for subject_code in exp_info.subjects_ids:
 
         # Save
         if high_freq:
-            fname_lmcv = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}_hfreq-lcmv.fif'
+            fname_lmcv = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-hfreq-lcmv.fif'
         else:
             fname_lmcv = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-lcmv.fif'
         filters.save(fname=fname_lmcv, overwrite=True)
