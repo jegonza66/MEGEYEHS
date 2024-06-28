@@ -11,10 +11,11 @@ import setup
 from mne.decoding import ReceptiveField
 from scipy import stats as stats
 from mne.stats import spatio_temporal_cluster_1samp_test, summarize_clusters_stc
+from tqdm import tqdm
 
 
-
-def define_events(subject, meg_data, epoch_id, trials=None, evt_dur=None, epoch_keys=None):
+# ---------- Epoch Data ---------- #
+def define_events(subject, meg_data, epoch_id, trial_num=None, evt_dur=None, epoch_keys=None):
     '''
 
     :param subject:
@@ -45,12 +46,12 @@ def define_events(subject, meg_data, epoch_id, trials=None, evt_dur=None, epoch_
                 epoch_keys = [key for key in epoch_keys if 'sac' not in key]
             if 'fix' not in epoch_sub_id:
                 epoch_keys = [key for key in epoch_keys if 'fix' not in key]
-            if trials != None and any('_t' in epoch_key for epoch_key in epoch_keys):
+            if trial_num != None and any('_t' in epoch_key for epoch_key in epoch_keys):
                 try:
                     if 'vsend' in epoch_sub_id or 'cross1' in epoch_sub_id:
-                        epoch_keys = [epoch_key for epoch_key in epoch_keys if epoch_key.split('_t')[-1] in trials]
+                        epoch_keys = [epoch_key for epoch_key in epoch_keys if epoch_key.split('_t')[-1] in trial_num]
                     else:
-                        epoch_keys = [epoch_key for epoch_key in epoch_keys if (epoch_key.split('_t')[-1].split('_')[0] in trials and 'end' not in epoch_key)]
+                        epoch_keys = [epoch_key for epoch_key in epoch_keys if (epoch_key.split('_t')[-1].split('_')[0] in trial_num and 'end' not in epoch_key)]
                 except:
                     print('Trial selection skipped. Epoch_id does not contain trial number.')
 
@@ -107,12 +108,10 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
 
     # Trials
     if not trial_num:
-        cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss, trial_dur=trial_dur, corr_ans=corr_ans, tgt_pres=tgt_pres)
-    else:
-        cond_trials = trial_num
+        trial_num, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss, trial_dur=trial_dur, corr_ans=corr_ans, tgt_pres=tgt_pres)
 
     # Define events
-    metadata, events, events_id, metadata_sup = define_events(subject=subject, epoch_id=epoch_id, evt_dur=evt_dur, trials=cond_trials, meg_data=meg_data)
+    metadata, events, events_id, metadata_sup = define_events(subject=subject, epoch_id=epoch_id, evt_dur=evt_dur, trial_num=trial_num, meg_data=meg_data)
     # Reject based on channel amplitude
     if reject == False:
         # Setting reject parameter to False uses No rejection (None in mne will not reject)
@@ -141,6 +140,7 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
     return epochs, events
 
 
+# ---------- Time Frequency analysis ---------- #
 def time_frequency(epochs, l_freq, h_freq, freqs_type='lin', n_cycles_div=2., average=True, return_itc=True, output='power',
                    save_data=False, trf_save_path=None, power_data_fname=None, itc_data_fname=None, n_jobs=4):
 
@@ -244,6 +244,7 @@ def get_plot_tf(tfr, plot_xlim=(None, None), plot_max=True, plot_min=True):
     return timefreqs
 
 
+# ---------- ICA ocular artifacts ---------- #
 def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', fix_id='fix_emap' , reject={'mag': 5e-12}, threshold=1.1,
                             plot_distributions=True):
     '''
@@ -346,6 +347,317 @@ def ocular_components_ploch(subject, meg_downsampled, ica, sac_id='sac_emap', fi
     return ocular_components, sac_epochs, fix_epochs
 
 
+#---------- MTRF -----------#
+def get_bad_annot_array(meg_data, subj_path, fname, save_var=True):
+    # Get bad annotations times
+    bad_annotations_idx = [i for i, annot in enumerate(meg_data.annotations.description) if
+                           ('bad' in annot or 'BAD' in annot)]
+    bad_annotations_time = meg_data.annotations.onset[bad_annotations_idx]
+    bad_annotations_duration = meg_data.annotations.duration[bad_annotations_idx]
+    bad_annotations_endtime = bad_annotations_time + bad_annotations_duration
+
+    bad_indexes = []
+    for i in range(len(bad_annotations_time)):
+        bad_annotation_span_idx = np.where(
+            np.logical_and((meg_data.times > bad_annotations_time[i]), (meg_data.times < bad_annotations_endtime[i])))[
+            0]
+        bad_indexes.append(bad_annotation_span_idx)
+
+    # Flatten all indexes and convert to array
+    bad_indexes = functions_general.flatten_list(bad_indexes)
+    bad_indexes = np.array(bad_indexes)
+
+    # Make bad annotations binary array
+    bad_annotations_array = np.ones(len(meg_data.times))
+    bad_annotations_array[bad_indexes] = 0
+
+    # Save arrays
+    if save_var:
+        save.var(var=bad_annotations_array, path=subj_path, fname=fname)
+
+    return bad_annotations_array
+
+
+def make_mtrf_input(input_arrays, var_name, subject, meg_data, evt_dur, cond_trials, epoch_keys, bad_annotations_array,
+                    subj_path, fname, save_var=True):
+
+    # Define events
+    metadata, events, _, _ = define_events(subject=subject, epoch_id=var_name, evt_dur=evt_dur, trial_num=cond_trials, meg_data=meg_data,  epoch_keys=epoch_keys)
+    # Make input arrays as 0
+    input_array = np.zeros(len(meg_data.times))
+    # Get events samples index
+    evt_idxs = events[:, 0]
+    # Set those indexes as 1
+    input_array[evt_idxs] = 1
+    # Exclude bad annotations
+    input_array = input_array * bad_annotations_array
+    # Save to all input arrays dictionary
+    input_arrays[var_name] = input_array
+
+    # Save arrays
+    if save_var:
+        save.var(var=input_array, path=subj_path, fname=fname)
+
+    return input_arrays
+
+
+def fit_mtrf(meg_data, tmin, tmax, model_input, chs_id, standarize=True, fit_power=False, alpha=0, n_jobs=4):
+
+    # Define mTRF model
+    rf = ReceptiveField(tmin, tmax, meg_data.info['sfreq'], estimator=alpha, scoring='corrcoef', verbose=False, n_jobs=n_jobs)
+
+    # Get subset channels data as array
+    picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
+    meg_sub = meg_data.copy().pick(picks)
+
+    # Apply hilbert and extract envelope
+    if fit_power:
+        meg_sub = meg_sub.apply_hilbert(envelope=True)
+
+    meg_data_array = meg_sub.get_data()
+
+    if standarize:
+        # Standarize data
+        print('Computing z-score...')
+        meg_data_array = np.expand_dims(meg_data_array, axis=0)  # Need shape (n_epochs, n_channels n_times)
+        meg_data_array = mne.decoding.Scaler(info=meg_sub.info, scalings='mean').fit_transform(meg_data_array)
+        meg_data_array = meg_data_array.squeeze()
+    # Transpose to input the model
+    meg_data_array = meg_data_array.T
+
+    # Fit TRF
+    rf.fit(model_input, meg_data_array)
+
+    return rf
+
+
+def compute_trf(subject, meg_data, trial_params, trf_params, meg_params, all_chs_regions=['frontal', 'temporal', 'central', 'parietal', 'occipital'],
+                save_data=False, trf_path=None, trf_fname=None):
+
+    print(f"Computing TRF for {trial_params['input_features']}")
+
+    # Get condition trials
+    cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=trial_params['mss'], trial_dur=trial_params['trialdur'],
+                                                                      corr_ans=trial_params['corrans'], tgt_pres=trial_params['tgtpres'])
+
+    # Bad annotations filepath
+    subj_path = paths().save_path() + f'TRF/{subject.subject_id}/'
+    fname_bad_annot = f'bad_annot_array.pkl'
+
+    try:
+        bad_annotations_array = load.var(subj_path + fname_bad_annot)
+        print(f'Loaded bad annotations array')
+    except:
+        print(f'Computing bad annotations array...')
+        bad_annotations_array = get_bad_annot_array(meg_data=meg_data, subj_path=subj_path, fname=fname_bad_annot)
+
+    # Iterate over input features
+    input_arrays = {}
+    for feature in trial_params['input_features']:
+
+        subj_path = paths().save_path() + f'TRF/{subject.subject_id}/'
+        fname_var = (f"{feature}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_tgtpres{trial_params['tgtpres']}_trialdur{trial_params['trialdur']}_"
+                     f"evtdur{trial_params['evtdur']}_array.pkl")
+
+        try:
+            input_arrays[feature] = load.var(file_path=subj_path + fname_var)
+            print(f"Loaded input array for {feature}")
+
+        except:
+            print(f'Computing input array for {feature}...')
+            # Exception for subsampled distractor fixations
+            if 'subsampled' in feature:
+                # Subsampled epochs path
+                epochs_save_id = (f"{feature}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_tgtpres{trial_params['tgtpres']}_"
+                                  f"trialdur{trial_params['trialdur']}_evtdur{trial_params['evtdur']}")
+                epochs_save_path = paths().save_path() + (f"Epochs_{meg_params['data_type']}/Band_{meg_params['band_id']}/{epochs_save_id}_{trf_params['tmin']}_"
+                                                          f"{trf_params['tmax']}_bline{trf_params['baseline']}/")
+
+                epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+
+                # Load epoched data
+                epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+
+                # Get epochs id from metadata
+                epoch_keys = epochs.metadata['id'].to_list()
+
+            else:
+                epoch_keys = None
+
+            input_arrays = make_mtrf_input(input_arrays=input_arrays, var_name=feature,
+                                           subject=subject, meg_data=meg_data, evt_dur=trial_params['evtdur'],
+                                           cond_trials=cond_trials, epoch_keys=epoch_keys,
+                                           bad_annotations_array=bad_annotations_array,
+                                           subj_path=subj_path, fname=fname_var)
+
+    # Concatenate input arrays as one
+    model_input = np.array([input_arrays[key] for key in input_arrays.keys()]).T
+
+    # All regions or selected (multiple) regions
+    if meg_params['chs_id'] == 'mag' or '_' in meg_params['chs_id']:
+        # rf as a dictionary containing the rf of each region
+        rf = {}
+        # iterate over regions
+        for chs_subset in all_chs_regions:
+            # Use only regions in channels id, or all in case of chs_id == 'mag'
+            if chs_subset in meg_params['chs_id'] or meg_params['chs_id'] == 'mag':
+                print(f'Fitting mTRF for region {chs_subset}')
+                rf[chs_subset] = fit_mtrf(meg_data=meg_data, tmin=trf_params['tmin'], tmax=trf_params['tmax'], alpha=trf_params['alpha'], fit_power=trf_params['fit_power'],
+                                                             model_input=model_input, chs_id=chs_subset, standarize=trf_params['standarize'], n_jobs=4)
+    # One region
+    else:
+        rf = fit_mtrf(meg_data=meg_data, tmin=trf_params['tmin'], tmax=trf_params['tmax'], alpha=trf_params['alpha'], fit_power=trf_params['fit_power'],
+                                                             model_input=model_input, chs_id=meg_params['chs_id'], standarize=trf_params['standarize'], n_jobs=4)
+    # Save TRF
+    if save_data:
+        save.var(var=rf, path=trf_path, fname=trf_fname)
+
+    return rf
+
+
+def make_trf_evoked(subject, rf, meg_data, evokeds, trf_params, trial_params, meg_params, display_figs=True, plot_individuals=True, save_fig=True, fig_path=None):
+    """
+    Get model coeficients as separate responses to each feature.
+
+    Parameters
+    ----------
+    subject
+    rf
+    meg_data
+    evokeds
+    trf_params
+    trial_params
+    meg_params
+    display_figs
+    plot_individuals
+    save_fig
+    fig_path
+
+    Returns
+    -------
+
+    """
+
+    # Sanity check
+    if save_fig and not fig_path:
+        raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
+
+    # Variables to store coefficients, and "evoked" data of the subject.
+    trf = {}
+    subj_evoked = {}
+    subj_evoked_list = {}
+    for i, feature in enumerate(trial_params['input_features']):
+
+        # All or multiple regions
+        if meg_params['chs_id'] == 'mag' or '_' in meg_params['chs_id']:
+
+            # Define evoked from TRF list to concatenate all
+            subj_evoked_list[feature] = []
+
+            # iterate over regions
+            for chs_idx, chs_subset in enumerate(rf.keys()):
+                # Get channels subset info
+                picks = functions_general.pick_chs(chs_id=chs_subset, info=meg_data.info)
+                meg_sub = meg_data.copy().pick(picks)
+
+                # Get TRF coeficients from chs subset
+                trf[feature] = rf[chs_subset].coef_[:, i, :]
+
+                if chs_idx == 0:
+                    # Define evoked object from arrays of TRF
+                    subj_evoked[feature] = mne.EvokedArray(data=trf[feature], info=meg_sub.info, tmin=trf_params['tmin'], baseline=trf_params['baseline'])
+                else:
+                    # Append evoked object from arrays of TRF to list, to concatenate all
+                    subj_evoked_list[feature].append(mne.EvokedArray(data=trf[feature], info=meg_sub.info, tmin=trf_params['tmin'], baseline=trf_params['baseline']))
+
+            # Concatenate evoked from al regions
+            subj_evoked[feature] = subj_evoked[feature].add_channels(subj_evoked_list[feature])
+
+        else:
+            trf[feature] = rf.coef_[:, i, :]
+            # Define evoked objects from arrays of TRF
+            subj_evoked[feature] = mne.EvokedArray(data=trf[feature], info=meg_sub.info, tmin=trf_params['tmin'], baseline=trf_params['baseline'])
+
+        # Append for Grand average
+        evokeds[feature].append(subj_evoked[feature])
+
+        # Plot
+        if plot_individuals:
+            fig = subj_evoked[feature].plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(trf_params['tmin'], trf_params['tmax']), titles=feature)
+            fig.suptitle(f'{feature}')
+
+        if save_fig:
+            # Save
+            fig_path_subj = fig_path + f'{subject.subject_id}/'
+            fname = f"{feature}_{meg_params['chs_id']}"
+            save.fig(fig=fig, fname=fname, path=fig_path_subj)
+
+    return subj_evoked, evokeds
+
+
+def trf_grand_average(feature_evokeds, trf_params, trial_params, meg_params, display_figs=False, save_fig=True, fig_path=None):
+
+    # Sanity check
+    if save_fig and not fig_path:
+        raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
+
+    grand_avg = {}
+    for feature in trial_params['input_features']:
+        # Compute grand average
+        grand_avg[feature] = mne.grand_average(feature_evokeds[feature], interpolate_bads=True)
+        plot_times_idx = np.where((grand_avg[feature].times > trf_params['tmin']) & (grand_avg[feature].times < trf_params['tmax']))[0]
+        data = grand_avg[feature].get_data()[:, plot_times_idx]
+
+        # Plot
+        fig = grand_avg[feature].plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(trf_params['tmin'], trf_params['tmax']), titles=feature)
+
+        if save_fig:
+            # Save
+            fname = f"{feature}_GA_{meg_params['chs_id']}"
+            save.fig(fig=fig, fname=fname, path=fig_path)
+
+    return grand_avg
+
+
+def reconstruct_meg_from_trf(subject, rf, meg_data,  picks,  trial_params, meg_params):
+    # Get TRF from all regions and features
+    rf_data = {}
+    for i, feature in enumerate(trial_params['input_features']):
+        chs_idx = 0
+        rf_data[feature] = np.zeros((len(picks), len(rf[list(rf.keys())[0]].delays_)))
+        for region in meg_params['chs_id'].split('_'):
+            rf_data[feature][chs_idx: chs_idx + rf[region].coef_.shape[0]] = rf[region].coef_[:, i, :]
+            chs_idx += rf[region].coef_.shape[0]
+
+    # Negative and positive time samples
+    neg_delays_len = -rf[list(rf.keys())[0]].delays_[0]
+    pos_delays_len = rf[list(rf.keys())[0]].delays_[-1] + 1  # To account for t=0
+
+    # Reconstructed signal variable
+    meg_sub = meg_data.copy().pick(picks)
+    reconstructed_data = np.zeros((len(picks), len(meg_data.times)))
+
+    for i, feature in enumerate(trial_params['input_features']):
+
+        subj_path = paths().save_path() + f'TRF/{subject.subject_id}/'
+        fname_var = (f"{feature}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_tgtpres{trial_params['tgtpres']}_trialdur{trial_params['trialdur']}_"
+                     f"evtdur{trial_params['evtdur']}_array.pkl")
+
+        input_feature = load.var(file_path=subj_path + fname_var)
+
+        print(f'Reconstructing signal from {feature}')
+        for event in tqdm(np.where(input_feature == 1)[0]):
+            reconstructed_data[:, event - neg_delays_len: event + pos_delays_len] += rf_data[feature]
+
+    reconstructed_meg = mne.io.RawArray(reconstructed_data, meg_sub.info)
+    reconstructed_meg.set_annotations(meg_sub.annotations)
+
+    return reconstructed_meg
+
+
+#----- Statistical tests -----#
+
+# ---------- Source reconstruction ---------- #
 def noise_cov(exp_info, subject, bads, use_ica_data, reject=dict(mag=4e-12), rank=None, high_freq=False):
     '''
     Compute background noise covariance matrix for source estimation.
@@ -439,87 +751,98 @@ def noise_csd(exp_info, subject, bads, use_ica_data, freqs):
 
     return noise_csd
 
-def get_bad_annot_array(meg_data, subj_path, fname, save_var=True):
-    # Get bad annotations times
-    bad_annotations_idx = [i for i, annot in enumerate(meg_data.annotations.description) if
-                           ('bad' in annot or 'BAD' in annot)]
-    bad_annotations_time = meg_data.annotations.onset[bad_annotations_idx]
-    bad_annotations_duration = meg_data.annotations.duration[bad_annotations_idx]
-    bad_annotations_endtime = bad_annotations_time + bad_annotations_duration
 
-    bad_indexes = []
-    for i in range(len(bad_annotations_time)):
-        bad_annotation_span_idx = np.where(
-            np.logical_and((meg_data.times > bad_annotations_time[i]), (meg_data.times < bad_annotations_endtime[i])))[
-            0]
-        bad_indexes.append(bad_annotation_span_idx)
+def estimate_sources_cov(subject, meg_params, trial_params,
+                         filters, active_times, rank, bline_mode_subj, save_data, cov_save_path, cov_act_fname, cov_baseline_fname, epochs_save_path, epochs_data_fname):
 
-    # Flatten all indexes and convert to array
-    bad_indexes = functions_general.flatten_list(bad_indexes)
-    bad_indexes = np.array(bad_indexes)
+    try:
+        # Load covariance matrix
+        baseline_cov = mne.read_cov(fname=cov_save_path + cov_baseline_fname)
+    except:
+        # Load epochs
+        try:
+            epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+        except:
+            # Compute epochs
+            if meg_params['data_type'] == 'ICA':
+                if meg_params['band_id'] and meg_params['filter_sensors']:
+                    meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], save_data=save_data,
+                                                  method=meg_params['filter_method'])
+                else:
+                    meg_data = load.ica_data(subject=subject)
+            elif meg_params['data_type'] == 'RAW':
+                if meg_params['band_id'] and meg_params['filter_sensors']:
+                    meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], use_ica_data=False,
+                                                  save_data=save_data, method=meg_params['filter_method'])
+                else:
+                    meg_data = subject.load_preproc_meg_data()
 
-    # Make bad annotations binary array
-    bad_annotations_array = np.ones(len(meg_data.times))
-    bad_annotations_array[bad_indexes] = 0
+            # Epoch data
+            epochs, events = epoch_data(subject=subject, meg_data=meg_data, mss=trial_params['mss'], corr_ans=trial_params['corrans'], tgt_pres=trial_params['tgtpres'],
+                                        epoch_id=trial_params['epoch_id'], tmin=trial_params['tmin'], trial_dur=trial_params['trialdur'],
+                                        tmax=trial_params['tmax'], reject=trial_params['reject'], baseline=trial_params['baseline'],
+                                        save_data=save_data, epochs_save_path=epochs_save_path,
+                                        epochs_data_fname=epochs_data_fname)
 
-    # Save arrays
-    if save_var:
-        save.var(var=bad_annotations_array, path=subj_path, fname=fname)
+        # Compute covariance matrices
+        baseline_cov = mne.cov.compute_covariance(epochs=epochs, tmin=trial_params['baseline'][0], tmax=trial_params['baseline'][1], method="shrunk", rank=dict(mag=rank))
+        # Save
+        if save_data:
+            os.makedirs(cov_save_path, exist_ok=True)
+            baseline_cov.save(fname=cov_save_path + cov_baseline_fname, overwrite=True)
 
-    return bad_annotations_array
+    try:
+        # Load covariance matrix
+        active_cov = mne.read_cov(fname=cov_save_path + cov_act_fname)
+    except:
+        # Load epochs
+        try:
+            epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+        except:
+            # Compute epochs
+            if meg_params['data_type'] == 'ICA':
+                if meg_params['band_id'] and meg_params['filter_sensors']:
+                    meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], save_data=save_data,
+                                                  method=meg_params['filter_method'])
+                else:
+                    meg_data = load.ica_data(subject=subject)
+            elif meg_params['data_type'] == 'RAW':
+                if meg_params['band_id'] and meg_params['filter_sensors']:
+                    meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], use_ica_data=False,
+                                                  save_data=save_data, method=meg_params['filter_method'])
+                else:
+                    meg_data = subject.load_preproc_meg_data()
 
-def make_mtrf_input(input_arrays, var_name, subject, meg_data, evt_dur, cond_trials, epoch_keys, bad_annotations_array,
-                    subj_path, fname, save_var=True):
+            # Epoch data
+            epochs, events = epoch_data(subject=subject, meg_data=meg_data, mss=trial_params['mss'], corr_ans=trial_params['corrans'], tgt_pres=trial_params['tgtpres'],
+                                        epoch_id=trial_params['epoch_id'], tmin=trial_params['tmin'], trial_dur=trial_params['trialdur'],
+                                        tmax=trial_params['tmax'], reject=trial_params['reject'], baseline=trial_params['baseline'],
+                                        save_data=save_data, epochs_save_path=epochs_save_path,
+                                        epochs_data_fname=epochs_data_fname)
 
-    # Define events
-    metadata, events, _, _ = define_events(subject=subject, epoch_id=var_name, evt_dur=evt_dur,
-                                           trials=cond_trials, meg_data=meg_data,  epoch_keys=epoch_keys)
-    # Make input arrays as 0
-    input_array = np.zeros(len(meg_data.times))
-    # Get events samples index
-    evt_idxs = events[:, 0]
-    # Set those indexes as 1
-    input_array[evt_idxs] = 1
-    # Exclude bad annotations
-    input_array = input_array * bad_annotations_array
-    # Save to all input arrays dictionary
-    input_arrays[var_name] = input_array
+        # Compute covariance matrices
+        active_cov = mne.cov.compute_covariance(epochs=epochs, tmin=active_times[0], tmax=active_times[1], method="shrunk", rank=dict(mag=rank))
+        # Save
+        if save_data:
+            os.makedirs(cov_save_path, exist_ok=True)
+            active_cov.save(fname=cov_save_path + cov_act_fname, overwrite=True)
 
-    # Save arrays
-    if save_var:
-        save.var(var=input_array, path=subj_path, fname=fname)
+    # Compute sources and apply baseline
+    stc_base = mne.beamformer.apply_lcmv_cov(baseline_cov, filters)
+    stc_act = mne.beamformer.apply_lcmv_cov(active_cov, filters)
 
-    return input_arrays
+    if bline_mode_subj == 'mean':
+        stc = stc_act - stc_base
+    elif bline_mode_subj == 'ratio':
+        stc = stc_act / stc_base
+    elif bline_mode_subj == 'db':
+        stc = stc_act / stc_base
+        stc.data = 10 * np.log10(stc.data)
+    else:
+        stc = stc_act
 
+    return stc
 
-def fit_mtrf(meg_data, tmin, tmax, model_input, chs_id, standarize=True, fit_power=False, alpha=0, n_jobs=4):
-
-    # Define mTRF model
-    rf = ReceptiveField(tmin, tmax, meg_data.info['sfreq'], estimator=alpha, scoring='corrcoef', verbose=False, n_jobs=n_jobs)
-
-    # Get subset channels data as array
-    picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
-    meg_sub = meg_data.copy().pick(picks)
-
-    # Apply hilbert and extract envelope
-    if fit_power:
-        meg_sub = meg_sub.apply_hilbert(envelope=True)
-
-    meg_data_array = meg_sub.get_data()
-
-    if standarize:
-        # Standarize data
-        print('Computing z-score...')
-        meg_data_array = np.expand_dims(meg_data_array, axis=0)  # Need shape (n_epochs, n_channels n_times)
-        meg_data_array = mne.decoding.Scaler(info=meg_sub.info, scalings='mean').fit_transform(meg_data_array)
-        meg_data_array = meg_data_array.squeeze()
-    # Transpose to input the model
-    meg_data_array = meg_data_array.T
-
-    # Fit TRF
-    rf.fit(model_input, meg_data_array)
-
-    return rf
 
 
 def run_source_permutations_test(src, stc, source_data, subject, exp_info, save_regions, fig_path, surf_vol, p_threshold=0.05, n_permutations=1024, desired_tval='TFCE',
@@ -582,93 +905,25 @@ def run_source_permutations_test(src, stc, source_data, subject, exp_info, save_
     return stc_all_cluster_vis, significant_voxels, significance_mask, t_thresh_name, time_label, p_threshold
 
 
-def estimate_sources_cov(subject, baseline, band_id, filter_sensors, filter_method, use_ica_data, epoch_id, mss, corr_ans, tgt_pres, trial_dur, reject, tmin, tmax,
-                         filters, active_times, rank, bline_mode_subj, save_data, cov_save_path, cov_act_fname, cov_baseline_fname, epochs_save_path, epochs_data_fname):
+def get_labels(parcelation, subjects_dir, surf_vol='surface'):
+    # Get parcelation labels
+    if surf_vol == 'surface':  # or surf_vol == 'mixed':
+        # Get labels for FreeSurfer 'aparc' cortical parcellation with 34 labels/hemi
+        fsaverage_labels = mne.read_labels_from_annot(subject='fsaverage', parc=parcelation, subjects_dir=subjects_dir)
+        # Remove 'unknown' label for fsaverage aparc labels
+        if parcelation == 'aparc':
+            print("Dropping extra 'unkown' label from lh.")
+            drop_idxs = [i for i, label in enumerate(fsaverage_labels) if 'unknown' in label.name]
+            for drop_idx in drop_idxs:
+                fsaverage_labels.pop(drop_idx)
 
-    try:
-        # Load covariance matrix
-        baseline_cov = mne.read_cov(fname=cov_save_path + cov_baseline_fname)
-    except:
-        # Load epochs
-        try:
-            epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
-        except:
-            # Compute epochs
-            if use_ica_data:
-                if band_id and filter_sensors:
-                    meg_data = load.filtered_data(subject=subject, band_id=band_id, save_data=save_data,
-                                                  method=filter_method)
-                else:
-                    meg_data = load.ica_data(subject=subject)
-            else:
-                if band_id and filter_sensors:
-                    meg_data = load.filtered_data(subject=subject, band_id=band_id, use_ica_data=False,
-                                                  save_data=save_data, method=filter_method)
-                else:
-                    meg_data = subject.load_preproc_meg_data()
+    if surf_vol == 'volume':
+        labels_fname = subjects_dir + f'/fsaverage/mri/aparc+aseg.mgz'
+        fsaverage_labels = mne.get_volume_labels_from_aseg(labels_fname, return_colors=True)
+        # Drop extra labels in fsaverage
+        drop_idxs = [i for i, label in enumerate(fsaverage_labels[0]) if (label == 'ctx-lh-corpuscallosum' or label == 'ctx-rh-corpuscallosum')]
+        for drop_idx in drop_idxs:
+            fsaverage_labels[0].pop(drop_idx)
+            fsaverage_labels[1].pop(drop_idx)
 
-            # Epoch data
-            epochs, events = epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
-                                                           epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, trial_dur=trial_dur,
-                                                           tmax=tmax, reject=reject, baseline=baseline,
-                                                           save_data=save_data, epochs_save_path=epochs_save_path,
-                                                           epochs_data_fname=epochs_data_fname)
-
-        # Compute covariance matrices
-        baseline_cov = mne.cov.compute_covariance(epochs=epochs, tmin=baseline[0], tmax=baseline[1], method="shrunk", rank=dict(mag=rank))
-        # Save
-        if save_data:
-            os.makedirs(cov_save_path, exist_ok=True)
-            baseline_cov.save(fname=cov_save_path + cov_baseline_fname, overwrite=True)
-
-    try:
-        # Load covariance matrix
-        active_cov = mne.read_cov(fname=cov_save_path + cov_act_fname)
-    except:
-        # Load epochs
-        try:
-            epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
-        except:
-            # Compute epochs
-            if use_ica_data:
-                if band_id and filter_sensors:
-                    meg_data = load.filtered_data(subject=subject, band_id=band_id, save_data=save_data,
-                                                  method=filter_method)
-                else:
-                    meg_data = load.ica_data(subject=subject)
-            else:
-                if band_id and filter_sensors:
-                    meg_data = load.filtered_data(subject=subject, band_id=band_id, use_ica_data=False,
-                                                  save_data=save_data, method=filter_method)
-                else:
-                    meg_data = subject.load_preproc_meg_data()
-
-            # Epoch data
-            epochs, events = epoch_data(subject=subject, mss=mss, corr_ans=corr_ans, tgt_pres=tgt_pres,
-                                                           epoch_id=epoch_id, meg_data=meg_data, tmin=tmin, trial_dur=trial_dur,
-                                                           tmax=tmax, reject=reject, baseline=baseline,
-                                                           save_data=save_data, epochs_save_path=epochs_save_path,
-                                                           epochs_data_fname=epochs_data_fname)
-
-        # Compute covariance matrices
-        active_cov = mne.cov.compute_covariance(epochs=epochs, tmin=active_times[0], tmax=active_times[1], method="shrunk", rank=dict(mag=rank))
-        # Save
-        if save_data:
-            os.makedirs(cov_save_path, exist_ok=True)
-            active_cov.save(fname=cov_save_path + cov_act_fname, overwrite=True)
-
-    # Compute sources and apply baseline
-    stc_base = mne.beamformer.apply_lcmv_cov(baseline_cov, filters)
-    stc_act = mne.beamformer.apply_lcmv_cov(active_cov, filters)
-
-    if bline_mode_subj == 'mean':
-        stc = stc_act - stc_base
-    elif bline_mode_subj == 'ratio':
-        stc = stc_act / stc_base
-    elif bline_mode_subj == 'db':
-        stc = stc_act / stc_base
-        stc.data = 10 * np.log10(stc.data)
-    else:
-        stc = stc_act
-
-    return stc
+    return fsaverage_labels
