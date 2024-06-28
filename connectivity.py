@@ -37,12 +37,12 @@ trial_params = {'epoch_id': ['vs', 'cross1'],
                 'reject': None,
                 'evtdur': None,
                 }
-
 run_comparison = True
 
-use_ica_data = True
-band_id = 'Theta'  # Frequency band (filter sensor space)
-filter_method = 'iir'  # Only for envelope connectivity
+meg_params = {'band_id': 'Theta',  # Frequency band (filter sensor space)
+              'filter_method': 'iir',  # Only for envelope connectivity
+              'data_type': True
+              }
 
 # Source estimation parameters
 force_fsaverage = False
@@ -102,7 +102,7 @@ for param in param_values.keys():
             trialdur = vs_dur[run_params['mss']]
 
         # Frequencies from band
-        fmin, fmax = functions_general.get_freq_band(band_id=band_id)
+        fmin, fmax = functions_general.get_freq_band(band_id=meg_params['band_id'])
 
         # Get time windows from epoch_id name
         map = dict(cross1={'tmin': 0, 'tmax': cross1_dur, 'plot_xlim': (None, None)},
@@ -124,25 +124,19 @@ for param in param_values.keys():
         subjects_dir = os.path.join(paths().mri_path(), 'FreeSurfer_out')
         os.environ["SUBJECTS_DIR"] = subjects_dir
 
-        # Data type
-        if use_ica_data:
-            data_type = 'ICA'
-        else:
-            data_type = 'RAW'
-
         # Load data paths
         if envelope_connectivity:
-            band_path = band_id
+            band_path = meg_params['band_id']
         elif not envelope_connectivity:
             band_path = 'None'
 
         run_path_data = f"Band_{band_path}/{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}" \
                         f"_trialdur{trialdur}_evtdur{run_params['evtdur']}_{tmin}_{tmax}"
 
-        epochs_save_path = paths().save_path() + f'Epochs_{data_type}/' + run_path_data + f'_bline{baseline}/'
+        epochs_save_path = paths().save_path() + f"Epochs_{meg_params['data_type']}/' + run_path_data + f'_bline{baseline}/"
 
         # Source plots and data paths
-        run_path_plot = run_path_data.replace('Band_None', f'Band_{band_id}')  # Replace band id for None because Epochs are the same on all bands
+        run_path_plot = run_path_data.replace('Band_None', f"Band_{meg_params['band_id']}")  # Replace band id for None because Epochs are the same on all bands
 
         # Set path for envelope or signal connectivity
         if envelope_connectivity:
@@ -158,15 +152,15 @@ for param in param_values.keys():
             final_path = f'{connectivity_method}'
 
         if surf_vol == 'volume':
-            fig_path = paths().plots_path() + f'{main_path}_{data_type}/' + run_path_plot + \
-                       f'/{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{parcelation}_{final_path}_std{standarize_con}/'
-            save_path = paths().save_path() + f'{main_path}_{data_type}/' + run_path_plot + \
-                        f'/{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{parcelation}_{final_path}/'
+            fig_path = paths().plots_path() + f"{main_path}_{meg_params['data_type']}/" + run_path_plot + \
+                       f"/{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{parcelation}_{final_path}_std{standarize_con}/"
+            save_path = paths().save_path() + f"{main_path}_{meg_params['data_type']}/" + run_path_plot + \
+                        f"/{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{parcelation}_{final_path}/"
         elif surf_vol == 'surface':
-            fig_path = paths().plots_path() + f'{main_path}_{data_type}/' + run_path_plot + \
-                       f'/{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{parcelation}_{final_path}_std{standarize_con}/'
-            save_path = paths().save_path() + f'{main_path}_{data_type}/' + run_path_plot + \
-                        f'/{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{parcelation}_{final_path}/'
+            fig_path = paths().plots_path() + f"{main_path}_{meg_params['data_type']}/" + run_path_plot + \
+                       f"/{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{parcelation}_{final_path}_std{standarize_con}/"
+            save_path = paths().save_path() + f"{main_path}_{meg_params['data_type']}/" + run_path_plot + \
+                        f"/{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{parcelation}_{final_path}/"
 
         # Save conectivity matrices
         subj_matrices[param][param_value] = []
@@ -198,7 +192,7 @@ for param in param_values.keys():
         # --------- Run ---------#
         for subj_num, subject_code in enumerate(exp_info.subjects_ids):
             # Load subject
-            if use_ica_data:
+            if meg_params['data_type'] == 'ICA':
                 subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
             else:
                 subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
@@ -256,14 +250,14 @@ for param in param_values.keys():
                     # Load data
                     epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
                 except:
-                    if use_ica_data:
-                        if band_id and envelope_connectivity:
-                            meg_data = load.filtered_data(subject=subject, band_id=band_id, save_data=save_data, method=filter_method)
+                    if meg_params['data_type'] == 'ICA':
+                        if meg_params['band_id'] and envelope_connectivity:
+                            meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], save_data=save_data, method=meg_params['filter_method'])
                         else:
                             meg_data = load.ica_data(subject=subject)
                     else:
-                        if band_id and envelope_connectivity:
-                            meg_data = load.filtered_data(subject=subject, band_id=band_id, use_ica_data=False, save_data=save_data, method=filter_method)
+                        if meg_params['band_id'] and envelope_connectivity:
+                            meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], use_ica_data=False, save_data=save_data, method=meg_params['filter_method'])
                         else:
                             meg_data = subject.load_preproc_meg_data()
                     try:
