@@ -31,10 +31,10 @@ else:
 #-----  Parameters -----#
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
-trial_params = {'epoch_id': 'it_fix_vs+tgt_fix_vs',
+trial_params = {'epoch_id': 'vs',
                 'corrans': None,
                 'tgtpres': None,
-                'mss': None,
+                'mss': [1, 2, 4],
                 'reject': None,
                 'evtdur': None,
                 }
@@ -46,20 +46,20 @@ chs_ids = ['parietal_occipital']  # region_hemisphere
 use_ica_data = True
 
 # Power time frequency params
-n_cycles_div = None
-l_freq = 20
-h_freq = 80
+n_cycles_div = 2.
+l_freq = 1
+h_freq = 100
 run_itc = False
 plot_edge = 0.15
 
 # Plots parameters
 # Colorbar
-vmax_power = 0.05
-vmin_power = -0.05
+vmax_power = 0.2
+vmin_power = -0.2
 vmin_itc, vmax_itc = None, None
 # plot_joint max and min topoplots
 plot_max, plot_min = True, True
-overlay_broadband_power = True
+overlay_broadband_power = False
 
 # Baseline method
 # logratio: dividing by the mean of baseline values and taking the log
@@ -134,7 +134,7 @@ for param in param_values.keys():
                    tgt_fix_vs={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
                    sac_emap={'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.3, 2.5)},
                    hl_start={'tmin': -3, 'tmax': 35, 'plot_xlim': (-2.5, 33)})
-        tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], plot_edge=plot_edge)
+        run_params['tmin'], run_params['tmax'], plot_xlim = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], plot_edge=plot_edge)
 
         # Define time-frequency bands to plot in plot_joint
         timefreqs_joint, timefreqs_tfr, vlines_times = functions_general.get_plots_timefreqs(epoch_id=run_params['epoch_id'], mss=run_params['mss'], cross2_dur=cross2_dur,
@@ -142,9 +142,10 @@ for param in param_values.keys():
                                                                                              plot_min=plot_min, plot_max=plot_max)
 
         # Get baseline duration for epoch_id
-        baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=run_params['epoch_id'], mss=run_params['mss'], tmin=tmin, tmax=tmax,
-                                                                          cross1_dur=cross1_dur, mss_duration=mss_duration,
-                                                                          cross2_dur=cross2_dur, plot_edge=plot_edge)
+        run_params['baseline'], run_params['plot_baseline'] = functions_general.get_baseline_duration(epoch_id=run_params['epoch_id'], mss=run_params['mss'],
+                                                                                                      tmin=run_params['tmin'], tmax=run_params['tmax'],
+                                                                                                      cross1_dur=cross1_dur, mss_duration=mss_duration,
+                                                                                                      cross2_dur=cross2_dur, plot_edge=plot_edge)
 
         # Specific run path for saving data and plots
         if use_ica_data:
@@ -154,14 +155,14 @@ for param in param_values.keys():
 
         # Save ids
         save_id = f"{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}_trialdur{trial_dur}_evtdur{run_params['evtdur']}"
-        plot_id = f"{save_id}_{round(plot_xlim[0],2)}_{round(plot_xlim[1], 2)}_bline{baseline}_cyc{int(n_cycles_div)}/"
+        plot_id = f"{save_id}_{round(plot_xlim[0],2)}_{round(plot_xlim[1], 2)}_bline{run_params['baseline']}_cyc{int(n_cycles_div)}/"
 
         # Save data paths
         if return_average_tfr:
-            trf_save_path = paths().save_path() + f'Time_Frequency_{data_type}/{tf_method}/{save_id}_{tmin}_{tmax}_bline{baseline}_cyc{int(n_cycles_div)}/'
+            trf_save_path = paths().save_path() + f"Time_Frequency_{data_type}/{tf_method}/{save_id}_{run_params['tmin']}_{run_params['tmax']}_bline{run_params['baseline']}_cyc{int(n_cycles_div)}/"
         else:
-            trf_save_path = paths().save_path() + f'Time_Frequency_Epochs_{data_type}/{tf_method}/{save_id}_{tmin}_{tmax}_bline{baseline}_cyc{int(n_cycles_div)}/'
-        epochs_save_path = paths().save_path() + f'Epochs_{data_type}/Band_None/{save_id}_{tmin}_{tmax}_bline{baseline}/'
+            trf_save_path = paths().save_path() + f"Time_Frequency_Epochs_{data_type}/{tf_method}/{save_id}_{run_params['tmin']}_{run_params['tmax']}_bline{run_params['baseline']}_cyc{int(n_cycles_div)}/"
+        epochs_save_path = paths().save_path() + f"Epochs_{data_type}/Band_None/{save_id}_{run_params['tmin']}_{run_params['tmax']}_bline{run_params['baseline']}/"
         # Save figures paths
         trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/{tf_method}/' + plot_id
 
@@ -274,8 +275,8 @@ for param in param_values.keys():
 
                         # Epoch data
                         epochs, events = functions_analysis.epoch_data(subject=subject, mss=run_params['mss'], corr_ans=run_params['corrans'], trial_dur=trial_dur,
-                                                                       tgt_pres=run_params['tgtpres'], baseline=baseline, reject=run_params['reject'],
-                                                                       epoch_id=run_params['epoch_id'], meg_data=meg_data, tmin=tmin, tmax=tmax,
+                                                                       tgt_pres=run_params['tgtpres'], baseline=run_params['baseline'], reject=run_params['reject'],
+                                                                       epoch_id=run_params['epoch_id'], meg_data=meg_data, tmin=run_params['tmin'], tmax=run_params['tmax'],
                                                                        save_data=save_data, epochs_save_path=epochs_save_path,
                                                                        epochs_data_fname=epochs_data_fname)
                     # Compute power and PLI over frequencies
@@ -303,9 +304,9 @@ for param in param_values.keys():
                             itc = itc.average()
 
                 # Apply baseline
-                power.apply_baseline(baseline=plot_baseline, mode=bline_mode)
+                power.apply_baseline(baseline=run_params['plot_baseline'], mode=bline_mode)
                 if run_itc:
-                    itc.apply_baseline(baseline=plot_baseline, mode=bline_mode)
+                    itc.apply_baseline(baseline=run_params['plot_baseline'], mode=bline_mode)
 
                 # Append data for GA
                 power_data[param][param_value].append(power)
@@ -419,16 +420,17 @@ for param in param_values.keys():
 
                 #--------- Plots ---------#
                 # Power Plotjoint
-                plot_general.tfr_plotjoint_picks(tfr=grand_avg, plot_baseline=plot_baseline, bline_mode=ga_plot_bline_mode, vlines_times=vlines_times, timefreqs=timefreqs_joint,
-                                                 image_args=image_args, clusters_mask=clusters_mask, chs_id=chs_id, plot_xlim=plot_xlim, plot_max=plot_max, plot_min=plot_min,
-                                                 vmin=vmin_power, vmax=vmax_power, display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, fname=fname)
+                plot_general.tfr_plotjoint_picks(tfr=grand_avg, plot_baseline=run_params['plot_baseline'], bline_mode=ga_plot_bline_mode, vlines_times=vlines_times,
+                                                 timefreqs=timefreqs_joint, image_args=image_args, clusters_mask=clusters_mask, chs_id=chs_id, plot_xlim=plot_xlim,
+                                                 plot_max=plot_max, plot_min=plot_min, vmin=vmin_power, vmax=vmax_power, display_figs=display_figs, save_fig=save_fig,
+                                                 trf_fig_path=trf_fig_path, fname=fname)
 
                 # Plot Power time-frequency in time scalde axes
                 fname = f'GA_{title}_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
-                fig, ax_tf = plot_general.tfr_times(tfr=grand_avg, chs_id=chs_id, timefreqs_tfr=timefreqs_tfr, baseline=plot_baseline, bline_mode=ga_plot_bline_mode,
-                                                    plot_xlim=plot_xlim, vlines_times=vlines_times, vmin=vmin_power, vmax=vmax_power, topo_vmin=vmin_power, topo_vmax=vmax_power,
-                                                    display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path, fname=fname, fontsize=18, ticksize=18)
-
+                fig, ax_tf = plot_general.tfr_times(tfr=grand_avg, chs_id=chs_id, timefreqs_tfr=timefreqs_tfr, baseline=run_params['plot_baseline'],
+                                                    bline_mode=ga_plot_bline_mode, plot_xlim=plot_xlim, vlines_times=vlines_times, vmin=vmin_power, vmax=vmax_power,
+                                                    topo_vmin=vmin_power, topo_vmax=vmax_power, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path,
+                                                    fname=fname, fontsize=18, ticksize=18)
 
                 if overlay_broadband_power:
 
