@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 
 # ---------- Epoch Data ---------- #
-def define_events(subject, meg_data, epoch_id, trial_num=None, evt_dur=None, epoch_keys=None):
+def define_events(subject, meg_data, epoch_id, trial_num=None, evt_dur=None, epoch_keys=None, rel_sac=False):
     '''
 
     :param subject:
@@ -69,10 +69,17 @@ def define_events(subject, meg_data, epoch_id, trial_num=None, evt_dur=None, epo
                     metadata_ids = list(metadata['id'])
                     epoch_keys = [key for key in epoch_keys if key in metadata_ids]
 
+            # Change fixations for previous saccades
+            if rel_sac:
+                epoch_keys_idx = metadata.loc[metadata['id'].isin(epoch_keys), f'{rel_sac}_sac']
+                epoch_keys_idx.dropna(inplace=True)
+                epoch_keys = subject.saccades.loc[epoch_keys_idx, 'id']
+                epoch_keys = epoch_keys[epoch_keys != 'None'].to_list()
+
     # Get events and ids matchig selection
     metadata, events, events_id = mne.epochs.make_metadata(events=all_events, event_id=all_event_id, row_events=epoch_keys, tmin=0, tmax=0, sfreq=meg_data.info['sfreq'])
 
-    if 'fix' in epoch_id:
+    if 'fix' in epoch_id and not rel_sac:
         metadata_sup = subject.fixations
     elif 'sac' in epoch_id:
         metadata_sup = subject.saccades
@@ -80,7 +87,7 @@ def define_events(subject, meg_data, epoch_id, trial_num=None, evt_dur=None, epo
     return metadata, events, events_id, metadata_sup
 
 
-def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax, trial_num=None, trial_dur=None, evt_dur=None,
+def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax, trial_num=None, trial_dur=None, evt_dur=None, rel_sac=False,
                baseline=(None, 0), reject=None, save_data=False, epochs_save_path=None, epochs_data_fname=None):
     '''
     :param subject:
@@ -110,8 +117,13 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
     if not trial_num:
         trial_num, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss, trial_dur=trial_dur, corr_ans=corr_ans, tgt_pres=tgt_pres)
 
+    # Redefine epoch id
+    if rel_sac and 'sac' in epoch_id:
+        epoch_id = epoch_id.replace('sac', 'fix')
+
     # Define events
-    metadata, events, events_id, metadata_sup = define_events(subject=subject, epoch_id=epoch_id, evt_dur=evt_dur, trial_num=trial_num, meg_data=meg_data)
+    metadata, events, events_id, metadata_sup = define_events(subject=subject, meg_data=meg_data, epoch_id=epoch_id, evt_dur=evt_dur, trial_num=trial_num, rel_sac=rel_sac)
+
     # Reject based on channel amplitude
     if reject == False:
         # Setting reject parameter to False uses No rejection (None in mne will not reject)
