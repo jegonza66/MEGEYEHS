@@ -582,7 +582,7 @@ def get_plots_timefreqs(epoch_id, mss, cross2_dur, mss_duration, topo_bands, plo
         timefreqs_joint = None
         vlines_times = None
 
-    if ('ms' in epoch_id or 'vs' in epoch_id) and 'fix' not in epoch_id and topo_bands is not None:
+    if ('ms' in epoch_id or 'vs' in epoch_id) and 'fix' not in epoch_id and 'sac' not in epoch_id and topo_bands is not None:
         timefreqs_tfr = {}
         for i, time_freq in enumerate(timefreqs_joint):
             # Get plot time from time defined for plot_joint
