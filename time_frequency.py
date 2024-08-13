@@ -31,12 +31,13 @@ else:
 #-----  Parameters -----#
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
-trial_params = {'epoch_id': 'vs',
-                'corrans': None,
+trial_params = {'epoch_id': 'it_fix_ms+tgt_fix_ms',
+                'corrans': True,
                 'tgtpres': None,
-                'mss': [1, 2, 4],
+                'mss': None,
                 'reject': None,
-                'evtdur': None,
+                'evtdur': 0.4,
+                'rel_sac': 'next'
                 }
 run_comparison = False
 
@@ -48,14 +49,14 @@ use_ica_data = True
 # Power time frequency params
 n_cycles_div = 2.
 l_freq = 1
-h_freq = 100
-run_itc = False
+h_freq = 40
+run_itc = True
 plot_edge = 0.15
 
 # Plots parameters
 # Colorbar
-vmax_power = 0.2
-vmin_power = -0.2
+vmax_power = None
+vmin_power = None
 vmin_itc, vmax_itc = None, None
 # plot_joint max and min topoplots
 plot_max, plot_min = True, True
@@ -77,7 +78,7 @@ return_average_tfr = True
 output = 'power'
 
 # Permutations cluster test parameters
-run_permutations_ga = False
+run_permutations_ga = True
 run_permutations_dif = False
 n_permutations = 1024
 degrees_of_freedom = len(exp_info.subjects_ids) - 1
@@ -114,27 +115,37 @@ for param in param_values.keys():
         run_params[param] = param_value
 
         #---------- Setup ----------#
+        # Redefine epoch id
+        if 'rel_sac' in run_params.keys():
+            if run_params['rel_sac'] != None:
+                run_params['epoch_id'] = run_params['epoch_id'].replace('fix', 'sac')
+
         # Windows durations
         cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
-        if 'vs' in run_params['epoch_id'] and 'fix' not in run_params['epoch_id']:
+        if 'vs' in run_params['epoch_id'] and 'fix' not in run_params['epoch_id'] and 'sac' not in run_params['epoch_id']:
             trial_dur = vs_dur[run_params['mss']]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
         else:
             trial_dur = None
 
         # morlet wavelet n_cycles divisor based on epochs duration
-        if not n_cycles_div and 'fix' in run_params['epoch_id']:
+        if not n_cycles_div and 'fix' in run_params['epoch_id'] or 'sac' in run_params['epoch_id']:
             n_cycles_div = 4.
         else:
             n_cycles_div = 2.
 
         # Get time windows from epoch_id name
-        map = dict(ms={'tmin': -cross1_dur, 'tmax': mss_duration[run_params['mss']], 'plot_xlim': (-cross1_dur + plot_edge, mss_duration[run_params['mss']] - plot_edge)},
-                   fix_vs={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
-                   tgt_fix_ms={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
-                   tgt_fix_vs={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
-                   sac_emap={'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.3, 2.5)},
-                   hl_start={'tmin': -3, 'tmax': 35, 'plot_xlim': (-2.5, 33)})
-        run_params['tmin'], run_params['tmax'], plot_xlim = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], plot_edge=plot_edge)
+        map = {'ms': {'tmin': -cross1_dur, 'tmax': mss_duration[run_params['mss']], 'plot_xlim': (-cross1_dur + plot_edge, mss_duration[run_params['mss']] - plot_edge)},
+                   'fix_vs': {'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
+                   'tgt_fix_ms': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
+                   'it_sac_ms+tgt_sac_ms': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.4 + plot_edge, 0.4 - plot_edge)},
+                   'it_sac_ms': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.4 + plot_edge, 0.4 - plot_edge)},
+                   'it_sac_vs+tgt_sac_vs': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.4 + plot_edge, 0.4 - plot_edge)},
+                   'it_sac_vs': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.4 + plot_edge, 0.4 - plot_edge)},
+                   'tgt_fix_vs': {'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
+                   'sac_emap': {'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.3, 2.5)},
+                   'hl_start': {'tmin': -3, 'tmax': 35, 'plot_xlim': (-2.5, 33)}}
+        run_params['tmin'], run_params['tmax'], plot_xlim = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'],
+                                                                                            plot_edge=plot_edge, map=map)
 
         # Define time-frequency bands to plot in plot_joint
         timefreqs_joint, timefreqs_tfr, vlines_times = functions_general.get_plots_timefreqs(epoch_id=run_params['epoch_id'], mss=run_params['mss'], cross2_dur=cross2_dur,
@@ -146,6 +157,8 @@ for param in param_values.keys():
                                                                                                       tmin=run_params['tmin'], tmax=run_params['tmax'],
                                                                                                       cross1_dur=cross1_dur, mss_duration=mss_duration,
                                                                                                       cross2_dur=cross2_dur, plot_edge=plot_edge)
+        # WARNING
+        run_params['plot_baseline'] = (0, 0)
 
         # Specific run path for saving data and plots
         if use_ica_data:
@@ -155,6 +168,9 @@ for param in param_values.keys():
 
         # Save ids
         save_id = f"{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}_trialdur{trial_dur}_evtdur{run_params['evtdur']}"
+        # Redefine save id
+        if 'rel_sac' in run_params.keys() and run_params['rel_sac'] != None:
+            save_id = run_params['rel_sac'] + '_' + save_id
         plot_id = f"{save_id}_{round(plot_xlim[0],2)}_{round(plot_xlim[1], 2)}_bline{run_params['baseline']}_cyc{int(n_cycles_div)}/"
 
         # Save data paths
@@ -182,14 +198,19 @@ for param in param_values.keys():
                 for file in matching_files:
                     l_freq_file = int(file.split('_')[-3])
                     h_freq_file = int(file.split('_')[-2])
+
                     if l_freq_file <= l_freq and h_freq_file >= h_freq:
                         grand_avg_power = mne.time_frequency.read_tfrs(file)[0]
+
+                        # Crop to desired frequencies
+                        grand_avg_power = grand_avg_power.crop(fmin=l_freq, fmax=h_freq)
                         break
 
-                # Crop to desired frequencies
-                grand_avg_power = grand_avg_power.crop(fmin=l_freq, fmax=h_freq)
+                    else:
+                        raise ValueError('No file found with desired frequency range')
+
             else:
-                raise ValueError
+                raise ValueError('No file found with desired frequency range')
 
             if run_itc:
                 # Get files matching name with extended frequency range
@@ -200,12 +221,15 @@ for param in param_values.keys():
                         h_freq_file = int(file.split('_')[-2])
                         if l_freq_file <= l_freq and h_freq_file >= h_freq:
                             grand_avg_itc = mne.time_frequency.read_tfrs(file)[0]
+                            # Crop to desired frequencies
+                            grand_avg_itc = grand_avg_itc.crop(fmin=l_freq, fmax=h_freq)
                             break
 
-                    # Crop to desired frequencies
-                    grand_avg_itc = grand_avg_itc.crop(fmin=l_freq, fmax=h_freq)
+                        else:
+                            raise ValueError('No file found with desired frequency range')
+
                 else:
-                    raise ValueError
+                    raise ValueError('No file found with desired frequency range')
 
         except:
             power_data[param][param_value] = []
@@ -239,11 +263,14 @@ for param in param_values.keys():
                             # If file contains desired frequencies, Load
                             if l_freq_file <= l_freq and h_freq_file >= h_freq:
                                 power = mne.time_frequency.read_tfrs(file)[0]
+
+                                # Crop to desired frequencies
+                                power = power.crop(fmin=l_freq, fmax=h_freq)
                                 break
-                        # Crop to desired frequencies
-                        power = power.crop(fmin=l_freq, fmax=h_freq)
+                            else:
+                                raise ValueError('No file found with desired frequency range')
                     else:
-                        raise ValueError
+                        raise ValueError('No file found with desired frequency range')
 
                     if run_itc:
                         # Get files matching name with extended frequency range
@@ -276,9 +303,9 @@ for param in param_values.keys():
                         # Epoch data
                         epochs, events = functions_analysis.epoch_data(subject=subject, mss=run_params['mss'], corr_ans=run_params['corrans'], trial_dur=trial_dur,
                                                                        tgt_pres=run_params['tgtpres'], baseline=run_params['baseline'], reject=run_params['reject'],
-                                                                       epoch_id=run_params['epoch_id'], meg_data=meg_data, tmin=run_params['tmin'], tmax=run_params['tmax'],
-                                                                       save_data=save_data, epochs_save_path=epochs_save_path,
-                                                                       epochs_data_fname=epochs_data_fname)
+                                                                       rel_sac=run_params['rel_sac'], evt_dur=run_params['evtdur'], epoch_id=run_params['epoch_id'],
+                                                                       meg_data=meg_data, tmin=run_params['tmin'], tmax=run_params['tmax'], save_data=False,
+                                                                       epochs_save_path=epochs_save_path, epochs_data_fname=epochs_data_fname)
                     # Compute power and PLI over frequencies
                     if tf_method == 'morlet':
                         power = functions_analysis.time_frequency(epochs=epochs, l_freq=l_freq, h_freq=h_freq,
@@ -456,7 +483,7 @@ for param in param_values.keys():
                         save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
 
-# --------- Permutation cluster test on difference between conditions -----------#
+# --------- Permutation cluster test on difference between conditions ----------- #
 # Take difference of conditions if applies
 for param in param_values.keys():
     if len(param_values[param]) > 1 and run_comparison:
