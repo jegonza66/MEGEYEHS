@@ -594,7 +594,7 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
             masks.append(mask)
     else:
         masks = [None]*len(timefreqs)
-    mask_params = dict(marker='o', markerfacecolor='white', markeredgecolor='k', linewidth=0, markersize=4, alpha=0.5)
+    mask_params = dict(marker='o', markerfacecolor='white', markeredgecolor='k', linewidth=0, markersize=4, alpha=0.6)
 
     # Get topo axes and overwrite topoplots
     topo_axes = fig.axes[1:-1]
