@@ -38,7 +38,7 @@ evt_dur = None
 # Time frequency params
 n_cycles_div = 2.
 l_freq = 1
-h_freq = 40
+h_freq = 100
 run_itc = False
 return_average_tfr = True
 output = 'power'
@@ -51,9 +51,8 @@ bline_mode = 'logratio'
 #----------#
 
 # Duration
-mss_duration = {1: 2, 2: 3.5, 4: 5, None: 0}
-cross1_dur = 0.75
-cross2_dur = 1
+# Windows durations
+cross1_dur, cross2_dur, mss_duration, _ = functions_general.get_duration()
 vs_dur = 4
 
 if use_ica_data:
