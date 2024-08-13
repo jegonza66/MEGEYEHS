@@ -40,10 +40,10 @@ meg_params = {'chs_id': 'parietal_occipital',
 # TRF parameters
 trf_params = {'epoch_id': 'vs',
               'standarize': False,
-              'fit_power': False,
+              'fit_power': True,
               'alpha': None,
-              'tmin': -0.3,
-              'tmax': 0.6}
+              'tmin': -0.05,
+              'tmax': 0.15}
 
 trf_params['baseline'] = (trf_params['tmin'], -0.05)
 
@@ -189,10 +189,13 @@ for mss in [1, 2, 4]:
         grand_avg[mss] = mne.grand_average(trial_evokeds[mss])
 
         # Define time-frequency bands to plot in plot_joint
-        _, _, plot_xlim = functions_general.get_time_lims(epoch_id=trf_params['epoch_id'], mss=mss, plot_edge=plot_edge)
+        recon_tmin, recon_tmax, plot_xlim = functions_general.get_time_lims(epoch_id=trf_params['epoch_id'], mss=mss, plot_edge=plot_edge)
         timefreqs_joint, timefreqs_tfr, vlines_times = functions_general.get_plots_timefreqs(epoch_id=trf_params['epoch_id'], mss=mss, cross2_dur=cross2_dur,
                                                                                              mss_duration=mss_duration, topo_bands=None, plot_xlim=plot_xlim,
                                                                                              plot_min=True, plot_max=True)
+
+        _, plot_baseline = functions_general.get_baseline_duration(epoch_id=trf_params['epoch_id'], mss=mss, tmin=recon_tmin, tmax=recon_tmax,
+                                                                   cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur, plot_edge=plot_edge)
 
         # Plot Power time-frequency in time scalde axes
         fname = f"GA_Power_mss{mss}_tf_{meg_params['chs_id']}_{bline_mode}_{l_freq}_{h_freq}"
