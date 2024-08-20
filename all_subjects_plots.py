@@ -211,7 +211,7 @@ for mss in [1, 2, 4]:
     saccades_rate_std = np.nanstd(all_saccades_rate[mss], axis=0)
 
     # Plot Fixations
-    fig, axes_topo, ax_tf, ax_cbar = plot_general.fig_tf_times(time_len=total_trial_length, ax_len_div=23)
+    fig, axes_topo, ax_tf, ax_cbar, ax_tfr_cbar = plot_general.fig_tf_times(time_len=total_trial_length, ax_len_div=23)
     title = f'Mean fixation rate (MSS= {mss} - Window= {int(time_window * 1000)} ms)'
     fig.suptitle(title)
     ax_tf.plot(np.linspace(0, total_trial_length, len(fixations_rate_mean)), fixations_rate_mean)
@@ -232,7 +232,7 @@ for mss in [1, 2, 4]:
         save.fig(fig=fig, path=fig_path, fname=title)
 
     # Plot Saccades
-    fig, axes_topo, ax_tf, ax_cbar = plot_general.fig_tf_times(time_len=total_trial_length, ax_len_div=23)
+    fig, axes_topo, ax_tf, ax_cbar, ax_tfr_cbar = plot_general.fig_tf_times(time_len=total_trial_length, ax_len_div=23)
     title = f'Mean saccades rate (MSS= {mss} - Window= {int(time_window * 1000)} ms)'
     fig.suptitle(title)
     ax_tf.plot(np.linspace(0, total_trial_length, len(fixations_rate_mean)), fixations_rate_mean)
@@ -257,8 +257,8 @@ for mss in [1, 2, 4]:
 # All MSS plots
 plot_edge = 0.15
 x_drop_size = int(plot_edge / time_step)
-fig1, axes_topo1, ax1, ax_cbar1 = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge*2, ax_len_div=24)
-fig2, axes_topo2, ax2, ax_cbar2 = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge*2, ax_len_div=24)
+fig1, axes_topo1, ax1, ax_cbar1, ax_tfr_cbar = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge*2, ax_len_div=24)
+fig2, axes_topo2, ax2, ax_cbar2, ax_tfr_cbar = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge*2, ax_len_div=24)
 
 for mss in [1, 2, 4]:
 
@@ -295,9 +295,9 @@ for mss in [1, 2, 4]:
     ax2.set_ylabel('Saccade rate (saccades/s)')
 
 # Plot vlines
-ymin1 = ax2.get_ylim()[0]
+ymin1 = ax1.get_ylim()[0]
 ymin2 = ax2.get_ylim()[0]
-ymax1 = ax2.get_ylim()[1]
+ymax1 = ax1.get_ylim()[1]
 ymax2 = ax2.get_ylim()[1]
 
 for t in [0, - cross2_dur, - mss_duration[mss] - cross2_dur]:
