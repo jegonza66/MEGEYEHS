@@ -12,6 +12,7 @@ import numpy as np
 import scipy
 from mne.stats import permutation_cluster_1samp_test
 import itertools
+import copy
 
 
 
@@ -32,12 +33,12 @@ else:
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
 trial_params = {'epoch_id': 'it_fix_ms+tgt_fix_ms',
-                'corrans': True,
+                'corrans': None,
                 'tgtpres': None,
                 'mss': None,
                 'reject': None,
-                'evtdur': 0.4,
-                'rel_sac': 'next'
+                'evtdur': None,
+                'rel_sac': None
                 }
 run_comparison = False
 
@@ -47,7 +48,7 @@ chs_ids = ['parietal_occipital']  # region_hemisphere
 use_ica_data = True
 
 # Power time frequency params
-n_cycles_div = 2.
+n_cycles_div = 4.
 l_freq = 1
 h_freq = 40
 run_itc = True
@@ -60,7 +61,7 @@ vmin_power = None
 vmin_itc, vmax_itc = None, None
 # plot_joint max and min topoplots
 plot_max, plot_min = True, True
-overlay_broadband_power = False
+overlay_broadband_power = True
 
 # Baseline method
 # logratio: dividing by the mean of baseline values and taking the log
@@ -91,6 +92,8 @@ significant_channels = 0.5  # Percent of total region channels
 # Save data of each id
 power_data = {}
 itc_data = {}
+ga_power_data = {}
+ga_itc_data = {}
 
 # Get param to compute difference from params dictionary
 param_values = {key: value for key, value in trial_params.items() if type(value) == list}
@@ -103,10 +106,12 @@ if param_values == {}:
 for param in param_values.keys():
     power_data[param] = {}
     itc_data[param] = {}
+    ga_power_data[param] = {}
+    ga_itc_data[param] = {}
     for param_value in param_values[param]:
 
         # Get run parameters from trial params
-        run_params = trial_params
+        run_params = copy.copy(trial_params)
         # Set first value of parameters comparisons to avoid having lists in run params
         if len(param_values.keys()) > 1:
             for key in param_values.keys():
@@ -116,8 +121,7 @@ for param in param_values.keys():
 
         #---------- Setup ----------#
         # Redefine epoch id
-        if 'rel_sac' in run_params.keys():
-            if run_params['rel_sac'] != None:
+        if 'rel_sac' in run_params.keys() and run_params['rel_sac'] != None:
                 run_params['epoch_id'] = run_params['epoch_id'].replace('fix', 'sac')
 
         # Windows durations
@@ -212,6 +216,9 @@ for param in param_values.keys():
             else:
                 raise ValueError('No file found with desired frequency range')
 
+            # Save grand avg param data
+            ga_power_data[param][param_value] = grand_avg_power
+
             if run_itc:
                 # Get files matching name with extended frequency range
                 matching_files = glob.glob(trf_save_path + grand_avg_itc_fname.replace(f'{l_freq}_{h_freq}', '*'))
@@ -230,6 +237,9 @@ for param in param_values.keys():
 
                 else:
                     raise ValueError('No file found with desired frequency range')
+
+                # Save grand avg param data
+                ga_itc_data[param][param_value] = grand_avg_itc
 
         except:
             power_data[param][param_value] = []
@@ -357,8 +367,10 @@ for param in param_values.keys():
 
             # Compute grand average
             grand_avg_power = mne.grand_average(power_data[param][param_value])
+            ga_power_data[param][param_value] = grand_avg_power
             if run_itc:
                 grand_avg_itc = mne.grand_average(itc_data[param][param_value])
+                ga_itc_data[param][param_value] = grand_avg_itc
 
             if save_data:
                 # Save trf data
@@ -597,3 +609,67 @@ for param in param_values.keys():
                     plot_general.tfr_plotjoint_picks(tfr=grand_avg, plot_baseline=None, bline_mode=bline_mode, vlines_times=vlines_times, timefreqs=timefreqs_joint,
                                                      image_args=image_args, clusters_mask=clusters_mask, chs_id=chs_id, plot_xlim=plot_xlim, plot_max=plot_max, plot_min=plot_min,
                                                      vmin=vmin_power, vmax=vmax_power, display_figs=display_figs, save_fig=save_fig, trf_fig_path=tfr_fig_path_dif, fname=fname)
+
+
+# ----- Broadband power mss figure -----#
+if 'mss' in param_values.keys() and trial_params['epoch_id'] == 'vs':
+
+    # Avg power figure
+    fig_a, _, ax_a, _, _ = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge * 2, ax_len_div=24)
+    title_a = f'Original signal HGamma average power'
+    fig_a.suptitle(title_a)
+
+    for mss in param_values['mss']:
+        # Define time-frequency bands to plot in plot_joint
+        recon_tmin, recon_tmax, plot_xlim = functions_general.get_time_lims(epoch_id=trial_params['epoch_id'], mss=mss, plot_edge=plot_edge)
+
+        # Crop to plot times and selected channels
+        broadband_power = ga_power_data['mss'][mss].copy().crop(tmin=plot_xlim[0], tmax=plot_xlim[1]).pick(picks)
+
+        # Select time index of baseline period end
+        idx0, value0 = functions_general.find_nearest(broadband_power.times, values=ga_power_data['mss'][mss].times[0] + cross1_dur)
+
+        # Apply mean baseline
+        baseline_power = broadband_power.data.mean(0).mean(0) - np.mean(broadband_power.data.mean(0).mean(0)[:idx0])
+
+        # Compute std
+        power_std = broadband_power.data.mean(0).std(0)
+
+        # Plot power average
+        ax_a.plot(broadband_power.times, baseline_power, label=f'MSS: {mss}')
+        ax_a.fill_between(x=broadband_power.times, y1=baseline_power - power_std, y2=baseline_power + power_std, alpha=0.5)
+
+    # Labels
+    ax_a.set_xlabel('Time (s)')
+    ax_a.set_ylabel('Avg. power (dB)')
+
+    # Plot vlines
+    ymin_a = ax_a.get_ylim()[0]
+    ymax_a = ax_a.get_ylim()[1]
+
+    for mss in [1, 2, 4]:
+        ax_a.vlines(x=(- mss_duration[mss] - cross2_dur), ymin=ymin_a, ymax=ymax_a, linestyles='--', colors='gray')
+    for t in [0, - cross2_dur, - mss_duration[mss] - cross2_dur]:
+        ax_a.vlines(x=t, ymin=ymin_a, ymax=ymax_a, linestyles='--', colors='gray')
+
+    if save_fig:
+
+        # Save ids
+        save_id = f"{trial_params['epoch_id']}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_tgtpres{trial_params['tgtpres']}_trialdur{None}_evtdur{trial_params['evtdur']}"
+
+        # Redefine save id
+        if 'rel_sac' in run_params.keys() and run_params['rel_sac'] != None:
+            save_id = run_params['rel_sac'] + '_' + save_id
+        plot_id = f"{save_id}_{round(plot_xlim[0], 2)}_{round(plot_xlim[1], 2)}_bline{run_params['baseline']}_cyc{int(n_cycles_div)}/"
+
+        # Save data paths
+        if return_average_tfr:
+            trf_save_path = paths().save_path() + f"Time_Frequency_{data_type}/{tf_method}/{save_id}_{run_params['tmin']}_{run_params['tmax']}_bline{run_params['baseline']}_cyc{int(n_cycles_div)}/"
+        else:
+            trf_save_path = paths().save_path() + f"Time_Frequency_Epochs_{data_type}/{tf_method}/{save_id}_{run_params['tmin']}_{run_params['tmax']}_bline{run_params['baseline']}_cyc{int(n_cycles_div)}/"
+        epochs_save_path = paths().save_path() + f"Epochs_{data_type}/Band_None/{save_id}_{run_params['tmin']}_{run_params['tmax']}_bline{run_params['baseline']}/"
+
+        # Save figures paths
+        trf_fig_path = paths().plots_path() + f'Time_Frequency_{data_type}/{tf_method}/' + plot_id
+
+        save.fig(fig=fig_a, path=trf_fig_path, fname=title_a)
