@@ -446,7 +446,7 @@ def fit_mtrf(meg_data, tmin, tmax, model_input, chs_id, standarize=True, fit_pow
 def compute_trf(subject, meg_data, trial_params, trf_params, meg_params, all_chs_regions=['frontal', 'temporal', 'central', 'parietal', 'occipital'],
                 save_data=False, trf_path=None, trf_fname=None):
 
-    print(f"Computing TRF for {trial_params['input_features']}")
+    print(f"Computing TRF for {trf_params['input_features']}")
 
     # Get condition trials
     cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=trial_params['mss'], trial_dur=trial_params['trialdur'],
@@ -465,7 +465,7 @@ def compute_trf(subject, meg_data, trial_params, trf_params, meg_params, all_chs
 
     # Iterate over input features
     input_arrays = {}
-    for feature in trial_params['input_features']:
+    for feature in trf_params['input_features']:
 
         subj_path = paths().save_path() + f'TRF/{subject.subject_id}/'
         fname_var = (f"{feature}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_tgtpres{trial_params['tgtpres']}_trialdur{trial_params['trialdur']}_"
@@ -558,7 +558,7 @@ def make_trf_evoked(subject, rf, meg_data, evokeds, trf_params, trial_params, me
     trf = {}
     subj_evoked = {}
     subj_evoked_list = {}
-    for i, feature in enumerate(trial_params['input_features']):
+    for i, feature in enumerate(trf_params['input_features']):
 
         # All or multiple regions
         if meg_params['chs_id'] == 'mag' or '_' in meg_params['chs_id']:
@@ -614,7 +614,7 @@ def trf_grand_average(feature_evokeds, trf_params, trial_params, meg_params, dis
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
     grand_avg = {}
-    for feature in trial_params['input_features']:
+    for feature in trf_params['input_features']:
         # Compute grand average
         grand_avg[feature] = mne.grand_average(feature_evokeds[feature], interpolate_bads=True)
         plot_times_idx = np.where((grand_avg[feature].times > trf_params['tmin']) & (grand_avg[feature].times < trf_params['tmax']))[0]
@@ -631,10 +631,10 @@ def trf_grand_average(feature_evokeds, trf_params, trial_params, meg_params, dis
     return grand_avg
 
 
-def reconstruct_meg_from_trf(subject, rf, meg_data,  picks,  trial_params, meg_params):
+def reconstruct_meg_from_trf(subject, rf, meg_data,  picks,  trial_params, trf_params, meg_params):
     # Get TRF from all regions and features
     rf_data = {}
-    for i, feature in enumerate(trial_params['input_features']):
+    for i, feature in enumerate(trf_params['input_features']):
         chs_idx = 0
         rf_data[feature] = np.zeros((len(picks), len(rf[list(rf.keys())[0]].delays_)))
         for region in meg_params['chs_id'].split('_'):
@@ -649,7 +649,7 @@ def reconstruct_meg_from_trf(subject, rf, meg_data,  picks,  trial_params, meg_p
     meg_sub = meg_data.copy().pick(picks)
     reconstructed_data = np.zeros((len(picks), len(meg_data.times)))
 
-    for i, feature in enumerate(trial_params['input_features']):
+    for i, feature in enumerate(trf_params['input_features']):
 
         subj_path = paths().save_path() + f'TRF/{subject.subject_id}/'
         fname_var = (f"{feature}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_tgtpres{trial_params['tgtpres']}_trialdur{trial_params['trialdur']}_"

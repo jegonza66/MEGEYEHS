@@ -23,8 +23,7 @@ else:
     plt.ioff()
 
 #-----  Parameters -----#
-trial_params = {'input_features': ['sac_cross1', 'fix_cross1', 'sac_ms', 'it_fix_ms+tgt_fix_ms', 'sac_cross2', 'fix_cross2', 'sac_vs', 'it_fix_vs+tgt_fix_vs'],  # Select features (events)
-                'corrans': None,
+trial_params = {'corrans': None,
                 'tgtpres': None,
                 'mss': None,
                 'evtdur': None,
@@ -36,7 +35,8 @@ meg_params = {'chs_id': 'parietal_occipital',
               }
 
 # TRF parameters
-trf_params = {'standarize': True,
+trf_params = {'input_features': ['sac_cross1', 'fix_cross1', 'sac_ms', 'it_fix_ms+tgt_fix_ms', 'sac_cross2', 'fix_cross2', 'sac_vs', 'it_fix_vs+tgt_fix_vs'],   # Select features (events)
+              'standarize': True,
               'fit_power': False,
               'alpha': None,
               'tmin': -0.3,
@@ -46,13 +46,13 @@ trf_params['baseline'] = (trf_params['tmin'], -0.05)
 
 # Window durations
 cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
-if 'vs' in trial_params['input_features']:
+if 'vs' in trf_params['input_features']:
     trial_params['trialdur'] = vs_dur[trial_params['mss']]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
 else:
     trial_params['trialdur'] = None
 
 # Figure path
-fig_path = paths().plots_path() + (f"TRF_{meg_params['data_type']}/Band_{meg_params['band_id']}/{trial_params['input_features']}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_"
+fig_path = paths().plots_path() + (f"TRF_{meg_params['data_type']}/Band_{meg_params['band_id']}/{trf_params['input_features']}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_"
                                    f"tgtpres{trial_params['tgtpres']}_trialdur{trial_params['trialdur']}_evtdur{trial_params['evtdur']}_{trf_params['tmin']}_{trf_params['tmax']}_"
                                    f"bline{trf_params['baseline']}_alpha{trf_params['alpha']}_std{trf_params['standarize']}/{meg_params['chs_id']}/")
 
@@ -65,7 +65,7 @@ save_path = fig_path.replace(paths().plots_path(), paths().save_path())
 
 # Define Grand average variables
 feature_evokeds = {}
-for feature in trial_params['input_features']:
+for feature in trf_params['input_features']:
     feature_evokeds[feature] = []
 
 # Iterate over subjects
