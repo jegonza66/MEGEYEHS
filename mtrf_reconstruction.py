@@ -26,7 +26,7 @@ else:
 
 #-----  Parameters -----#
 # Select features (events)
-trial_params = {'input_features': ['sac_cross1', 'fix_cross1', 'sac_ms', 'fix_ms', 'sac_cross2', 'fix_cross2', 'sac_vs', 'fix_vs'],
+trial_params = {'epoch_id': 'vs',
                 'corrans': None,
                 'tgtpres': None,
                 'mss': None,
@@ -38,14 +38,17 @@ meg_params = {'chs_id': 'parietal_occipital',
               'data_type': 'ICA'}
 
 # TRF parameters
-trf_params = {'epoch_id': 'vs',
+trf_params = {'input_features': ['sac', 'fix'],
               'standarize': False,
-              'fit_power': True,
+              'fit_power': False,
               'alpha': None,
-              'tmin': -0.05,
-              'tmax': 0.15}
+              'tmin': -0.02,
+              'tmax': 0.1}
 
-trf_params['baseline'] = (trf_params['tmin'], -0.05)
+trf_params['baseline'] = (None, None)
+# Convert input features stringo to list
+if type(trf_params['input_features']) is str:
+    trf_params['input_features'] = [trf_params['input_features']]
 
 # Get frequencies from band id
 l_freq, h_freq = functions_general.get_freq_band(band_id=meg_params['band_id'])
@@ -59,7 +62,7 @@ plot_edge = 0.15
 bline_mode = 'logratio'
 ga_plot_bline_mode = 'mean'
 
-if 'vs' in trial_params['input_features']:
+if 'vs' in trf_params['input_features']:
     trial_params['trialdur'] = vs_dur[trial_params['mss']]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
 else:
     trial_params['trialdur'] = None
@@ -69,11 +72,11 @@ all_chs_regions = ['frontal', 'temporal', 'central', 'parietal', 'occipital']
 
 # Define Grand average variables
 ga = {}
-for feature in trial_params['input_features']:
+for feature in trf_params['input_features']:
     ga[feature] = []
 
 # Figure path
-fig_path = paths().plots_path() + (f"TRF_SIM_{meg_params['data_type']}/Band_{meg_params['band_id']}/{trial_params['input_features']}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_"
+fig_path = paths().plots_path() + (f"TRF_SIM_{meg_params['data_type']}/Band_{meg_params['band_id']}/{trf_params['input_features']}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_"
                                    f"tgtpres{trial_params['tgtpres']}_trialdur{trial_params['trialdur']}_evtdur{trial_params['evtdur']}_{trf_params['tmin']}_{trf_params['tmax']}_"
                                    f"bline{trf_params['baseline']}_alpha{trf_params['alpha']}_std{trf_params['standarize']}/{meg_params['chs_id']}/")
 
@@ -87,7 +90,7 @@ save_path = save_path.replace('_SIM', '')
 
 # Define Grand average variables to plot TRF evoked responses
 feature_evokeds = {}
-for feature in trial_params['input_features']:
+for feature in trf_params['input_features']:
     feature_evokeds[feature] = []
 
 # MSS whole trial evokeds
@@ -102,7 +105,7 @@ for subject_code in exp_info.subjects_ids:
         subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
         # Load MEG
         if meg_params['band_id']:
-            meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], save_data=save_data)
+            meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], use_ica_data=True, save_data=save_data)
         else:
             meg_data = load.ica_data(subject=subject)
     elif meg_params['data_type'] == 'RAW':
@@ -139,15 +142,15 @@ for subject_code in exp_info.subjects_ids:
 
     # Reconstruct ntire signal from selected features TRFs
     reconstructed_meg = functions_analysis.reconstruct_meg_from_trf(subject=subject, rf=rf, meg_data=meg_data,  picks=picks,
-                                                                    trial_params=trial_params, meg_params=meg_params)
+                                                                    trial_params=trial_params, trf_params=trf_params, meg_params=meg_params)
 
     for mss_subj in [1, 2, 4]:
 
-        recon_tmin, recon_tmax, plot_xlim = functions_general.get_time_lims(epoch_id=trf_params['epoch_id'], mss=mss_subj, plot_edge=plot_edge)
+        recon_tmin, recon_tmax, plot_xlim = functions_general.get_time_lims(epoch_id=trial_params['epoch_id'], mss=mss_subj, plot_edge=plot_edge)
 
         print(f'Epoching data for MSS: {mss_subj}')
         # Epoch data
-        epochs, events = functions_analysis.epoch_data(subject=subject, meg_data=reconstructed_meg, epoch_id=trf_params['epoch_id'], mss=mss_subj,
+        epochs, events = functions_analysis.epoch_data(subject=subject, meg_data=reconstructed_meg, epoch_id=trial_params['epoch_id'], mss=mss_subj,
                                                        tgt_pres=trial_params['tgtpres'], corr_ans=trial_params['corrans'], trial_dur=trial_params['trialdur'],
                                                        baseline=trf_params['baseline'], reject=False, tmin=recon_tmin, tmax=recon_tmax,
                                                        save_data=False, epochs_save_path=None, epochs_data_fname=None)
@@ -157,7 +160,7 @@ for subject_code in exp_info.subjects_ids:
             trial_evokeds[mss_subj].append(evoked)
 
         else:
-            _, plot_baseline = functions_general.get_baseline_duration(epoch_id=trf_params['epoch_id'], mss=trial_params['mss'], tmin=recon_tmin, tmax=recon_tmax,
+            _, plot_baseline = functions_general.get_baseline_duration(epoch_id=trial_params['epoch_id'], mss=trial_params['mss'], tmin=recon_tmin, tmax=recon_tmax,
                                                                        cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur, plot_edge=plot_edge)
 
             power = functions_analysis.time_frequency(epochs=epochs, l_freq=l_freq, h_freq=h_freq, n_cycles_div=2., average=True, return_itc=False,
@@ -171,6 +174,12 @@ for subject_code in exp_info.subjects_ids:
 # Plot features Grand average evoked
 _ = functions_analysis.trf_grand_average(feature_evokeds=feature_evokeds, trf_params=trf_params, trial_params=trial_params, meg_params=meg_params,
                                          display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path)
+
+# Reconstructed power figure
+fig_r, _, ax_r, _, _ = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge*2, ax_len_div=24)
+title_r = f'Reconstructed signal HGamma average power'
+fig_r.suptitle(title_r)
+
 
 grand_avg = {}
 for mss in [1, 2, 4]:
@@ -189,12 +198,12 @@ for mss in [1, 2, 4]:
         grand_avg[mss] = mne.grand_average(trial_evokeds[mss])
 
         # Define time-frequency bands to plot in plot_joint
-        recon_tmin, recon_tmax, plot_xlim = functions_general.get_time_lims(epoch_id=trf_params['epoch_id'], mss=mss, plot_edge=plot_edge)
-        timefreqs_joint, timefreqs_tfr, vlines_times = functions_general.get_plots_timefreqs(epoch_id=trf_params['epoch_id'], mss=mss, cross2_dur=cross2_dur,
+        recon_tmin, recon_tmax, plot_xlim = functions_general.get_time_lims(epoch_id=trial_params['epoch_id'], mss=mss, plot_edge=plot_edge)
+        timefreqs_joint, timefreqs_tfr, vlines_times = functions_general.get_plots_timefreqs(epoch_id=trial_params['epoch_id'], mss=mss, cross2_dur=cross2_dur,
                                                                                              mss_duration=mss_duration, topo_bands=None, plot_xlim=plot_xlim,
                                                                                              plot_min=True, plot_max=True)
 
-        _, plot_baseline = functions_general.get_baseline_duration(epoch_id=trf_params['epoch_id'], mss=mss, tmin=recon_tmin, tmax=recon_tmax,
+        _, plot_baseline = functions_general.get_baseline_duration(epoch_id=trial_params['epoch_id'], mss=mss, tmin=recon_tmin, tmax=recon_tmax,
                                                                    cross1_dur=cross1_dur, mss_duration=mss_duration, cross2_dur=cross2_dur, plot_edge=plot_edge)
 
         # Plot Power time-frequency in time scalde axes
@@ -212,6 +221,9 @@ for mss in [1, 2, 4]:
         # Apply mean baseline
         baseline_power = broadband_power.data.mean(0).mean(0) - np.mean(broadband_power.data.mean(0).mean(0)[:idx0])
 
+        # Compute std
+        power_std = broadband_power.data.mean(0).std(0)
+
         # Define axes on right side of TF plot
         ax_tf_r = ax_tf.twinx()
 
@@ -223,3 +235,23 @@ for mss in [1, 2, 4]:
 
         if save_fig:
             save.fig(fig=fig, path=fig_path, fname=fname)
+
+        # Plot reconstructed power average
+        ax_r.plot(broadband_power.times, baseline_power, label=f'MSS: {mss}')
+        ax_r.fill_between(x=broadband_power.times, y1=baseline_power - power_std, y2=baseline_power + power_std, alpha=0.5)
+
+# Labels
+ax_r.set_xlabel('Time (s)')
+ax_r.set_ylabel('Reconstructed power (dB)')
+
+# Plot vlines
+ymin_r = ax_r.get_ylim()[0]
+ymax_r = ax_r.get_ylim()[1]
+
+for mss in [1, 2, 4]:
+    ax_r.vlines(x=(- mss_duration[mss] - cross2_dur), ymin=ymin_r, ymax=ymax_r, linestyles='--', colors='gray')
+for t in [0, - cross2_dur, - mss_duration[mss] - cross2_dur]:
+    ax_r.vlines(x=t, ymin=ymin_r, ymax=ymax_r, linestyles='--', colors='gray')
+
+if save_fig:
+    save.fig(fig=fig_r, path=fig_path, fname=title_r)
