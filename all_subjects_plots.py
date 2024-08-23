@@ -124,7 +124,7 @@ import save
 import matplotlib.pyplot as plt
 from paths import paths
 
-save_fig = False
+save_fig = True
 display_figs = True
 if display_figs:
     plt.ion()
@@ -303,6 +303,10 @@ ymax2 = ax2.get_ylim()[1]
 for t in [0, - cross2_dur, - mss_duration[mss] - cross2_dur]:
     ax1.vlines(x=t, ymin=ymin1, ymax=ymax1, linestyles='--', colors='gray')
     ax2.vlines(x=t, ymin=ymin2, ymax=ymax2, linestyles='--', colors='gray')
+
+# Remove blank space before and after
+ax1.autoscale(tight=True)
+ax2.autoscale(tight=True)
 
 if save_fig:
     fig_path = paths().plots_path() + 'Preprocessing/All_Subjects/'

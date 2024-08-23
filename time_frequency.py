@@ -32,10 +32,10 @@ else:
 #-----  Parameters -----#
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
-trial_params = {'epoch_id': 'it_fix_ms+tgt_fix_ms',
+trial_params = {'epoch_id': 'vs',
                 'corrans': None,
                 'tgtpres': None,
-                'mss': None,
+                'mss': [1, 2, 4],
                 'reject': None,
                 'evtdur': None,
                 'rel_sac': None
@@ -48,16 +48,16 @@ chs_ids = ['parietal_occipital']  # region_hemisphere
 use_ica_data = True
 
 # Power time frequency params
-n_cycles_div = 4.
-l_freq = 1
-h_freq = 40
-run_itc = True
+n_cycles_div = 2.
+l_freq = 40
+h_freq = 100
+run_itc = False
 plot_edge = 0.15
 
 # Plots parameters
 # Colorbar
-vmax_power = None
-vmin_power = None
+vmax_power = 0.05
+vmin_power = -0.05
 vmin_itc, vmax_itc = None, None
 # plot_joint max and min topoplots
 plot_max, plot_min = True, True
@@ -79,7 +79,7 @@ return_average_tfr = True
 output = 'power'
 
 # Permutations cluster test parameters
-run_permutations_ga = True
+run_permutations_ga = False
 run_permutations_dif = False
 n_permutations = 1024
 degrees_of_freedom = len(exp_info.subjects_ids) - 1
@@ -161,8 +161,6 @@ for param in param_values.keys():
                                                                                                       tmin=run_params['tmin'], tmax=run_params['tmax'],
                                                                                                       cross1_dur=cross1_dur, mss_duration=mss_duration,
                                                                                                       cross2_dur=cross2_dur, plot_edge=plot_edge)
-        # WARNING
-        run_params['plot_baseline'] = (0, 0)
 
         # Specific run path for saving data and plots
         if use_ica_data:
@@ -651,6 +649,9 @@ if 'mss' in param_values.keys() and trial_params['epoch_id'] == 'vs':
         ax_a.vlines(x=(- mss_duration[mss] - cross2_dur), ymin=ymin_a, ymax=ymax_a, linestyles='--', colors='gray')
     for t in [0, - cross2_dur, - mss_duration[mss] - cross2_dur]:
         ax_a.vlines(x=t, ymin=ymin_a, ymax=ymax_a, linestyles='--', colors='gray')
+
+    # Remove blank space before and after
+    ax_a.autoscale(tight=True)
 
     if save_fig:
 

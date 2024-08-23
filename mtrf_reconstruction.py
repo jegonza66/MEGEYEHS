@@ -253,5 +253,8 @@ for mss in [1, 2, 4]:
 for t in [0, - cross2_dur, - mss_duration[mss] - cross2_dur]:
     ax_r.vlines(x=t, ymin=ymin_r, ymax=ymax_r, linestyles='--', colors='gray')
 
+# Remove blank space before and after
+ax_r.autoscale(tight=True)
+
 if save_fig:
     save.fig(fig=fig_r, path=fig_path, fname=title_r)
