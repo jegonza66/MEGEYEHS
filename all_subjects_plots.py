@@ -257,8 +257,8 @@ for mss in [1, 2, 4]:
 # All MSS plots
 plot_edge = 0.15
 x_drop_size = int(plot_edge / time_step)
-fig1, axes_topo1, ax1, ax_cbar1, ax_tfr_cbar = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge*2, ax_len_div=24)
-fig2, axes_topo2, ax2, ax_cbar2, ax_tfr_cbar = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge*2, ax_len_div=24)
+fig1, axes_topo1, ax1, ax_cbar1, ax_tfr_cbar = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge*2, ax_len_div=24, fontsize=16, ticksize=16)
+fig2, axes_topo2, ax2, ax_cbar2, ax_tfr_cbar = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge*2, ax_len_div=24, fontsize=16, ticksize=16)
 
 for mss in [1, 2, 4]:
 
@@ -280,7 +280,7 @@ for mss in [1, 2, 4]:
 
     # Labels
     ax1.set_xlabel('Time (s)')
-    ax1.set_ylabel('Saccade rate (saccades/s)')
+    ax1.set_ylabel('Fixations/s)')
 
     # Plot Saccades
     title2 = f'Mean saccades rate (Window= {int(time_window * 1000)} ms)'
@@ -292,7 +292,7 @@ for mss in [1, 2, 4]:
 
     # Labels
     ax2.set_xlabel('Time (s)')
-    ax2.set_ylabel('Saccade rate (saccades/s)')
+    ax2.set_ylabel('Saccades/s')
 
 # Plot vlines
 ymin1 = ax1.get_ylim()[0]
@@ -300,7 +300,7 @@ ymin2 = ax2.get_ylim()[0]
 ymax1 = ax1.get_ylim()[1]
 ymax2 = ax2.get_ylim()[1]
 
-for t in [0, - cross2_dur, - mss_duration[mss] - cross2_dur]:
+for t in [0, - cross2_dur, - mss_duration[1] - cross2_dur, - mss_duration[2] - cross2_dur, - mss_duration[4] - cross2_dur]:
     ax1.vlines(x=t, ymin=ymin1, ymax=ymax1, linestyles='--', colors='gray')
     ax2.vlines(x=t, ymin=ymin2, ymax=ymax2, linestyles='--', colors='gray')
 
