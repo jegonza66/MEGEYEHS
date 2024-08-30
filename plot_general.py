@@ -857,17 +857,22 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
         pass
 
     # Convert view to list in case only 1 view as str
-    if type(views) == str:
+    if isinstance(views, str):
         views = [views]
 
     # Define clim
     if not clim:
-        clim = {'kind': 'values', 'lims': ((abs(stc.data).max() - abs(stc.data).min()) / 1.5,
-                                           (abs(stc.data).max() - abs(stc.data).min()) / 1.25,
-                                           (abs(stc.data).max() - abs(stc.data).min()))}
+        if initial_time != None:
+            initial_time_idx, _ = functions_general.find_nearest(array=stc.times, values=initial_time)
+        else:
+            initial_time_idx = None
+
+        clim = {'kind': 'values', 'lims': ((abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) / 1.5,
+                                           (abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) / 1.25,
+                                           (abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) * 1.1)}
 
         # Replace positive cbar for positive / negative
-        if positive_cbar == False or (stc.data.mean() - stc.data.std() <= 0 and positive_cbar != True):
+        if not positive_cbar or (stc.data.mean() - stc.data.std() <= 0 and positive_cbar != True):
             clim['pos_lims'] = clim.pop('lims')
 
     if surf_vol == 'volume':
