@@ -15,13 +15,14 @@ exp_info = setup.exp_info()
 # --------- Setup ---------#
 
 # Define surface or volume source space
-surf_vol = 'surface'
+surf_vol = 'volume'
 use_ica_data = True
 force_fsaverage = False
 ico = 5
 spacing = 5.
 pick_ori = None
-high_freq = True
+high_freq = False
+depth = 0
 
 # Define Subjects_dir as Freesurfer output folder
 mri_path = paths().mri_path()
@@ -186,7 +187,7 @@ for subject_code in exp_info.subjects_ids:
         # Define linearly constrained minimum variance spatial filter
         # reg parameter is for regularization on rank deficient matrices (rank < channels)
         filters = beamformer.make_lcmv(info=meg_data.info, forward=fwd, data_cov=data_cov, reg=0.05,
-                                       noise_cov=noise_cov, pick_ori=pick_ori, rank=dict(mag=rank))
+                                       noise_cov=noise_cov, pick_ori=pick_ori, rank=dict(mag=rank), depth=depth)
 
         # Save
         if high_freq:
@@ -209,9 +210,14 @@ for subject_code in exp_info.subjects_ids:
             mne.write_source_spaces(fname_src, src, overwrite=True)
 
         # Forward model
-        fwd = mne.make_forward_solution(meg_data.info, trans=trans_path, src=src, bem=bem)
         fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
-        mne.write_forward_solution(fname_fwd, fwd, overwrite=True)
+        try:
+            # Load
+            fwd = mne.read_forward_solution(fname=fname_fwd)
+        except:
+            # Compute
+            fwd = mne.make_forward_solution(meg_data.info, trans=trans_path, src=src, bem=bem)
+            mne.write_forward_solution(fname_fwd, fwd, overwrite=True)
 
         # Spatial filter
         rank = sum([ch_type == 'mag' for ch_type in meg_data.get_channel_types()]) - len(meg_data.info['bads'])
