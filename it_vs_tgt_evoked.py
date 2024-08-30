@@ -64,6 +64,7 @@ mins = {}
 
 # Figure
 fig, axs = plt.subplots(ncols=len(chs_ids), figsize=(17, 5))
+fig_both, ax_both = plt.subplots(figsize=(10, 5))
 
 for i, epoch_id in enumerate(epoch_ids):
 
@@ -135,10 +136,16 @@ for i, epoch_id in enumerate(epoch_ids):
         mins[epoch_id][lat_chs] = means[epoch_id][lat_chs].min()
 
         # Plot
+        # Separated plots
         axs[j].plot(evoked.times, means[epoch_id][lat_chs], color=f'C{i}', label=labels[i])
-        axs[j].fill_between(evoked.times, y1=means[epoch_id][lat_chs]-stds[epoch_id][lat_chs],
-                            y2=means[epoch_id][lat_chs]+stds[epoch_id][lat_chs], alpha=0.5, color=f'C{i}', edgecolor=None)
+        axs[j].fill_between(evoked.times, y1=means[epoch_id][lat_chs]-stds[epoch_id][lat_chs], y2=means[epoch_id][lat_chs]+stds[epoch_id][lat_chs], alpha=0.5, color=f'C{i}', edgecolor=None)
         axs[j].set_xlim(evoked.times[0], evoked.times[-1])
+
+        # Mixed plots
+        ax_both.plot(evoked.times, means[epoch_id][lat_chs], color=f'C{i}', label=labels[i])
+        ax_both.fill_between(evoked.times, y1=means[epoch_id][lat_chs] - stds[epoch_id][lat_chs], y2=means[epoch_id][lat_chs] + stds[epoch_id][lat_chs], alpha=0.5,
+                             color=f'C{i}', edgecolor=None)
+        ax_both.set_xlim(evoked.times[0], evoked.times[-1])
 
 if run_tfce:
     # Get subjects trf from both clases split in left and right
@@ -182,35 +189,70 @@ if run_tfce:
             # axs[1].axhline(y=axs[1].get_ylim()[1] - 5, xmin=xmin, xmax=xmax, color='k')
             axs[1].text(x=xmid, y=axs[1].get_ylim()[1], s='*')
 
+    # Both
+    if len(significant_clusters_left) == len(significant_clusters_right):
+        for cluster_left, cluster_right in zip(significant_clusters_left, significant_clusters_right):
+            set_left = set(cluster_left)
+            set_right = set(cluster_right)
+            # Find intersection of the sets (common elements)
+            significant_clusters_both = np.array(list(set_left.intersection(set_right)))
 
+            # Plot overlaped significance
+            xmin = (evoked.times[cluster[0]] - evoked.times[0]) / (evoked.times[-1] - evoked.times[0])
+            xmax = (evoked.times[cluster[-1]] - evoked.times[0]) / (evoked.times[-1] - evoked.times[0])
+            xmid = evoked.times[cluster[0]] + (evoked.times[cluster[-1]] - evoked.times[cluster[0]]) / 2
+            ax_both.axvspan(xmin=evoked.times[cluster[0]], xmax=evoked.times[cluster[-1]], ymin=0.95, ymax=0.95, color='k')
+            ax_both.text(x=xmid, y=ax_both.get_ylim()[1], s='*')
+
+fontsize = 22
 # Put legend to 2nd ax
-axs[0].legend(loc='lower left')
-axs[1].legend(loc='upper left')
+axs[0].legend(loc='lower left', fontsize=fontsize)
+axs[1].legend(loc='upper left', fontsize=fontsize)
+# Both
+handles, labels = ax_both.get_legend_handles_labels()
+by_label = dict(zip(labels, handles))
+ax_both.legend(by_label.values(), by_label.keys(), fontsize=fontsize)
+
 # Plot vertical lines
 axs[0].vlines(x=0, ymin=axs[0].get_ylim()[0], ymax=axs[0].get_ylim()[1], color='gray')
 axs[1].vlines(x=0, ymin=axs[1].get_ylim()[0], ymax=axs[1].get_ylim()[1], color='gray')
+ax_both.vlines(x=0, ymin=axs[1].get_ylim()[0], ymax=axs[1].get_ylim()[1], color='gray')
+
+# Set labels
 axs[0].set_xlabel('time (s)')
-axs[1].set_xlabel('time (s)')
 axs[0].set_ylabel('FRF (fT)')
+axs[1].set_xlabel('time (s)')
 axs[1].set_ylabel('FRF (fT)')
+ax_both.set_xlabel('time (s)')
+ax_both.set_ylabel('FRF (fT)')
+axs[0].xaxis.label.set_fontsize(fontsize)
+axs[0].yaxis.label.set_fontsize(fontsize)
+axs[1].xaxis.label.set_fontsize(fontsize)
+axs[1].yaxis.label.set_fontsize(fontsize)
+ax_both.xaxis.label.set_fontsize(fontsize)
+ax_both.yaxis.label.set_fontsize(fontsize)
+axs[0].xaxis.set_tick_params(labelsize=fontsize)
+axs[0].yaxis.set_tick_params(labelsize=fontsize)
+axs[1].xaxis.set_tick_params(labelsize=fontsize)
+axs[1].yaxis.set_tick_params(labelsize=fontsize)
+ax_both.xaxis.set_tick_params(labelsize=fontsize)
+ax_both.yaxis.set_tick_params(labelsize=fontsize)
+
+# Title
 if run_tfce:
     fig.suptitle(f'Target vs. Distractor FRF {chs_id} (t_threshold: {round(t_thresh, 2)} - Significance threshold: {pval_threshold})')
+    fig_both.suptitle(f'Target vs. Distractor FRF {chs_id} (t_threshold: {round(t_thresh, 2)} - Significance threshold: {pval_threshold})')
 else:
     fig.suptitle(f'Target vs. Distractor FRF {chs_id}')
+    fig_both.suptitle(f'Target vs. Distractor FRF {chs_id}')
 
-axs[0].xaxis.label.set_fontsize(18)
-axs[0].yaxis.label.set_fontsize(18)
-axs[1].xaxis.label.set_fontsize(18)
-axs[1].yaxis.label.set_fontsize(18)
-axs[0].xaxis.set_tick_params(labelsize=18)
-axs[0].yaxis.set_tick_params(labelsize=18)
-axs[1].xaxis.set_tick_params(labelsize=18)
-axs[1].yaxis.set_tick_params(labelsize=18)
-
+# Limits
 axs[0].set_xlim(left=-0.2, right=0.5)
 axs[1].set_xlim(left=-0.2, right=0.5)
+ax_both.set_xlim(left=-0.2, right=0.5)
 
 fig.tight_layout()
+fig_both.tight_layout()
 
 if save_fig:
     fig_path = paths().plots_path() + f'Evoked_{data_type}/it_vs_tgt/'
@@ -220,6 +262,7 @@ if save_fig:
     else:
         fname += f'_t{round(t_thresh, 2)}_p{pval_threshold}'
     save.fig(fig=fig, path=fig_path, fname=fname)
+    save.fig(fig=fig_both, path=fig_path, fname=fname + '_both')
 
 # Plot topographies
 topo_times = [0.1, 0.3]
