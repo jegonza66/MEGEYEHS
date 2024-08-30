@@ -176,7 +176,7 @@ _ = functions_analysis.trf_grand_average(feature_evokeds=feature_evokeds, trf_pa
                                          display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path)
 
 # Reconstructed power figure
-fig_r, _, ax_r, _, _ = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge*2, ax_len_div=24)
+fig_r, _, ax_r, _, _ = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge*2, ax_len_div=24, fontsize=16, ticksize=16)
 title_r = f'Reconstructed signal HGamma average power'
 fig_r.suptitle(title_r)
 
@@ -248,9 +248,7 @@ ax_r.set_ylabel('Reconstructed power (dB)')
 ymin_r = ax_r.get_ylim()[0]
 ymax_r = ax_r.get_ylim()[1]
 
-for mss in [1, 2, 4]:
-    ax_r.vlines(x=(- mss_duration[mss] - cross2_dur), ymin=ymin_r, ymax=ymax_r, linestyles='--', colors='gray')
-for t in [0, - cross2_dur, - mss_duration[mss] - cross2_dur]:
+for t in [0, - cross2_dur, - mss_duration[1] - cross2_dur, - mss_duration[2] - cross2_dur, - mss_duration[4] - cross2_dur]:
     ax_r.vlines(x=t, ymin=ymin_r, ymax=ymax_r, linestyles='--', colors='gray')
 
 # Remove blank space before and after
