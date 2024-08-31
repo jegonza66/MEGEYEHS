@@ -613,7 +613,7 @@ for param in param_values.keys():
 if 'mss' in param_values.keys() and trial_params['epoch_id'] == 'vs':
 
     # Avg power figure
-    fig_a, _, ax_a, _, _ = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge * 2, ax_len_div=24)
+    fig_a, _, ax_a, _, _ = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge * 2, ax_len_div=24, fontsize=16, ticksize=16)
     title_a = f'Original signal HGamma average power'
     fig_a.suptitle(title_a)
 
@@ -645,9 +645,7 @@ if 'mss' in param_values.keys() and trial_params['epoch_id'] == 'vs':
     ymin_a = ax_a.get_ylim()[0]
     ymax_a = ax_a.get_ylim()[1]
 
-    for mss in [1, 2, 4]:
-        ax_a.vlines(x=(- mss_duration[mss] - cross2_dur), ymin=ymin_a, ymax=ymax_a, linestyles='--', colors='gray')
-    for t in [0, - cross2_dur, - mss_duration[mss] - cross2_dur]:
+    for t in [0, - cross2_dur, - mss_duration[1] - cross2_dur, - mss_duration[2] - cross2_dur, - mss_duration[4] - cross2_dur]:
         ax_a.vlines(x=t, ymin=ymin_a, ymax=ymax_a, linestyles='--', colors='gray')
 
     # Remove blank space before and after
