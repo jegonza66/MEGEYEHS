@@ -29,22 +29,20 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': 'vs',  # use'+' to mix conditions (red+blue)
+trial_params = {'epoch_id': 'it_fix_vs+tgt_fix_vs',  # use'+' to mix conditions (red+blue)
                 'corrans': None,
                 'tgtpres': None,
-                'mss': [1, 2, 4],
+                'mss': None,
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
                 'evtdur': None}
 
-meg_params = {'chs_id': 'parietal_occipital',
-              'band_id': 'HGamma',
-              'filter_sensors': True,
+meg_params = {'chs_id': 'mag',
+              'band_id': None,
+              'filter_sensors': False,
               'filter_method': 'iir',
               'data_type': 'ICA'
               }
 l_freq, h_freq = functions_general.get_freq_band(band_id=meg_params['band_id'])
-
-
 
 # Compare features
 run_comparison = False
@@ -58,8 +56,8 @@ spacing = 5.  # Only for volume source estimation
 pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
 source_power = False
 estimate_epochs = False  # epochs and covariance cannot be both true (but they can be both false and estimate sources from evoked)
-estimate_evoked = False
-estimate_source_tf = True
+estimate_evoked = True
+estimate_source_tf = False
 estimate_covariance = False
 visualize_alignment = False
 
@@ -72,14 +70,15 @@ bline_mode_ga = 'mean'
 plot_edge = 0.15
 
 # Plot
-initial_time = 0.
-positive_cbar = None  # None for free determination, False to include negative values
+initial_time = 0.1
+difference_initial_time = 0.3
+positive_cbar = True  # None for free determination, False to include negative values
 plot_individuals = True
 plot_ga = True
 
 # Permutations test
 run_permutations_GA = True
-run_permutations_diff = False
+run_permutations_diff = True
 desired_tval = 0.01
 p_threshold = 0.05
 mask_negatives = False
@@ -99,7 +98,7 @@ else:
 cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
 
 # Adapt to hfreq model
-if meg_params['band_id'] == 'HGamma' or meg_params['band_id'][0] > 40:
+if meg_params['band_id'] == 'HGamma' or ((isinstance(meg_params['band_id'], list) or isinstance(meg_params['band_id'], tuple)) and meg_params['band_id'][0] > 40):
     model_name = 'hfreq-' + model_name
 
 
@@ -175,10 +174,10 @@ for param in param_values.keys():
 
         # Define path
         if surf_vol == 'volume' or surf_vol == 'mixed':
-            fig_path = paths().plots_path() + (f"Source_Space_{meg_params['data_type']}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_"
+            fig_path = paths().plots_path() + (f"Source_Space_{meg_params['data_type']}/" + run_path + f"{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_"
                                                f"{pick_ori}_{bline_mode_subj}_{source_computation}/")
         else:
-            fig_path = paths().plots_path() + (f"Source_Space_{meg_params['data_type']}/' + run_path + f'{model_name}_{surf_vol}_ico{ico}_{pick_ori}_"
+            fig_path = paths().plots_path() + (f"Source_Space_{meg_params['data_type']}/" + run_path + f"{model_name}_{surf_vol}_ico{ico}_{pick_ori}_"
                                                f"{bline_mode_subj}_{source_computation}/")
 
         # Get parcelation labels
@@ -360,6 +359,9 @@ for param in param_values.keys():
 
                     # Drop edges due to artifacts from power computation
                     stc.crop(tmin=stc.tmin + plot_edge, tmax=stc.tmax - plot_edge)
+
+            else:
+                raise ValueError('No source estimation method was selected. Please select either estimating sources from evoked, epochs or covariance matrix.')
 
             if bline_mode_subj and not estimate_covariance:
                 # Apply baseline correction
@@ -677,10 +679,10 @@ for param in param_values.keys():
 
         # --------- Plot GA ---------#
         if plot_ga:
-            fname = 'GA'
+            fname = f'GA_{initial_time}'
             brain = plot_general.sources(stc=GA_stc, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=initial_time, surf_vol=surf_vol,
                                          force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, mask_negatives=mask_negatives,
-                                         positive_cbar=positive_cbar, views=['lat', 'med'], save_fig=save_fig, save_vid=True, fig_path=fig_path, fname=fname)
+                                         positive_cbar=positive_cbar, views=['lat', 'med'], save_fig=save_fig, save_vid=False, fig_path=fig_path, fname=fname)
 
         # --------- Test significance compared to baseline --------- #
         if run_permutations_GA and pick_ori != 'vector':
@@ -699,14 +701,14 @@ for param in param_values.keys():
                 fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
                 brain = plot_general.sources(stc=GA_stc_sig, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0, surf_vol=surf_vol,
                                      time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, views=['lat', 'med'],
-                                     mask_negatives=mask_negatives, positive_cbar=True, save_vid=False, save_fig=save_fig, fig_path=fig_path, fname=fname)
+                                     mask_negatives=mask_negatives, positive_cbar=positive_cbar, save_vid=False, save_fig=save_fig, fig_path=fig_path, fname=fname)
 
             # If time variable, visualize clusters using mne's function
             elif significance_mask is not None:
                 fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
                 brain = plot_general.sources(stc=stc_all_cluster_vis, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0,
                                              surf_vol=surf_vol, time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance,
-                                             views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=True,
+                                             views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=positive_cbar,
                                              save_vid=False, save_fig=save_fig, fig_path=fig_path, fname=fname)
 
 
@@ -750,10 +752,10 @@ for param in param_values.keys():
 
             # --------- Plots ---------#
             if plot_ga:
-                fname = f'GA'
-                brain = plot_general.sources(stc=GA_stc_diff, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0.408, surf_vol=surf_vol,
+                fname = f'GA_{difference_initial_time}'
+                brain = plot_general.sources(stc=GA_stc_diff, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=difference_initial_time, surf_vol=surf_vol,
                                              force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance, mask_negatives=mask_negatives,
-                                             views=['lat', 'med'], save_vid=False, save_fig=save_fig, fig_path=fig_path_diff, fname=fname, positive_cbar=True)
+                                             views=['lat', 'med'], save_vid=False, save_fig=save_fig, fig_path=fig_path_diff, fname=fname, positive_cbar=positive_cbar)
 
             #--------- Cluster permutations test ---------#
             if run_permutations_diff and pick_ori != 'vector':
@@ -771,12 +773,12 @@ for param in param_values.keys():
                     fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
                     brain = plot_general.sources(stc=GA_stc_diff_sig, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0,
                                                  surf_vol=surf_vol, time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance,
-                                                 views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=True,
+                                                 views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=positive_cbar,
                                                  save_vid=False, save_fig=save_fig, fig_path=fig_path_diff, fname=fname)
 
                 elif significance_mask is not None:
                     fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
                     brain = plot_general.sources(stc=stc_all_cluster_vis, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0,
                                                  surf_vol=surf_vol, time_label=time_label, force_fsaverage=force_fsaverage, estimate_covariance=estimate_covariance,
-                                                 views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=True,
+                                                 views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=positive_cbar,
                                                  save_vid=False, save_fig=save_fig, fig_path=fig_path_diff, fname=fname)
