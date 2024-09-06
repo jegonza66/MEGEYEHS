@@ -527,7 +527,7 @@ def compute_trf(subject, meg_data, trial_params, trf_params, meg_params, all_chs
     return rf
 
 
-def make_trf_evoked(subject, rf, meg_data, evokeds, trf_params, trial_params, meg_params, display_figs=True, plot_individuals=True, save_fig=True, fig_path=None):
+def make_trf_evoked(subject, rf, meg_data, trf_params, meg_params, evokeds=None, display_figs=False, plot_individuals=True, save_fig=True, fig_path=None):
     """
     Get model coeficients as separate responses to each feature.
 
@@ -591,7 +591,8 @@ def make_trf_evoked(subject, rf, meg_data, evokeds, trf_params, trial_params, me
             subj_evoked[feature] = mne.EvokedArray(data=trf[feature], info=meg_sub.info, tmin=trf_params['tmin'], baseline=trf_params['baseline'])
 
         # Append for Grand average
-        evokeds[feature].append(subj_evoked[feature])
+        if evokeds != None:
+            evokeds[feature].append(subj_evoked[feature])
 
         # Plot
         if plot_individuals:
@@ -764,8 +765,8 @@ def noise_csd(exp_info, subject, bads, use_ica_data, freqs):
     return noise_csd
 
 
-def estimate_sources_cov(subject, meg_params, trial_params,
-                         filters, active_times, rank, bline_mode_subj, save_data, cov_save_path, cov_act_fname, cov_baseline_fname, epochs_save_path, epochs_data_fname):
+def estimate_sources_cov(subject, meg_params, trial_params, filters, active_times, rank, bline_mode_subj, save_data, cov_save_path, cov_act_fname,
+                         cov_baseline_fname, epochs_save_path, epochs_data_fname):
 
     try:
         # Load covariance matrix
@@ -775,19 +776,8 @@ def estimate_sources_cov(subject, meg_params, trial_params,
         try:
             epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
         except:
-            # Compute epochs
-            if meg_params['data_type'] == 'ICA':
-                if meg_params['band_id'] and meg_params['filter_sensors']:
-                    meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], save_data=save_data,
-                                                  method=meg_params['filter_method'])
-                else:
-                    meg_data = load.ica_data(subject=subject)
-            elif meg_params['data_type'] == 'RAW':
-                if meg_params['band_id'] and meg_params['filter_sensors']:
-                    meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], use_ica_data=False,
-                                                  save_data=save_data, method=meg_params['filter_method'])
-                else:
-                    meg_data = subject.load_preproc_meg_data()
+            # Load MEG
+            meg_data = load.meg(subject=subject, meg_params=meg_params, save_data=save_data)
 
             # Epoch data
             epochs, events = epoch_data(subject=subject, meg_data=meg_data, mss=trial_params['mss'], corr_ans=trial_params['corrans'], tgt_pres=trial_params['tgtpres'],
