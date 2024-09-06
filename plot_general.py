@@ -846,7 +846,7 @@ def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, sub
         brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
 
 
-def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsaverage, estimate_covariance, save_fig, fig_path, fname, surface='pial', hemi='split', views='lateral',
+def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsaverage, source_estimation, save_fig, fig_path, fname, surface='pial', hemi='split', views='lateral',
             alpha=0.75, mask_negatives=False, time_label='auto', save_vid=True, positive_cbar=None, clim=None):
 
     # Close all plot figures
@@ -860,20 +860,37 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
     if isinstance(views, str):
         views = [views]
 
+    # Get time indexes matching selected time
+    if initial_time != None:
+        initial_time_idx, _ = functions_general.find_nearest(array=stc.times, values=initial_time)
+    else:
+        initial_time_idx = None
+
+    # If times to plot is list, average data in time interval
+    if isinstance(initial_time, list) and len(initial_time) == 2:
+        time_data = stc.data[:, initial_time_idx[0]:initial_time_idx[1]]
+        average_time_data = time_data.mean(axis=1)
+        # Overwrite data in first initial time
+        stc.data[:, initial_time_idx[0]] = average_time_data
+        stc.data[:, initial_time_idx[1]] = average_time_data
+        # Set initial time to plot first initial time
+        initial_time_plot = initial_time[0]
+
+    # if float just plot at selected time
+    else:
+        initial_time_plot = initial_time
+
     # Define clim
     if not clim:
-        if initial_time != None:
-            initial_time_idx, _ = functions_general.find_nearest(array=stc.times, values=initial_time)
-        else:
-            initial_time_idx = None
 
         clim = {'kind': 'values', 'lims': ((abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) / 1.5,
                                            (abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) / 1.25,
                                            (abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) * 1.1)}
 
         # Replace positive cbar for positive / negative
-        if not positive_cbar or (stc.data.mean() - stc.data.std() <= 0 and positive_cbar != True):
+        if not positive_cbar or (stc.data[:, initial_time_idx].mean() - stc.data[:, initial_time_idx].std() <= 0 and positive_cbar != True):
             clim['pos_lims'] = clim.pop('lims')
+
 
     if surf_vol == 'volume':
 
@@ -886,18 +903,20 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
         # Set backend
         matplotlib.use('TkAgg')
 
-        fig = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, initial_time=initial_time, clim=clim, bg_img=bg_img)
+        fig = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, initial_time=initial_time_plot, clim=clim, bg_img=bg_img)
         if save_fig:
             if force_fsaverage:
                 fname += '_fsaverage'
             if mask_negatives:
                 fname += '_masked'
+            if initial_time != None and not source_estimation == 'cov':
+                fname += f'_{initial_time}'
             os.makedirs(fig_path, exist_ok=True)
             save.fig(fig=fig, path=fig_path, fname=fname)
 
         # 3D plot
         brain = stc.plot_3d(src=src, subject=subject, subjects_dir=subjects_dir, hemi=hemi, views=views, clim=clim,
-                            initial_time=initial_time, size=(1000, 500), time_label=time_label, brain_kwargs=dict(surf=surface, alpha=alpha))
+                            initial_time=initial_time_plot, size=(1000, 500), time_label=time_label, brain_kwargs=dict(surf=surface, alpha=alpha))
 
         if save_fig:
             view_fname = fname + f'_3D'
@@ -908,7 +927,7 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
             os.makedirs(fig_path + '/svg/', exist_ok=True)
             brain.save_image(filename=fig_path + view_fname + '.png')
             brain.save_image(filename=fig_path + '/svg/' + view_fname + '.pdf')
-            if save_vid and not estimate_covariance:
+            if save_vid and not source_estimation == 'cov':
                 try:
                     brain.save_movie(filename=fig_path + view_fname + '.mp4', time_dilation=12, framerate=30)
                 except:
@@ -917,7 +936,7 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
     # 3D plot
     elif surf_vol == 'surface':
 
-        brain = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, hemi=hemi, clim=clim, initial_time=initial_time, views=views, size=(1000, 500),
+        brain = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, hemi=hemi, clim=clim, initial_time=initial_time_plot, views=views, size=(1000, 500),
                          brain_kwargs=dict(surf=surface, alpha=alpha))
 
         if save_fig:
@@ -929,7 +948,7 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
             os.makedirs(fig_path + '/svg/', exist_ok=True)
             brain.save_image(filename=fig_path + view_fname + '.png')
             brain.save_image(filename=fig_path + '/svg/' + view_fname + '.pdf')
-            if save_vid and not estimate_covariance:
+            if save_vid and not source_estimation == 'cov':
                 try:
                     brain.save_movie(filename=fig_path + view_fname + '.mp4', time_dilation=12, framerate=30)
                 except:
