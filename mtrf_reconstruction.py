@@ -134,7 +134,7 @@ for subject_code in exp_info.subjects_ids:
     # Get model coeficients as separate responses to each feature
     trf_fig_path = fig_path.replace('_SIM', '')
     subj_evoked, feature_evokeds = functions_analysis.make_trf_evoked(subject=subject, rf=rf, meg_data=meg_data, evokeds=feature_evokeds,
-                                                                      trf_params=trf_params, trial_params=trial_params, meg_params=meg_params,
+                                                                      trf_params=trf_params, meg_params=meg_params,
                                                                       display_figs=display_figs, plot_individuals=plot_individuals, save_fig=save_fig, fig_path=trf_fig_path)
 
     # Select channels and pick in data
