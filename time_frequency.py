@@ -49,19 +49,19 @@ use_ica_data = True
 
 # Power time frequency params
 n_cycles_div = 2.
-l_freq = 40
-h_freq = 100
+l_freq = 1
+h_freq = 40
 run_itc = False
 plot_edge = 0.15
 
 # Plots parameters
 # Colorbar
-vmax_power = 0.05
-vmin_power = -0.05
+vmax_power = 0.2
+vmin_power = -0.2
 vmin_itc, vmax_itc = None, None
 # plot_joint max and min topoplots
-plot_max, plot_min = True, True
-overlay_broadband_power = True
+plot_max, plot_min = False, True
+overlay_broadband_power = False
 
 # Baseline method
 # logratio: dividing by the mean of baseline values and taking the log
@@ -460,14 +460,14 @@ for param in param_values.keys():
                 plot_general.tfr_plotjoint_picks(tfr=grand_avg, plot_baseline=run_params['plot_baseline'], bline_mode=ga_plot_bline_mode, vlines_times=vlines_times,
                                                  timefreqs=timefreqs_joint, image_args=image_args, clusters_mask=clusters_mask, chs_id=chs_id, plot_xlim=plot_xlim,
                                                  plot_max=plot_max, plot_min=plot_min, vmin=vmin_power, vmax=vmax_power, display_figs=display_figs, save_fig=save_fig,
-                                                 trf_fig_path=trf_fig_path, fname=fname)
+                                                 trf_fig_path=trf_fig_path, fname=fname, fontsize=22, ticksize=22)
 
                 # Plot Power time-frequency in time scalde axes
                 fname = f'GA_{title}_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
                 fig, ax_tf = plot_general.tfr_times(tfr=grand_avg, chs_id=chs_id, timefreqs_tfr=timefreqs_tfr, baseline=run_params['plot_baseline'],
                                                     bline_mode=ga_plot_bline_mode, plot_xlim=plot_xlim, vlines_times=vlines_times, vmin=vmin_power, vmax=vmax_power,
                                                     topo_vmin=vmin_power, topo_vmax=vmax_power, display_figs=display_figs, save_fig=save_fig, fig_path=trf_fig_path,
-                                                    fname=fname, fontsize=18, ticksize=18)
+                                                    fname=fname, fontsize=22, ticksize=22)
 
                 if overlay_broadband_power:
 
@@ -485,12 +485,13 @@ for param in param_values.keys():
 
                     # Plot
                     ax_tf_r.plot(broadband_power.times, baseline_power, color=f'k', linewidth=3)
-                    ax_tf_r.set_ylabel('Average Power (dB)')
+                    ax_tf_r.set_ylabel('Avg. Power (dB)')
 
                     fig.tight_layout()
 
                     if save_fig:
-                        save.fig(fig=fig, path=trf_fig_path, fname=fname)
+                        fname_overlay = fname + '_overlay'
+                        save.fig(fig=fig, path=trf_fig_path, fname=fname_overlay)
 
 
 # --------- Permutation cluster test on difference between conditions ----------- #
@@ -614,7 +615,7 @@ if 'mss' in param_values.keys() and trial_params['epoch_id'] == 'vs':
 
     # Avg power figure
     fig_a, _, ax_a, _, _ = plot_general.fig_tf_times(time_len=cross1_dur + mss_duration[4] + cross2_dur + vs_dur[4][0] - plot_edge * 2, ax_len_div=24, fontsize=16, ticksize=16)
-    title_a = f'Original signal HGamma average power'
+    title_a = f'Original signal {l_freq} {h_freq} average power'
     fig_a.suptitle(title_a)
 
     for mss in param_values['mss']:
