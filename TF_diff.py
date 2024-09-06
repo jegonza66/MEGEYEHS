@@ -38,7 +38,7 @@ evt_dur = None
 # Time frequency params
 n_cycles_div = 2.
 l_freq = 1
-h_freq = 100
+h_freq = 40
 run_itc = False
 return_average_tfr = True
 output = 'power'
@@ -384,7 +384,8 @@ for mssh, mssl in [(2, 1), (4, 1), (4, 2)]:
                 fname = f'GA_Power_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_t{round(t_thresh, 2)}_pval{pval_threshold}_chs{significant_channels}'
 
             plot_general.tfr_plotjoint_picks(tfr=ga, plot_baseline=None, bline_mode=bline_mode, image_args=image_args, chs_id=chs_id, plot_max=True, plot_min=True, vmin=-0.2,
-                                             vmax=0.2, display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, clusters_mask=clusters_mask, fname=fname)
+                                             vmax=0.2, display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path, clusters_mask=clusters_mask, fname=fname,
+                                             fontsize=20, ticksize=20)
 
         if run_itc:
             # Plot ITC time-frequency
