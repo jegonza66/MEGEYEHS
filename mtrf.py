@@ -100,12 +100,12 @@ for subject_code in exp_info.subjects_ids:
 
     except:
         # Compute TRF for defined features
-        rf = functions_analysis.compute_trf(subject=subject, meg_data=meg_data, trial_params=trial_params, trf_params=trf_params,
+        rf = functions_analysis.compute_trf(subject=subject, meg_data=meg_data, trial_params=trial_params, trf_params=trf_params, meg_params=meg_params,
                                             save_data=save_data, trf_path=trf_path, trf_fname=trf_fname)
 
     # Get model coeficients as separate responses to each feature
     subj_evoked, feature_evokeds = functions_analysis.make_trf_evoked(subject=subject, rf=rf, meg_data=meg_data, evokeds=feature_evokeds,
-                                                                      trf_params=trf_params, trial_params=trial_params, meg_params=meg_params,
+                                                                      trf_params=trf_params, meg_params=meg_params,
                                                                       plot_individuals=plot_individuals, save_fig=save_fig, fig_path=fig_path)
 
 fname = f"{feature}_GA_{meg_params['chs_id']}"
