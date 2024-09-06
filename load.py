@@ -159,37 +159,6 @@ def ica_subject(exp_info, subject_code):
     return ica_subject
 
 
-# def raw_data(subject):
-#     """
-#     MEG data.
-#     """
-#
-#     print('\nLoading MEG data')
-#     # get subject path
-#     ctf_path = pathlib.Path(os.path.join(paths().ctf_path(), subject.subject_id))
-#     ds_files = list(ctf_path.glob('*{}*.ds'.format(subject.subject_id)))
-#     ds_files.sort()
-#
-#     # Load sesions
-#     # If more than 1 session concatenate all data to one raw data
-#     if len(ds_files) > 1:
-#         raws_list = []
-#         for i in range(len(ds_files)):
-#             raw = mne.io.read_raw_ctf(ds_files[i], system_clock='ignore')
-#             raws_list.append(raw)
-#         # MEG data structure
-#         raw = mne.io.concatenate_raws(raws_list, on_mismatch='warn')
-#
-#     # If only one session return that session as whole raw data
-#     elif len(ds_files) == 1:
-#         raw = mne.io.read_raw_ctf(ds_files[0], system_clock='ignore')
-#
-#     # Missing data
-#     else:
-#         raise ValueError('No .ds files found in subject directory: {}'.format(subject.subj_path))
-#
-#     return raw
-
 def filtered_data(subject, band_id, method='iir', use_ica_data=True, preload=False, save_data=False):
 
     if use_ica_data:
@@ -243,3 +212,21 @@ def ica_data(subject, preload=False):
         raise ValueError(f'No previous ica data found for subject {subject.subject_id}')
 
     return ica_data
+
+
+def meg(subject, meg_params, save_data=False):
+
+    if meg_params['data_type'] == 'ICA':
+        if meg_params['band_id'] and meg_params['filter_sensors']:
+            meg_data = filtered_data(subject=subject, band_id=meg_params['band_id'], save_data=save_data,
+                                          method=meg_params['filter_method'])
+        else:
+            meg_data = ica_data(subject=subject)
+    elif meg_params['data_type'] == 'RAW':
+        if meg_params['band_id'] and meg_params['filter_sensors']:
+            meg_data = filtered_data(subject=subject, band_id=meg_params['band_id'], use_ica_data=False,
+                                          save_data=save_data, method=meg_params['filter_method'])
+        else:
+            meg_data = subject.load_preproc_meg_data()
+
+    return meg_data
