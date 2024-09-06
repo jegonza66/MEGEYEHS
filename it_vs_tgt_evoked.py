@@ -322,7 +322,7 @@ run_tfce = True
 standarize = True
 band_id = None
 # Id
-epoch_ids = ['it_fix_subsampled', 'tgt_fix', 'blue', 'red']
+epoch_ids = ['it_fix_vs_subsampled', 'tgt_fix_vs', 'blue', 'red']
 # Pick MEG chs (Select channels or set picks = 'mag')
 chs_id = 'temporal'
 chs_ids = [f'{chs_id}_L', f'{chs_id}_R']
