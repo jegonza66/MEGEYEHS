@@ -211,7 +211,7 @@ for mss in [1, 2, 4]:
     saccades_rate_std = np.nanstd(all_saccades_rate[mss], axis=0)
 
     # Plot Fixations
-    fig, axes_topo, ax_tf, ax_cbar, ax_tfr_cbar = plot_general.fig_tf_times(time_len=total_trial_length, ax_len_div=23)
+    fig, axes_topo, ax_tf, ax_cbar, ax_tfr_cbar = plot_general.fig_tf_times(time_len=total_trial_length, ax_len_div=24)
     title = f'Mean fixation rate (MSS= {mss} - Window= {int(time_window * 1000)} ms)'
     fig.suptitle(title)
     ax_tf.plot(np.linspace(0, total_trial_length, len(fixations_rate_mean)), fixations_rate_mean)
@@ -232,7 +232,7 @@ for mss in [1, 2, 4]:
         save.fig(fig=fig, path=fig_path, fname=title)
 
     # Plot Saccades
-    fig, axes_topo, ax_tf, ax_cbar, ax_tfr_cbar = plot_general.fig_tf_times(time_len=total_trial_length, ax_len_div=23)
+    fig, axes_topo, ax_tf, ax_cbar, ax_tfr_cbar = plot_general.fig_tf_times(time_len=total_trial_length, ax_len_div=24)
     title = f'Mean saccades rate (MSS= {mss} - Window= {int(time_window * 1000)} ms)'
     fig.suptitle(title)
     ax_tf.plot(np.linspace(0, total_trial_length, len(fixations_rate_mean)), fixations_rate_mean)
