@@ -522,3 +522,247 @@ for mssh, mssl in [(4, 1), (4, 2), (2, 1)]:
                                 fig = stc.plot(src=fwd['src'], subject=subject_code, subjects_dir=subjects_dir)
                                 if save_fig:
                                     save.fig(fig=fig, path=source_fig_path, fname=fname)
+
+
+## Taken from source estimation
+
+# Source TF
+if estimate_source_tf:
+
+    #------------- EXTRACTING LABELS ----------------#
+    occipital_labels_id = ['cuneus', 'lateraloccipital', 'lingual', 'pericalcarine']
+    if surf_vol == 'volume':
+        labels_path = subjects_dir + f'/{subject_code}/mri/aparc+aseg.mgz'
+        labels = mne.get_volume_labels_from_aseg(labels_path, return_colors=False)
+        occipital_labels = [label for label in labels for occipital_id in occipital_labels_id if occipital_id in label]
+        used_labels = [labels_path, occipital_labels]
+
+    elif subject_code != 'fsaverage':
+        # Get labels for FreeSurfer cortical parcellation
+        labels = mne.read_labels_from_annot(subject=subject_code, parc='aparc', subjects_dir=subjects_dir)
+        used_labels = [label for label in labels for occipital_id in occipital_labels_id if label.name.startswith(occipital_id + '-')]
+
+    else:
+        labels = fsaverage_labels
+        used_labels = [label for label in labels for occipital_id in occipital_labels_id if label.name.startswith(occipital_id + '-')]
+
+    # Redefine stc epochs to iterate over
+    stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
+
+    # Average the source estimates within each label using sign-flips to reduce signal cancellations
+    label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=used_labels, src=src, mode='auto', return_generator=False)
+
+    occipital_source_array = np.array(label_ts)
+    freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)
+    n_cycles = freqs / 2.
+    source_tf_array = mne.time_frequency.tfr_array_morlet(occipital_source_array, sfreq=epochs.info['sfreq'], freqs=freqs, n_cycles=n_cycles, output='avg_power')
+    source_tf = mne.time_frequency.AverageTFR(info=epochs.copy().pick(epochs.ch_names[:occipital_source_array.shape[1]]).info, data=source_tf_array,
+                                              times=epochs.times, freqs=freqs, nave=len(label_ts))
+
+    source_tf.crop(tmin=epochs.tmin + plot_edge, tmax=epochs.tmax - plot_edge)
+
+    if bline_mode_subj == 'db':
+        source_tf.data = 10 * np.log10(
+            source_tf.data / np.expand_dims(
+                source_tf.copy().crop(tmin=run_params['plot_baseline'][0], tmax=run_params['plot_baseline'][1]).data.mean(axis=-1), axis=-1))
+    elif bline_mode_subj == 'ratio':
+        source_tf.data = source_tf.data / np.expand_dims(
+            source_tf.copy().crop(tmin=run_params['plot_baseline'][0], tmax=run_params['plot_baseline'][1]).data.mean(axis=-1), axis=-1)
+    elif bline_mode_subj == 'mean':
+        source_tf.data = source_tf.data - np.expand_dims(
+            source_tf.copy().crop(tmin=run_params['plot_baseline'][0], tmax=run_params['plot_baseline'][1]).data.mean(axis=-1), axis=-1)
+
+    source_tf.plot()
+
+
+    #------------ MAKING FILTER ON LABELS -----------#
+
+    occipital_labels_id = ['cuneus', 'lateraloccipital', 'lingual', 'pericalcarine']
+    if surf_vol == 'volume':
+        labels_path = subjects_dir + f'/{subject_code}/mri/aparc+aseg.mgz'
+        labels = mne.get_volume_labels_from_aseg(labels_path, return_colors=False)
+        occipital_labels = [label for label in labels for occipital_id in occipital_labels_id if occipital_id in label]
+        used_labels = [labels_path, occipital_labels]
+
+    elif subject_code != 'fsaverage':
+        # Get labels for FreeSurfer cortical parcellation
+        labels = mne.read_labels_from_annot(subject=subject_code, parc='aparc', subjects_dir=subjects_dir)
+        used_labels = [label for label in labels for occipital_id in occipital_labels_id if label.name.startswith(occipital_id + '-')]
+
+    else:
+        labels = fsaverage_labels
+        used_labels = [label for label in labels for occipital_id in occipital_labels_id if label.name.startswith(occipital_id + '-')]
+
+    unified_label = used_labels[0]
+    for i in range(len(used_labels) - 1):
+        unified_label += used_labels[i + 1]
+
+    # Load meg data previously
+    if meg_params['data_type'] == 'ICA':
+        if meg_params['band_id'] and meg_params['filter_sensors']:
+            meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], save_data=save_data,
+                                          method=meg_params['filter_method'])
+        else:
+            meg_data = load.ica_data(subject=subject)
+    elif meg_params['data_type'] == 'RAW':
+        if meg_params['band_id'] and meg_params['filter_sensors']:
+            meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], use_ica_data=False,
+                                          save_data=save_data, method=meg_params['filter_method'])
+        else:
+            meg_data = subject.load_preproc_meg_data()
+
+    # Make lcmv filter
+    data_cov = mne.compute_raw_covariance(meg_data, reject=dict(mag=4e-12), rank=None)
+    noise_cov = functions_analysis.noise_cov(exp_info=exp_info, subject=subject, bads=meg_data.info['bads'], use_ica_data=True, high_freq=True)
+    rank = sum([ch_type == 'mag' for ch_type in meg_data.get_channel_types()]) - len(meg_data.info['bads'])
+    if meg_params['data_type'] == 'ICA':
+        rank -= len(subject.ex_components)
+    filters = mne.beamformer.make_lcmv(meg_data.info, forward=fwd, data_cov=data_cov, reg=0.05, noise_cov=noise_cov, rank=dict(mag=rank), label=unified_label)
+
+    # Redefine stc epochs to iterate over
+    stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
+
+    # Average the source estimates within each label using sign-flips to reduce signal cancellations
+    label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=used_labels, src=src, mode='auto', return_generator=False)
+
+    occipital_source_array = np.array(label_ts)
+    freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)
+    n_cycles = freqs / 2.
+    source_tf_array = mne.time_frequency.tfr_array_morlet(occipital_source_array, sfreq=epochs.info['sfreq'], freqs=freqs, n_cycles=n_cycles,
+                                                          output='avg_power')
+    source_tf = mne.time_frequency.AverageTFR(info=epochs.copy().pick(epochs.ch_names[:occipital_source_array.shape[1]]).info, data=source_tf_array,
+                                              times=epochs.times, freqs=freqs, nave=len(label_ts))
+
+    source_tf.crop(tmin=epochs.tmin + plot_edge, tmax=epochs.tmax - plot_edge)
+
+    if bline_mode_subj == 'db':
+        source_tf.data = 10 * np.log10(
+            source_tf.data / np.expand_dims(
+                source_tf.copy().crop(tmin=run_params['plot_baseline'][0], tmax=run_params['plot_baseline'][1]).data.mean(axis=-1), axis=-1))
+    elif bline_mode_subj == 'ratio':
+        source_tf.data = source_tf.data / np.expand_dims(
+            source_tf.copy().crop(tmin=run_params['plot_baseline'][0], tmax=run_params['plot_baseline'][1]).data.mean(axis=-1), axis=-1)
+    elif bline_mode_subj == 'mean':
+        source_tf.data = source_tf.data - np.expand_dims(
+            source_tf.copy().crop(tmin=run_params['plot_baseline'][0], tmax=run_params['plot_baseline'][1]).data.mean(axis=-1), axis=-1)
+
+    source_tf.plot()
+
+
+    # ----------- TAKING VOXEL ON SUBJECTS SPACE ------------#
+    max_gamma_voxel_pos = np.array([-12, -75, 16])
+
+    # Extract time series from mni coords
+    used_voxels_mm = src[0]['rr'][src[0]['inuse'].astype(bool)] * 1000
+
+    voxel_idx = np.argmin(abs(used_voxels_mm - max_gamma_voxel_pos).sum(axis=1))
+
+    max_gamma_voxel = src[0]['vertno'][voxel_idx]
+
+    # Redefine stc epochs to iterate over
+    stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
+
+    max_gamma_epochs = []
+    for stc_epoch in stc_epochs:
+        # epoch_stc = stc_epoch.to_data_frame()
+        # voxels_columns = [f'VOL_{max_gamma_voxel}']
+        # max_gamma_epoch = epoch_stc.loc[:, epoch_stc.columns.isin(voxels_columns)].values
+        # max_gamma_epochs.append(max_gamma_epoch)
+
+        max_gamma_epoch = stc_epoch.data[voxel_idx]
+        max_gamma_epochs.append(max_gamma_epoch)
+
+    max_gamma_array = np.array(max_gamma_epochs)
+    # max_gamma_array = max_gamma_array.swapaxes(1, 2)
+    max_gamma_array = np.expand_dims(max_gamma_array, axis=1)
+
+    # Compute TF
+    freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)
+    n_cycles = freqs / 2.
+    source_tf_array = mne.time_frequency.tfr_array_morlet(max_gamma_array, sfreq=epochs.info['sfreq'], freqs=freqs, n_cycles=n_cycles, output='avg_power')
+    source_tf = mne.time_frequency.AverageTFR(info=epochs.copy().pick(epochs.ch_names[:1]).info, data=source_tf_array, times=epochs.times, freqs=freqs, nave=len(max_gamma_epochs))
+
+    # Drop plot edges
+    source_tf.crop(tmin=epochs.tmin + plot_edge, tmax=epochs.tmax - plot_edge)
+
+    # Apply baseline
+    if bline_mode_subj == 'db':
+        source_tf.data = 10 * np.log10(
+            source_tf.data / np.expand_dims(
+                source_tf.copy().crop(tmin=run_params['plot_baseline'][0], tmax=run_params['plot_baseline'][1]).data.mean(axis=-1), axis=-1))
+    elif bline_mode_subj == 'ratio':
+        source_tf.data = source_tf.data / np.expand_dims(
+            source_tf.copy().crop(tmin=run_params['plot_baseline'][0], tmax=run_params['plot_baseline'][1]).data.mean(axis=-1), axis=-1)
+    elif bline_mode_subj == 'mean':
+        source_tf.data = source_tf.data - np.expand_dims(
+            source_tf.copy().crop(tmin=run_params['plot_baseline'][0], tmax=run_params['plot_baseline'][1]).data.mean(axis=-1), axis=-1)
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(15, 5))
+    source_tf.plot(axes=ax)
+    for t in [-cross2_dur - mss_duration[run_params['mss']], -cross2_dur, 0]:
+        ax.vlines(x=t, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyles='--', colors='gray')
+
+
+    #----------- TAKING VOXEL ON MNI TEMPLATE SPACE (DEPRECATED MORPHING TO MNI TOOK TOO LONG) ------------#
+    max_gamma_box = {'x': (-10, 10), 'y': (-95, -70), 'z': (-5, 30)}
+
+    # Extract time series from mni coords
+    used_voxels_mm = src_default[0]['rr'][src_default[0]['inuse'].astype(bool)] * 1000
+
+    # Get voxels in box
+    voxel_idx = np.where((used_voxels_mm[:, 0] > max_gamma_box['x'][0]) & (used_voxels_mm[:, 0] < max_gamma_box['x'][1]) &
+                         (used_voxels_mm[:, 1] > max_gamma_box['y'][0]) & (used_voxels_mm[:, 1] < max_gamma_box['y'][1]) &
+                         (used_voxels_mm[:, 2] > max_gamma_box['z'][0]) & (used_voxels_mm[:, 2] < max_gamma_box['z'][1]))[0]
+
+    max_gamma_voxels = src_default[0]['vertno'][voxel_idx]
+
+    # Redefine stc epochs to iterate over
+    stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
+
+    # Morph to default subject
+    if subject_code != 'fsaverage':
+        # Define morph function
+        morph = mne.compute_source_morph(src=src, subject_from=subject_code, subject_to='fsaverage', src_to=src_default, subjects_dir=subjects_dir)
+
+    max_gamma_epochs = []
+    for stc_epoch in stc_epochs:
+        if subject_code:
+            # Apply morph
+            stc_default = morph.apply(stc_epoch)
+        epoch_stc = stc_epoch.to_data_frame()
+        voxels_columns = [f'VOL_{max_gamma_voxel}' for max_gamma_voxel in max_gamma_voxels]
+        max_gamma_epoch = epoch_stc.loc[:, epoch_stc.columns.isin(voxels_columns)].values
+        max_gamma_epochs.append(max_gamma_epoch)
+
+    max_gamma_array = np.array(max_gamma_epochs)
+    max_gamma_array = np.expand_dims(max_gamma_array, axis=1)
+    freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)
+    n_cycles = freqs / 2.
+    source_tf_array = mne.time_frequency.tfr_array_morlet(max_gamma_array, sfreq=epochs.info['sfreq'], freqs=freqs, n_cycles=n_cycles, output='avg_power')
+    source_tf = mne.time_frequency.AverageTFR(info=epochs.copy().pick(epochs.ch_names[:len(max_gamma_voxels)]).info, data=source_tf_array,
+                                              times=epochs.times, freqs=freqs, nave=len(max_gamma_epochs))
+
+    source_tf.crop(tmin=epochs.tmin + plot_edge, tmax=epochs.tmax - plot_edge)
+
+    if bline_mode_subj == 'db':
+        source_tf.data = 10 * np.log10(
+            source_tf.data / np.expand_dims(source_tf.copy().crop(tmin=run_params['plot_baseline'][0], tmax=run_params['plot_baseline'][1]).data.mean(axis=-1), axis=-1))
+    elif bline_mode_subj == 'ratio':
+        source_tf.data = source_tf.data / np.expand_dims(source_tf.copy().crop(tmin=run_params['plot_baseline'][0], tmax=run_params['plot_baseline'][1]).data.mean(axis=-1), axis=-1)
+    elif bline_mode_subj == 'mean':
+        source_tf.data = source_tf.data - np.expand_dims(source_tf.copy().crop(tmin=run_params['plot_baseline'][0], tmax=run_params['plot_baseline'][1]).data.mean(axis=-1), axis=-1)
+
+    # Save to variable
+    # sources_tf[param][param_value].append(source_tf)
+
+    if plot_individuals:
+        # Plot
+        fig, ax = plt.subplots(figsize=(15, 5))
+        source_tf.plot(axes=ax)
+        for t in [-cross2_dur - mss_duration[run_params['mss']], -cross2_dur, 0]:
+            ax.vlines(x=t, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyles='--', colors='gray')
+
+        if save_fig:
+            fname = f'{subject.subject_id}'
+        save.fig(fig=fig, path=fig_path, fname=fname)
