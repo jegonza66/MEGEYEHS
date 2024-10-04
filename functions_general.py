@@ -392,6 +392,8 @@ def get_freq_band(band_id):
             elif band == 'Broad':
                 l_freq = 0.5
                 h_freq = 100
+            else:
+                raise ValueError(f'Band id {band_id} not recognized.')
 
             l_freqs.append(l_freq)
             h_freqs.append(h_freq)
