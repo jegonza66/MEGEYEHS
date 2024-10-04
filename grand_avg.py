@@ -108,6 +108,9 @@ import mne
 from paths import paths
 import matplotlib.pyplot as plt
 import plot_general
+import save
+import numpy as np
+
 
 save_path = paths().save_path()
 plot_path = paths().plots_path()
@@ -115,24 +118,41 @@ exp_info = setup.exp_info()
 
 #----- Save data and display figures -----#
 display_figs = True
+save_fig = False
+
 if display_figs:
     plt.ion()
 else:
     plt.ioff()
 
-#-----  Select frequency band -----#
-band_id = None
-chs_id = 'mag'
-epoch_id = 'it_fix'
 
-# Get time windows from epoch_id name
-tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id)
+trial_params = {'epoch_id': 'it_fix_vs+tgt_fix_vs',  # use'+' to mix conditions (red+blue)
+                'corrans': None,
+                'tgtpres': None,
+                'mss': None,
+                'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
+                'evtdur': None,
+                'trialdur': None,
+                'tmin': -0.3,
+                'tmax': 0.6,
+                'baseline': (-0.3, -0.05)
+                }
 
-# Specific run path for saving data and plots
-run_path = f'/Band_{band_id}/{epoch_id}_{tmin}_{tmax}/'
+meg_params = {'chs_id': 'temporal',
+              'band_id': None,
+              'filter_sensors': False,
+              'filter_method': 'iir',
+              'data_type': 'ICA'
+              }
+
+# Paths
+run_path = (f"Band_{meg_params['band_id']}/{trial_params['epoch_id']}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_tgtpres{trial_params['tgtpres']}_"
+            f"trialdur{trial_params['trialdur']}_evtdur{trial_params['evtdur']}_{trial_params['tmin']}_{trial_params['tmax']}_bline{trial_params['baseline']}/")
+
+evoked_save_path = paths().save_path() + f"Evoked_{meg_params['data_type']}/" + run_path
 
 #----- Load Grand Average data -----#
-ga_save_path = save_path + f'Evoked/' + run_path
+ga_save_path = save_path + f'Evoked_{meg_params["data_type"]}/' + run_path
 grand_avg_data_fname = f'Grand_average_ave.fif'
 grand_avg = mne.read_evokeds(ga_save_path + grand_avg_data_fname, condition=0)
 
@@ -141,12 +161,24 @@ grand_avg_meg = grand_avg.copy().pick('mag')
 grand_avg_misc = grand_avg.copy().pick('misc')
 
 # Pick channels
-picks = functions_general.pick_chs(chs_id, info=grand_avg.info)
+picks = functions_general.pick_chs(chs_id=[meg_params['chs_id']], info=grand_avg.info)
 
-# Plot evoked
-save_fig = True
-fig_path = plot_path + f'Evoked/' + run_path
-fname = f'Grand_average_{chs_id}'
-plot_general.evoked(evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
-                    plot_gaze=True, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
-                    fig_path=fig_path, fname=fname)
+# Plot times
+topo_times = [0.09, 0.4]
+topo_times_span = [0.01, 0.2]
+
+# mask
+mask = np.zeros(grand_avg.data.shape)
+for ch in picks:
+    try:
+        mask[grand_avg.ch_names.index(ch), :] = 1
+    except:
+        pass
+mask = mask.astype(bool)
+mask_params = dict(markersize=10, markerfacecolor="grey", alpha=0.65)
+
+fig_topo = grand_avg.plot_topomap(times=topo_times, average=topo_times_span, cmap='bwr', show=display_figs, mask=mask, mask_params=mask_params, vlim=(-60, 60))
+if save_fig:
+    fig_path = ga_save_path.replace(paths().save_path(), paths().plots_path())
+    fname = f'{chs_id}_topomaps'
+    save.fig(fig=fig_topo, path=fig_path, fname=fname)
