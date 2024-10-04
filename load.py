@@ -5,7 +5,7 @@ import pathlib
 import pickle
 import mne
 import functions_general
-
+import glob
 
 
 def config(path, fname):
@@ -230,3 +230,27 @@ def meg(subject, meg_params, save_data=False):
             meg_data = subject.load_preproc_meg_data()
 
     return meg_data
+
+
+def time_frequency_range(file_path, l_freq, h_freq):
+
+    # MS difference
+    matching_files_ms = glob.glob(file_path)
+    if len(matching_files_ms):
+        for file in matching_files_ms:
+            l_freq_file = int(file.split('_')[-3])
+            h_freq_file = int(file.split('_')[-2])
+
+            # If file contains desired frequencies, Load
+            if l_freq_file <= l_freq and h_freq_file >= h_freq:
+                time_frequency = mne.time_frequency.read_tfrs(file)[0]
+
+                # Crop to desired frequencies
+                time_frequency = time_frequency.crop(fmin=l_freq, fmax=h_freq)
+                break
+            else:
+                raise ValueError('No file found with desired frequency range')
+    else:
+        raise ValueError('No file found with desired frequency range')
+
+    return time_frequency
