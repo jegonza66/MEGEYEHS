@@ -97,7 +97,6 @@ for mssh, mssl in [(2, 1), (4, 1), (4, 2)]:
     grand_avg_power_cross2_fname = f'Grand_Average_power_cross2_{l_freq}_{h_freq}_tfr.h5'
     grand_avg_itc_cross2_fname = f'Grand_Average_itc_cross2_{l_freq}_{h_freq}_tfr.h5'
 
-
     averages_power_ms_diff = []
     averages_itc_ms_diff = []
     averages_power_cross2_diff = []
@@ -126,21 +125,36 @@ for mssh, mssl in [(2, 1), (4, 1), (4, 2)]:
         trf_fig_path_subj = trf_fig_path + f'{subject.subject_id}/'
 
         try:
-            # Load difference data
-            power_diff_ms = mne.time_frequency.read_tfrs(trf_diff_save_path + 'ms_' + power_data_fname, condition=0)
-            power_diff_cross2 = mne.time_frequency.read_tfrs(trf_diff_save_path + 'cross2_' + power_data_fname, condition=0)
+            # MS difference
+            file_path = trf_diff_save_path + 'ms_' + power_data_fname.replace(f'{l_freq}_{h_freq}', '*')
+            power_diff_ms = load.time_frequency_range(file_path=file_path, l_freq=l_freq, h_freq=h_freq)
+            # Cross 2 difference
+            file_path = trf_diff_save_path + 'cross2_' + power_data_fname.replace(f'{l_freq}_{h_freq}', '*')
+            power_diff_cross2 = load.time_frequency_range(file_path=file_path, l_freq=l_freq, h_freq=h_freq)
+
             if run_itc:
-                itc_diff_ms = mne.time_frequency.read_tfrs(trf_diff_save_path + 'ms_' + itc_data_fname, condition=0)
-                itc_diff_cross2 = mne.time_frequency.read_tfrs(trf_diff_save_path + 'cross2_' + itc_data_fname, condition=0)
+                # MS difference
+                file_path = trf_diff_save_path + 'ms_' + itc_data_fname.replace(f'{l_freq}_{h_freq}', '*')
+                itc_diff_ms = load.time_frequency_range(file_path=file_path, l_freq=l_freq, h_freq=h_freq)
+
+                # MS difference
+                file_path = trf_diff_save_path + 'cross2_' + itc_data_fname.replace(f'{l_freq}_{h_freq}', '*')
+                itc_diff_cross2 = load.time_frequency_range(file_path=file_path, l_freq=l_freq, h_freq=h_freq)
+
         except:
             # Compute difference
             try:
-                # Load previous data
-                power_mssl = mne.time_frequency.read_tfrs(trf_path_mssl + power_data_fname, condition=0)
-                power_mssh = mne.time_frequency.read_tfrs(trf_path_mssh + power_data_fname, condition=0)
+                # MSSL
+                power_mssl = load.time_frequency_range(file_path=trf_path_mssl + power_data_fname, l_freq=l_freq, h_freq=h_freq)
+                # MSSSH
+                power_mssh = load.time_frequency_range(file_path=trf_path_mssh + power_data_fname, l_freq=l_freq, h_freq=h_freq)
+
                 if run_itc:
-                    itc_mssl = mne.time_frequency.read_tfrs(trf_path_mssl + itc_data_fname, condition=0)
-                    itc_mssh = mne.time_frequency.read_tfrs(trf_path_mssh + itc_data_fname, condition=0)
+                    # MSSL
+                    itc_diff_ms = load.time_frequency_range(file_path=trf_path_mssl + itc_data_fname, l_freq=l_freq, h_freq=h_freq)
+                    # MSSH
+                    itc_diff_cross2 = load.time_frequency_range(file_path=trf_path_mssh + itc_data_fname, l_freq=l_freq, h_freq=h_freq)
+
             except:
                 # Compute power using from epoched data
                 for mss, tmin, tmax, epochs_path, trf_save_path in zip((mssl, mssh), (tmin_mssl, tmin_mssh), (tmax_mssl, tmax_mssh),
@@ -208,14 +222,12 @@ for mssh, mssl in [(2, 1), (4, 1), (4, 2)]:
             if run_itc:
                 # mssl
                 itc_mssl_ms = itc_mssl.copy().crop(tmin=mssl_ms_window_times[0], tmax=mssl_ms_window_times[1])
-                itc_mssl_cross2 = itc_mssl.copy().crop(tmin=mssl_cross2_window_times[0],
-                                                       tmax=mssl_cross2_window_times[1])
+                itc_mssl_cross2 = itc_mssl.copy().crop(tmin=mssl_cross2_window_times[0], tmax=mssl_cross2_window_times[1])
                 # mssh
                 itc_mssh_ms = itc_mssh.copy().crop(tmin=mssl_ms_window_times[0], tmax=mssl_ms_window_times[1])
                 # Force matching times by copying variable and changin data
                 itc_mssh_cross2 = itc_mssl_cross2.copy()
-                itc_mssh_cross2.data = itc_mssh.copy().crop(tmin=mssh_cross2_window_times[0],
-                                                            tmax=mssh_cross2_window_times[1]).data
+                itc_mssh_cross2.data = itc_mssh.copy().crop(tmin=mssh_cross2_window_times[0], tmax=mssh_cross2_window_times[1]).data
 
             # Condition difference
             # MS
@@ -290,6 +302,11 @@ for mssh, mssl in [(2, 1), (4, 1), (4, 2)]:
     if run_itc:
         grand_avg_itc_ms_diff = mne.grand_average(averages_itc_ms_diff)
         grand_avg_itc_cross2_diff = mne.grand_average(averages_itc_cross2_diff)
+
+    # Set time relative to VS screen
+    grand_avg_power_cross2_diff.shift_time(tshift=-1, relative=False)
+    if run_itc:
+        grand_avg_itc_cross2_diff.shift_time(tshift=-1, relative=False)
 
     if save_data:
         # Save trf data
