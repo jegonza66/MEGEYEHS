@@ -518,7 +518,7 @@ def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, Non
         save.fig(fig=fig, path=trf_fig_path, fname=fname)
 
 
-def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, image_args=None, clusters_mask=None,
+def tfr_plotjoint_picks(tfr, plot_baseline=(None, 0), bline_mode=None, plot_xlim=(None, None), timefreqs=None, image_args=None, clusters_mask=None,
                         plot_max=True, plot_min=True, vmin=None, vmax=None, chs_id='mag', vlines_times=None, cmap='bwr',
                         display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
@@ -571,7 +571,7 @@ def tfr_plotjoint_picks(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(Non
 
     # Plot vertical lines
     tf_ax = fig.axes[0]
-    if not vlines_times:
+    if not vlines_times and (tfr_plotjoint.times[0] != 0 and tfr_plotjoint.times[-1] != 0):
         vlines_times = [0]
     for t in vlines_times:
         try:
@@ -866,19 +866,23 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
     else:
         initial_time_idx = None
 
-    # If times to plot is list, average data in time interval
-    if isinstance(initial_time, list) and len(initial_time) == 2:
-        time_data = stc.data[:, initial_time_idx[0]:initial_time_idx[1]]
-        average_time_data = time_data.mean(axis=1)
-        # Overwrite data in first initial time
-        stc.data[:, initial_time_idx[0]] = average_time_data
-        stc.data[:, initial_time_idx[1]] = average_time_data
-        # Set initial time to plot first initial time
-        initial_time_plot = initial_time[0]
+    if source_estimation != 'cov':
+        # If times to plot is list, average data in time interval
+        if isinstance(initial_time, list) and len(initial_time) == 2:
+            time_data = stc.data[:, initial_time_idx[0]:initial_time_idx[1]]
+            average_time_data = time_data.mean(axis=1)
+            # Overwrite data in first initial time
+            stc.data[:, initial_time_idx[0]] = average_time_data
+            stc.data[:, initial_time_idx[1]] = average_time_data
+            # Set initial time to plot first initial time
+            initial_time_plot = initial_time[0]
 
-    # if float just plot at selected time
+        # if float just plot at selected time
+        else:
+            initial_time_plot = initial_time
+    # Set plot times as None for cov method
     else:
-        initial_time_plot = initial_time
+        initial_time_plot = None
 
     # Define clim
     if not clim:
@@ -886,9 +890,9 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
         clim = {'kind': 'values', 'lims': ((abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) / 1.5,
                                            (abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) / 1.25,
                                            (abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) * 1.1)}
-
+        print(clim)
         # Replace positive cbar for positive / negative
-        if not positive_cbar or (stc.data[:, initial_time_idx].mean() - stc.data[:, initial_time_idx].std() <= 0 and positive_cbar != True):
+        if positive_cbar == False or (stc.data[:, initial_time_idx].mean() - stc.data[:, initial_time_idx].std() <= 0 and positive_cbar != True):
             clim['pos_lims'] = clim.pop('lims')
 
 
