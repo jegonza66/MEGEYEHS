@@ -30,37 +30,35 @@ else:
     plt.ioff()
 
 #-----  Parameters -----#
+use_ica_data = True
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
-trial_params = {'epoch_id': 'vs',
-                'corrans': None,
-                'tgtpres': None,
-                'mss': [1, 2, 4],
+trial_params = {'epoch_id': ['tgt_fix_vs', 'it_fix_vs_subsampled'],
+                'corrans': True,
+                'tgtpres': True,
+                'mss': None,
                 'reject': None,
                 'evtdur': None,
                 'rel_sac': None
                 }
-run_comparison = False
+run_comparison = True
 
 # Select channels
-chs_ids = ['parietal_occipital']  # region_hemisphere
-
-use_ica_data = True
+chs_ids = ['central_parietal']  # region_hemisphere
 
 # Power time frequency params
-n_cycles_div = 2.
 l_freq = 1
 h_freq = 40
-run_itc = False
+run_itc = True
 plot_edge = 0.15
 
 # Plots parameters
 # Colorbar
-vmax_power = 0.2
-vmin_power = -0.2
+vmax_power = None
+vmin_power = None
 vmin_itc, vmax_itc = None, None
 # plot_joint max and min topoplots
-plot_max, plot_min = False, True
+plot_max, plot_min = True, True
 overlay_broadband_power = False
 
 # Baseline method
@@ -79,8 +77,8 @@ return_average_tfr = True
 output = 'power'
 
 # Permutations cluster test parameters
-run_permutations_ga = False
-run_permutations_dif = False
+run_permutations_ga = True
+run_permutations_dif = True
 n_permutations = 1024
 degrees_of_freedom = len(exp_info.subjects_ids) - 1
 desired_tval = 0.01
@@ -132,7 +130,7 @@ for param in param_values.keys():
             trial_dur = None
 
         # morlet wavelet n_cycles divisor based on epochs duration
-        if not n_cycles_div and 'fix' in run_params['epoch_id'] or 'sac' in run_params['epoch_id']:
+        if 'fix' in run_params['epoch_id'] or 'sac' in run_params['epoch_id']:
             n_cycles_div = 4.
         else:
             n_cycles_div = 2.
@@ -173,7 +171,7 @@ for param in param_values.keys():
         # Redefine save id
         if 'rel_sac' in run_params.keys() and run_params['rel_sac'] != None:
             save_id = run_params['rel_sac'] + '_' + save_id
-        plot_id = f"{save_id}_{round(plot_xlim[0],2)}_{round(plot_xlim[1], 2)}_bline{run_params['baseline']}_cyc{int(n_cycles_div)}/"
+        plot_id = f"{save_id}_{round(plot_xlim[0],2)}_{round(plot_xlim[1], 2)}_bline{run_params['plot_baseline']}_cyc{int(n_cycles_div)}/"
 
         # Save data paths
         if return_average_tfr:
@@ -190,8 +188,8 @@ for param in param_values.keys():
 
         #------------ Run -------------#
         try:
-            # Raise error if run_permutations == True to load data from all subjects
-            if run_permutations_ga or (run_comparison and run_permutations_dif):
+            # Raise error if run_permutations or run_comparison == True to load data from all subjects
+            if run_permutations_ga or run_comparison:
                 raise ValueError
 
             # Get files matching name with extended frequency range
@@ -291,11 +289,14 @@ for param in param_values.keys():
                                 # If file contains desired frequencies, Load
                                 if l_freq_file <= l_freq and h_freq_file >= h_freq:
                                     itc = mne.time_frequency.read_tfrs(file)[0]
+
+                                    # Crop to desired frequencies
+                                    itc = itc.crop(fmin=l_freq, fmax=h_freq)
                                     break
-                            # Crop to desired frequencies
-                            itc = itc.crop(fmin=l_freq, fmax=h_freq)
+                                else:
+                                    raise ValueError('No file found with desired frequency range')
                         else:
-                            raise ValueError
+                            raise ValueError('No file found with desired frequency range')
 
                 except:
                     try:
@@ -312,7 +313,7 @@ for param in param_values.keys():
                         epochs, events = functions_analysis.epoch_data(subject=subject, mss=run_params['mss'], corr_ans=run_params['corrans'], trial_dur=trial_dur,
                                                                        tgt_pres=run_params['tgtpres'], baseline=run_params['baseline'], reject=run_params['reject'],
                                                                        rel_sac=run_params['rel_sac'], evt_dur=run_params['evtdur'], epoch_id=run_params['epoch_id'],
-                                                                       meg_data=meg_data, tmin=run_params['tmin'], tmax=run_params['tmax'], save_data=False,
+                                                                       meg_data=meg_data, tmin=run_params['tmin'], tmax=run_params['tmax'], save_data=save_data,
                                                                        epochs_save_path=epochs_save_path, epochs_data_fname=epochs_data_fname)
                     # Compute power and PLI over frequencies
                     if tf_method == 'morlet':
@@ -362,6 +363,9 @@ for param in param_values.keys():
                             plot_general.tfr_plotjoint_picks(tfr=itc, plot_baseline=None, bline_mode=bline_mode, vlines_times=vlines_times,
                                                              timefreqs=None, chs_id=chs_id, plot_xlim=plot_xlim, plot_max=plot_max, plot_min=plot_min, vmin=None,
                                                              vmax=None, display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path_subj, fname=fname)
+
+                # Free up memory
+                del(power, itc)
 
             # Compute grand average
             grand_avg_power = mne.grand_average(power_data[param][param_value])
@@ -454,7 +458,6 @@ for param in param_values.keys():
                     else:
                         fname = f'GA_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
 
-
                 #--------- Plots ---------#
                 # Power Plotjoint
                 plot_general.tfr_plotjoint_picks(tfr=grand_avg, plot_baseline=run_params['plot_baseline'], bline_mode=ga_plot_bline_mode, vlines_times=vlines_times,
@@ -532,15 +535,14 @@ for param in param_values.keys():
                     if run_permutations_dif:
                         subj_permutations_list = [power_data_dif, itc_data_dif]
                     else:
-                        subj_permutations_list = []
+                        subj_permutations_list = [None, None]
                 else:
                     ga_permutations_list = [grand_avg_power_dif]
                     titles_list = ['Power']
                     if run_permutations_dif:
                         subj_permutations_list = [power_data_dif]
                     else:
-                        subj_permutations_list = []
-
+                        subj_permutations_list = [None]
 
                 for grand_avg, subj_list, title in zip(ga_permutations_list, subj_permutations_list, titles_list):
 
@@ -591,14 +593,14 @@ for param in param_values.keys():
                             else:
                                 image_args = None
 
-                        if type(t_thresh) == dict:
+                        if isinstance(t_thresh, dict):
                             fname = f'GA_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_tTFCE_pval{pval_threshold}_chs{significant_channels}'
                         else:
                             fname = f'GA_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_t{round(t_thresh, 2)}_pval{pval_threshold}_chs{significant_channels}'
                     else:
                         image_args = None
                         clusters_mask = None
-                        if type(t_thresh) == dict:
+                        if isinstance(t_thresh, dict):
                             fname = f'GA_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
                         else:
                             fname = f'GA_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
