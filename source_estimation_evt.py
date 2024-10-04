@@ -29,16 +29,16 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': ['tgt_fix_vs', 'it_fix_vs_subsampled'],  # use'+' to mix conditions (red+blue)
-                'corrans': True,
-                'tgtpres': True,
-                'mss': None,
+trial_params = {'epoch_id': ['tgt_fix_vs'],  # use'+' to mix conditions (red+blue)
+                'corrans': None,
+                'tgtpres': None,
+                'mss': [1, 2, 4],
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
                 'evtdur': None}
 
 meg_params = {'chs_id': 'mag',
               'band_id': None,
-              'filter_sensors': False,
+              'filter_sensors': None,
               'filter_method': 'iir',
               'data_type': 'ICA'
               }
@@ -66,7 +66,7 @@ ico = 5
 spacing = 5.  # Only for volume source estimation
 pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
 source_power = False
-source_estimation = 'trf'  # 'epo' / 'evk' / 'cov' / 'trf'
+source_estimation = 'evk'  # 'epo' / 'evk' / 'cov' / 'trf'
 estimate_source_tf = False
 visualize_alignment = False
 
@@ -80,7 +80,7 @@ plot_edge = 0.15
 
 # Plot
 initial_time = 0.1
-difference_initial_time = [0.25, 0.35]
+difference_initial_time = 0.3
 positive_cbar = None  # None for free determination, False to include negative values
 plot_individuals = True
 plot_ga = True
@@ -160,7 +160,7 @@ for param in param_values.keys():
                                                                                                       cross2_dur=cross2_dur, plot_edge=plot_edge)
 
         # Paths
-        run_path = (f"/Band_{meg_params['band_id']}/{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}_"
+        run_path = (f"Band_{meg_params['band_id']}/{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}_"
                     f"trialdur{run_params['trialdur']}_evtdur{run_params['evtdur']}_{run_params['tmin']}_{run_params['tmax']}_bline{run_params['baseline']}/")
 
         # Data paths
@@ -171,7 +171,6 @@ for param in param_values.keys():
         # Source plots paths
         if source_power or source_estimation == 'cov':
             run_path = run_path.replace(f"{run_params['epoch_id']}_", f"{run_params['epoch_id']}_power_")
-        run_path = run_path.replace('Band_None', f"Band_{meg_params['band_id']}")
 
         # Define path
         if surf_vol == 'volume' or surf_vol == 'mixed':
@@ -445,7 +444,7 @@ for param in param_values.keys():
                 l_freq, h_freq = functions_general.get_freq_band(band_id=meg_params['band_id'])
                 stc.data = functions_general.butter_lowpass_filter(data=stc.data, h_freq=h_freq/2, sfreq=evoked.info['sfreq'], order=3)
 
-            # Morph to default subject
+            # Morph to MNI152 space
             if subject_code != 'fsaverage':
 
                 # Define morph function
@@ -454,15 +453,11 @@ for param in param_values.keys():
                 # Apply morph
                 stc_default = morph.apply(stc)
 
-                # Append to fs_stcs to make GA
-                stcs_default_dict[param][param_value].append(stc_default)
-
             else:
-                src_default = src
                 stc_default = stc
 
-                # Append to fs_stcs to make GA
-                stcs_default_dict[param][param_value].append(stc)
+            # Append to fs_stcs to make GA
+            stcs_default_dict[param][param_value].append(stc_default)
 
             # Plot
             if plot_individuals:
