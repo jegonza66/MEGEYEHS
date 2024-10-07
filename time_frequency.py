@@ -120,7 +120,7 @@ for param in param_values.keys():
         #---------- Setup ----------#
         # Redefine epoch id
         if 'rel_sac' in run_params.keys() and run_params['rel_sac'] != None:
-                run_params['epoch_id'] = run_params['epoch_id'].replace('fix', 'sac')
+            run_params['epoch_id'] = run_params['epoch_id'].replace('fix', 'sac')
 
         # Windows durations
         cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
@@ -413,38 +413,16 @@ for param in param_values.keys():
 
                     # Get channel adjacency
                     ch_adjacency_sparse = functions_general.get_channel_adjacency(info=grand_avg.info, ch_type='mag', picks='mag')
-                    # Clusters out type
-                    if type(t_thresh) == dict:
-                        out_type = 'indices'
-                    else:
-                        out_type = 'mask'
 
-                    # Permutations cluster test (TFCE if t_thresh as dict)
-                    t_tfce, clusters, p_tfce, H0 = permutation_cluster_1samp_test(X=permutations_test_data_array, threshold=t_thresh, n_permutations=n_permutations, out_type=out_type, n_jobs=4)
+                    # Define minimum significant channels to show on TF plot
+                    min_sig_chs = len(picks) * significant_channels
 
-                    # Make clusters mask
-                    if type(t_thresh) == dict:
-                        # If TFCE use p-vaues of voxels directly
-                        p_tfce = p_tfce.reshape(permutations_test_data_array.shape[-2:])  # Reshape to data's shape
-                        clusters_mask_plot = p_tfce < pval_threshold
-                        clusters_mask = None
-                    else:
-                        # Get significant clusters
-                        good_clusters_idx = np.where(p_tfce < pval_threshold)[0]
-                        significant_clusters = [clusters[idx] for idx in good_clusters_idx]
+                    # Run clusters permutations test
+                    clusters_mask, clusters_mask_plot = functions_analysis.run_time_frequency_test(data=permutations_test_data_array, pval_threshold=pval_threshold,
+                                                                                                   t_thresh=pval_threshold, n_permutations=n_permutations, min_sig_chs=min_sig_chs)
 
-                        # Reshape to data's shape by adding all clusters into one bool array
-                        clusters_mask = np.zeros(permutations_test_data_array[0].shape)
-                        if len(significant_clusters):
-                            for significant_cluster in significant_clusters:
-                                clusters_mask += significant_cluster
-                                clusters_mask_plot = clusters_mask.sum(axis=-1) > len(picks) * significant_channels
-                                clusters_mask_plot = clusters_mask_plot.astype(bool)
-
-                            # Cluster contour
-                            image_args = {'mask': clusters_mask_plot, 'mask_style': 'contour'}
-                        else:
-                            image_args = None
+                    # Define image args to plot mask
+                    image_args = {'mask': clusters_mask_plot, 'mask_style': 'contour'}
 
                     if type(t_thresh) == dict:
                         fname = f'GA_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_tTFCE_pval{pval_threshold}_chs{significant_channels}'
