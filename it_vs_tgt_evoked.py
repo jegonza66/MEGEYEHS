@@ -682,7 +682,7 @@ plot_edge = 0.15
 
 # Plot
 initial_time = 0.1
-difference_initial_time = [0.25, 0.35]
+difference_initial_time = 0.3
 positive_cbar = None  # None for free determination, False to include negative values
 plot_individuals = True
 plot_ga = True
@@ -726,12 +726,8 @@ param_values = {key: value for key, value in trial_params.items() if type(value)
 if param_values == {}:
     param_values = {list(trial_params.items())[0][0]: [list(trial_params.items())[0][1]]}
 
-# Save source estimates time courses on FreeSurfer
-stcs_default_dict = {}
-GA_stcs = {}
-
 # Paths
-run_path = (f"Band_{meg_params['band_id']}/{trial_params['epoch_id']}-{trial_params['epoch_id'][1]}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_tgtpres{trial_params['tgtpres']}_"
+run_path = (f"Band_{meg_params['band_id']}/{trial_params['epoch_id']}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_tgtpres{trial_params['tgtpres']}_"
             f"trialdur{trial_params['trialdur']}_evtdur{trial_params['evtdur']}_{trial_params['tmin']}_{trial_params['tmax']}_bline{trial_params['baseline']}/")
 
 # Source plots paths
@@ -754,7 +750,11 @@ if os.path.isfile(save_path_sources + fname):
     stcs_default_dict = load.var(file_path=save_path_sources + fname)
 else:
     print(f'File not fount at: {save_path_sources + fname}')
+
     # --------- Run ---------#
+    # Save source estimates time courses on FreeSurfer
+    stcs_default_dict = {}
+    GA_stcs = {}
     for param in param_values.keys():
         stcs_default_dict[param] = {}
         GA_stcs[param] = {}
@@ -1240,7 +1240,7 @@ for j in selected_box.keys():
                 fig.tight_layout()
 
                 # Save
-                save.fig(fig=fig, path=fig_path_diff, fname=str(titles))
+                save.fig(fig=fig, path=fig_path_diff, fname=titles[j])
 
 
 ## it vs tgt all channels FRF
