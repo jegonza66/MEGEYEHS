@@ -12,6 +12,7 @@ from mne.decoding import ReceptiveField
 from scipy import stats as stats
 from mne.stats import spatio_temporal_cluster_1samp_test, summarize_clusters_stc
 from tqdm import tqdm
+from mne.stats import permutation_cluster_1samp_test
 
 
 # ---------- Epoch Data ---------- #
@@ -905,6 +906,48 @@ def run_source_permutations_test(src, stc, source_data, subject, exp_info, save_
                                                                             t_thresh_name=t_thresh_name, p_threshold=p_threshold, masked_negatves=mask_negatives)
 
     return stc_all_cluster_vis, significant_voxels, significance_mask, t_thresh_name, time_label, p_threshold
+
+
+def run_time_frequency_test(data, pval_threshold, t_thresh, min_sig_chs, n_permutations=1024, ):
+
+    # Clusters out type
+    if type(t_thresh) == dict:
+        out_type = 'indices'
+    else:
+        out_type = 'mask'
+
+    # Permutations cluster test (TFCE if t_thresh as dict)
+    t_tfce, clusters, p_tfce, H0 = permutation_cluster_1samp_test(X=data, threshold=t_thresh, n_permutations=n_permutations,
+                                                                  out_type=out_type, n_jobs=4)
+
+    # Make clusters mask
+    if type(t_thresh) == dict:
+        # If TFCE use p-vaues of voxels directly
+        p_tfce = p_tfce.reshape(data.shape[-2:])  # Reshape to data's shape
+        clusters_mask_plot = p_tfce < pval_threshold
+        clusters_mask = None
+
+    else:
+        # Get significant clusters
+        good_clusters_idx = np.where(p_tfce < pval_threshold)[0]
+        significant_clusters = [clusters[idx] for idx in good_clusters_idx]
+
+        # Reshape to data's shape by adding all clusters into one bool array
+        clusters_mask = np.zeros(data[0].shape)
+        if len(significant_clusters):
+            for significant_cluster in significant_clusters:
+                clusters_mask += significant_cluster
+
+            if min_sig_chs:
+                clusters_mask_plot = clusters_mask.sum(axis=-1) > min_sig_chs
+            else:
+                clusters_mask_plot = clusters_mask.sum(axis=-1)
+            clusters_mask_plot = clusters_mask_plot.astype(bool)
+
+        else:
+            clusters_mask_plot = None
+
+    return clusters_mask, clusters_mask_plot
 
 
 def get_labels(parcelation, subjects_dir, surf_vol='surface'):
