@@ -959,3 +959,16 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
                     pass
 
     return brain
+
+
+def add_task_lines(y_text, fontsize=10, color='white', ax=None):
+    lines_times = [0, 2, 3]
+    text_times = [-.32, 1, 2.5, 3.75]
+    x_conditions = ['Cross 1', 'MS', 'Cross 2', 'VS']
+    if ax is None: ax = plt.gca()  # noqa
+    plt.sca(ax)
+    for line_time in lines_times:
+        plt.axvline(line_time, lw=2, color=color)
+    for x_t, t_t in zip(text_times, x_conditions):
+        plt.text(x_t, y_text, t_t, color=color, fontsize=fontsize, ha='center',
+                 va='center', fontweight='bold')
