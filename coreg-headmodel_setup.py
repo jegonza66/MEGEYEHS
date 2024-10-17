@@ -15,14 +15,14 @@ exp_info = setup.exp_info()
 # --------- Setup ---------#
 
 # Define surface or volume source space
-surf_vol = 'volume'
+surf_vol = 'surface'
 use_ica_data = True
 force_fsaverage = False
-ico = 5
+ico = 4
 spacing = 5.
 pick_ori = None
-high_freq = False
-depth = 0
+high_freq = True
+depth = None
 
 # Define Subjects_dir as Freesurfer output folder
 mri_path = paths().mri_path()
