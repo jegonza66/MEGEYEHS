@@ -1155,17 +1155,20 @@ pval_threshold = 0.05
 used_voxels_mm = src_default[0]['rr'][src_default[0]['inuse'].astype(bool)] * 1000
 
 # Plot
-selected_box = {0: {'x': (-10, 10), 'y': (-90, -75), 'z': (0, 15)},
-                1: {'x': (20, 40), 'y': (-50, -40), 'z': (5, 25)}}
-titles = ['V1', 'P3']
+selected_box = {0: {'x': (-10, 0), 'y': (9, 19), 'z': (37, 47)},
+                1: {'x': (0, 10), 'y': (9, 19), 'z': (37, 47)},
+                2: {'x': (-33, -23), 'y': (-11, -1), 'z': (59, 69)},
+                3: {'x': (25, 35), 'y': (-5, 5), 'z': (55, 65)}}
+
+titles = ['DACCL', 'DACCR', 'FEFL', 'FEFR']
 
 fontsize = 22
 
 for j in selected_box.keys():
     # Get voxels in box
-    voxel_idx = np.where((used_voxels_mm[:, 0] > selected_box[j]['x'][0]) & (used_voxels_mm[:, 0] < selected_box[j]['x'][1]) &
-                         (used_voxels_mm[:, 1] > selected_box[j]['y'][0]) & (used_voxels_mm[:, 1] < selected_box[j]['y'][1]) &
-                         (used_voxels_mm[:, 2] > selected_box[j]['z'][0]) & (used_voxels_mm[:, 2] < selected_box[j]['z'][1]))[0]
+    voxel_idx = np.where((used_voxels_mm[:, 0] >= selected_box[j]['x'][0]) & (used_voxels_mm[:, 0] <= selected_box[j]['x'][1]) &
+                         (used_voxels_mm[:, 1] >= selected_box[j]['y'][0]) & (used_voxels_mm[:, 1] <= selected_box[j]['y'][1]) &
+                         (used_voxels_mm[:, 2] >= selected_box[j]['z'][0]) & (used_voxels_mm[:, 2] <= selected_box[j]['z'][1]))[0]
 
     # Get selected voxels id
     selected_voxels = src_default[0]['vertno'][voxel_idx]
@@ -1234,13 +1237,13 @@ for j in selected_box.keys():
                 # Remove blank space before and after
                 axs[i].set_xlim(-0.2, 0.5)
 
-                # Title
-                fig.suptitle(f'{titles[j]} {str(selected_box[j])} (t_threshold: {round(t_thresh, 2)} - Significance threshold: {pval_threshold}', fontsize=fontsize)
+            # Title
+            fig.suptitle(f'{titles[j]}\n{str(selected_box[j])}\n(t_thres: {round(t_thresh, 2)} - p_thresh: {pval_threshold}', fontsize=fontsize)
 
-                fig.tight_layout()
+            fig.tight_layout()
 
-                # Save
-                save.fig(fig=fig, path=fig_path_diff, fname=titles[j])
+            # Save
+            save.fig(fig=fig, path=fig_path_diff, fname=titles[j])
 
 
 ## it vs tgt all channels FRF
