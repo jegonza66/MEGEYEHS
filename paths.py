@@ -289,3 +289,32 @@ class paths:
         os.makedirs(sources_path, exist_ok=True)
 
         return sources_path
+    
+
+    def fwd_path(self, subject, subject_code, ico, spacing, surf_vol):
+
+        sources_path_subject = self.sources_path() + subject.subject_id
+        
+        # Load forward model
+        if surf_vol == 'volume':
+            fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
+        elif surf_vol == 'surface':
+            fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
+        elif surf_vol == 'mixed':
+            fname_fwd = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}-fwd.fif'
+        
+        return fname_fwd
+    
+    def filter_path(self, subject, subject_code, ico, spacing, surf_vol, pick_ori, model_name):
+        
+        sources_path_subject = self.sources_path() + subject.subject_id
+        
+        # Load filter
+        if surf_vol == 'volume':
+            fname_filter = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
+        elif surf_vol == 'surface':
+            fname_filter = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-{model_name}.fif'
+        elif surf_vol == 'mixed':
+            fname_filter = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
+
+        return fname_filter
