@@ -1,3 +1,5 @@
+import os.path
+
 from tensorpac import Pac
 from tensorpac import EventRelatedPac
 import functions_general
@@ -10,6 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import plot_general
+import functions_analysis
 
 # Load experiment info
 exp_info = setup.exp_info()
@@ -42,11 +45,11 @@ meg_params = {'chs_id': 'occipital',
               }
 
 # Define PAC parameters
-l_freq_amp, h_freq_amp = 20, 100
-width_amp = 30
+l_freq_amp, h_freq_amp = 15, 100
+width_amp = 10
 step_amp = 2
 
-l_freq_pha, h_freq_pha = 4, 8
+l_freq_pha, h_freq_pha = 2, 8
 width_pha = 2
 step_pha = .2
 
@@ -57,7 +60,7 @@ cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
 
 # Get time limits based on epoch id
 time_map = {'vs': dict(tmin=0, tmax=2, plot_xlim=(0, 2)),
-            'ms': dict(tmin=-0.75, tmax=7, plot_xlim=(0, 7))}
+            'ms': dict(tmin=-0.75, tmax=5, plot_xlim=(0, 5))}
 
 if 'vs' in trial_params['epoch_id'] and 'fix' not in trial_params['epoch_id'] and 'sac' not in trial_params['epoch_id']:
     trial_dur = vs_dur[trial_params['mss']]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
@@ -135,8 +138,22 @@ for param in param_values.keys():
             # Data filenames
             epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
 
-            # Load epoched data
-            epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+            if os.path.isfile(epochs_save_path + epochs_data_fname):
+                # Load epoched data
+                epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+            else:
+                # Load meg data
+                if meg_params['data_type']:
+                    meg_data = load.ica_data(subject=subject)
+                else:
+                    meg_data = subject.load_preproc_meg_data()
+
+                # Epoch data
+                epochs, events = functions_analysis.epoch_data(subject=subject, mss=run_params['mss'], corr_ans=run_params['corrans'], trial_dur=trial_dur,
+                                                               tgt_pres=run_params['tgtpres'], baseline=run_params['baseline'], reject=run_params['reject'],
+                                                               evt_dur=run_params['evtdur'], epoch_id=run_params['epoch_id'],
+                                                               meg_data=meg_data, tmin=run_params['tmin'], tmax=run_params['tmax'], save_data=save_data,
+                                                               epochs_save_path=epochs_save_path, epochs_data_fname=epochs_data_fname)
 
             # Pick channels
             picks = functions_general.pick_chs(chs_id=meg_params['chs_id'], info=epochs.info)
