@@ -41,7 +41,7 @@ run_comparison = True
 
 meg_params = {'band_id': 'Theta',  # Frequency band (filter sensor space)
               'filter_method': 'iir',  # Only for envelope connectivity
-              'data_type': True
+              'data_type': 'ICA'
               }
 
 # Source estimation parameters
@@ -57,6 +57,7 @@ pick_ori = None  # 'vector' For dipoles, 'max_power' for
 parcelation = 'aparc'
 
 # Connectivity parameters
+label_extraction_mode = 'pca_flip'
 envelope_connectivity = False
 downsample_ts = False
 if envelope_connectivity:
@@ -133,7 +134,7 @@ for param in param_values.keys():
         run_path_data = f"Band_{band_path}/{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}" \
                         f"_trialdur{trialdur}_evtdur{run_params['evtdur']}_{tmin}_{tmax}"
 
-        epochs_save_path = paths().save_path() + f"Epochs_{meg_params['data_type']}/' + run_path_data + f'_bline{baseline}/"
+        epochs_save_path = paths().save_path() + f"Epochs_{meg_params['data_type']}/{run_path_data}_bline{baseline}/"
 
         # Source plots and data paths
         run_path_plot = run_path_data.replace('Band_None', f"Band_{meg_params['band_id']}")  # Replace band id for None because Epochs are the same on all bands
@@ -146,10 +147,10 @@ for param in param_values.keys():
                 downsample_path = f'ds{desired_sfreq}'
             else:
                 downsample_path = f'dsFalse'
-            final_path = f'{orthogonalization}_{downsample_path}_{connectivity_method}'
+            final_path = f'{orthogonalization}_{downsample_path}_{label_extraction_mode}_{connectivity_method}'
         else:
             main_path = 'Connectivity'
-            final_path = f'{connectivity_method}'
+            final_path = f'{label_extraction_mode}_{connectivity_method}'
 
         if surf_vol == 'volume':
             fig_path = paths().plots_path() + f"{main_path}_{meg_params['data_type']}/" + run_path_plot + \
@@ -294,7 +295,7 @@ for param in param_values.keys():
                     labels = fsaverage_labels
 
                 # Average the source estimates within each label using sign-flips to reduce signal cancellations
-                label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=labels, src=src, mode='auto', return_generator=False)
+                label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=labels, src=src, mode=label_extraction_mode, return_generator=False)
 
                 if envelope_connectivity:
                     if downsample_ts:
