@@ -908,7 +908,7 @@ def run_source_permutations_test(src, stc, source_data, subject, exp_info, save_
     return stc_all_cluster_vis, significant_voxels, significance_mask, t_thresh_name, time_label, p_threshold
 
 
-def run_time_frequency_test(data, pval_threshold, t_thresh, min_sig_chs, n_permutations=1024, ):
+def run_time_frequency_test(data, pval_threshold, t_thresh, min_sig_chs=0, n_permutations=1024):
 
     # Clusters out type
     if type(t_thresh) == dict:
