@@ -30,16 +30,17 @@ else:
     plt.ioff()
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
-trial_params = {'epoch_id': ['vs', 'cross1'],
-                'corrans': None,
-                'tgtpres': None,
+trial_params = {'epoch_id': ['it_fix_vs_subsampled', 'tgt_fix_vs'],
+                'corrans': True,
+                'tgtpres': True,
                 'mss': None,
                 'reject': None,
                 'evtdur': None,
                 }
 run_comparison = True
 
-meg_params = {'band_id': 'Theta',  # Frequency band (filter sensor space)
+meg_params = {'band_id': 'Beta',  # Frequency band (filter sensor space)
+              'filter_sensors': False,  # connectivity computation method includes filtering in desired frequency range
               'filter_method': 'iir',  # Only for envelope connectivity
               'data_type': 'ICA'
               }
@@ -100,7 +101,7 @@ for param in param_values.keys():
         if 'vs' in run_params['epoch_id'] and 'fix' not in run_params['epoch_id'] and 'sac' not in run_params['epoch_id']:
             trialdur = vs_dur[run_params['mss']]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
         else:
-            trialdur = vs_dur[run_params['mss']]
+            trialdur = None
 
         # Frequencies from band
         fmin, fmax = functions_general.get_freq_band(band_id=meg_params['band_id'])
@@ -109,7 +110,9 @@ for param in param_values.keys():
         map = dict(cross1={'tmin': 0, 'tmax': cross1_dur, 'plot_xlim': (None, None)},
                    ms={'tmin': 0, 'tmax': mss_duration[run_params['mss']], 'plot_xlim': (None, None)},
                    cross2={'tmin': 0, 'tmax': cross2_dur, 'plot_xlim': (None, None)},
-                   vs={'tmin': 0, 'tmax': vs_dur[run_params['mss']][0], 'plot_xlim': (None, None)})
+                   vs={'tmin': 0, 'tmax': vs_dur[run_params['mss']][0], 'plot_xlim': (None, None)},
+                   it_fix_vs_subsampled={'tmin': 0.25, 'tmax': 0.35, 'plot_xlim': (None, None)},
+                   tgt_fix_vs={'tmin': 0.25, 'tmax': 0.35, 'plot_xlim': (None, None)})
 
         tmin, tmax, _ = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], map=map)
 
@@ -117,6 +120,10 @@ for param in param_values.keys():
         baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=run_params['epoch_id'], mss=run_params['mss'], tmin=tmin, tmax=tmax,
                                                                           cross1_dur=cross1_dur, mss_duration=mss_duration,
                                                                           cross2_dur=cross2_dur, plot_edge=None)
+
+        # Connectivity tmin relative to epochs tmin time (label_ts restarts time to 0)s
+        con_tmin = 0
+        con_tmax = tmax - tmin
 
         # Load experiment info
         exp_info = setup.exp_info()
@@ -251,25 +258,14 @@ for param in param_values.keys():
                     # Load data
                     epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
                 except:
-                    if meg_params['data_type'] == 'ICA':
-                        if meg_params['band_id'] and envelope_connectivity:
-                            meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], save_data=save_data, method=meg_params['filter_method'])
-                        else:
-                            meg_data = load.ica_data(subject=subject)
-                    else:
-                        if meg_params['band_id'] and envelope_connectivity:
-                            meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], use_ica_data=False, save_data=save_data, method=meg_params['filter_method'])
-                        else:
-                            meg_data = subject.load_preproc_meg_data()
-                    try:
-                        epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
-                    except:
-                        # Epoch data
-                        epochs, events = functions_analysis.epoch_data(subject=subject, mss=run_params['mss'], corr_ans=run_params['corrans'], tgt_pres=run_params['tgtpres'],
-                                                                       epoch_id=run_params['epoch_id'], meg_data=meg_data, trial_dur=trialdur,
-                                                                       tmin=tmin, tmax=tmax, baseline=baseline, reject=run_params['reject'],
-                                                                       save_data=save_data, epochs_save_path=epochs_save_path,
-                                                                       epochs_data_fname=epochs_data_fname)
+                    meg_data = load.meg(subject=subject, meg_params=meg_params, save_data=save_data)
+
+                    # Epoch data
+                    epochs, events = functions_analysis.epoch_data(subject=subject, mss=run_params['mss'], corr_ans=run_params['corrans'], tgt_pres=run_params['tgtpres'],
+                                                                   epoch_id=run_params['epoch_id'], meg_data=meg_data, trial_dur=trialdur,
+                                                                   tmin=tmin, tmax=tmax, baseline=baseline, reject=run_params['reject'],
+                                                                   save_data=False, epochs_save_path=epochs_save_path,
+                                                                   epochs_data_fname=epochs_data_fname)
 
                 # Pick meg channels for source modeling
                 epochs.pick('meg')
@@ -323,7 +319,7 @@ for param in param_values.keys():
 
                 else:
                     con = mne_connectivity.spectral_connectivity_epochs(label_ts, method=connectivity_method, mode='multitaper', sfreq=epochs.info['sfreq'],
-                                                                        fmin=fmin, fmax=fmax, tmin=tmin, tmax=tmax, faverage=True, mt_adaptive=True)
+                                                                        fmin=fmin, fmax=fmax, tmin=con_tmin, tmax=con_tmax, faverage=True, mt_adaptive=True)
                 # Save
                 if save_data:
                     os.makedirs(save_path, exist_ok=True)
