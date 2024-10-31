@@ -916,6 +916,8 @@ def run_time_frequency_test(data, pval_threshold, t_thresh, min_sig_chs=0, n_per
     else:
         out_type = 'mask'
 
+    significant_pvalues = None
+
     # Permutations cluster test (TFCE if t_thresh as dict)
     t_tfce, clusters, p_tfce, H0 = permutation_cluster_1samp_test(X=data, threshold=t_thresh, n_permutations=n_permutations,
                                                                   out_type=out_type, n_jobs=4)
@@ -931,6 +933,7 @@ def run_time_frequency_test(data, pval_threshold, t_thresh, min_sig_chs=0, n_per
         # Get significant clusters
         good_clusters_idx = np.where(p_tfce < pval_threshold)[0]
         significant_clusters = [clusters[idx] for idx in good_clusters_idx]
+        significant_pvalues = [p_tfce[idx] for idx in good_clusters_idx]
 
         # Reshape to data's shape by adding all clusters into one bool array
         clusters_mask = np.zeros(data[0].shape)
@@ -947,7 +950,7 @@ def run_time_frequency_test(data, pval_threshold, t_thresh, min_sig_chs=0, n_per
         else:
             clusters_mask_plot = None
 
-    return clusters_mask, clusters_mask_plot
+    return clusters_mask, clusters_mask_plot, significant_pvalues
 
 
 def get_labels(parcelation, subjects_dir, surf_vol='surface'):
