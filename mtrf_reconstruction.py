@@ -34,7 +34,7 @@ trial_params = {'epoch_id': 'vs',
 
 # MEG parameters
 meg_params = {'chs_id': 'parietal_occipital',
-              'band_id': 'HGamma',
+              'band_id': 'Theta',
               'data_type': 'ICA'}
 
 # TRF parameters
@@ -46,12 +46,15 @@ trf_params = {'input_features': ['sac', 'fix'],
               'tmax': 0.1}
 
 trf_params['baseline'] = (None, None)
-# Convert input features stringo to list
+# Convert input features string to list
 if type(trf_params['input_features']) is str:
     trf_params['input_features'] = [trf_params['input_features']]
 
-# Get frequencies from band id
-l_freq, h_freq = functions_general.get_freq_band(band_id=meg_params['band_id'])
+# Get TF frequency limits
+if meg_params['band_id'] is None:
+    l_freq, h_freq = (1, 40)
+else:
+    l_freq, h_freq = functions_general.get_freq_band(band_id=meg_params['band_id'])
 
 # Window durations
 cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
