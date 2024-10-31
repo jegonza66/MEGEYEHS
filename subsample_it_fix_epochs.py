@@ -33,7 +33,7 @@ use_ica_data = True
 band_id = None
 chs_id = 'mag'
 # Id
-epoch_id = 'it_fix'
+epoch_id = 'it_fix_vs'
 corr_ans = True
 tgt_pres = True
 mss = None
@@ -43,12 +43,12 @@ reject = None
 
 
 # Get time windows from epoch_id name
-tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
+tmin, tmax, plot_xlim = 0.25, 0.35, (0.25, 0.25)
 # Baseline
-baseline = (tmin, -0.05)
+baseline = (tmin, 0.25)
 
 # Specific run path for saving data and plots
-run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_Corr{corr_ans}_tgt{tgt_pres}_tdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
+run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_corrans{corr_ans}_tgtpres{tgt_pres}_trialdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
 
 # Data type
 if use_ica_data:
@@ -72,16 +72,16 @@ for subject_code in exp_info.subjects_ids:
         subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
 
     # Load data paths
-    epochs_tgt_load_path = save_path + f'Epochs_{data_type}/' + run_path.replace('it_fix', 'tgt_fix')
+    epochs_tgt_load_path = save_path + f'Epochs_{data_type}/' + run_path.replace('it_fix', 'tgt_fix').replace(f'Band_{band_id}', 'Band_None')
     epochs_it_load_path = save_path + f'Epochs_{data_type}/' + run_path
 
     # Save data paths
-    epochs_it_save_path = epochs_it_load_path.replace('it_fix', 'it_fix_subsampled')
-    evoked_it_save_path = save_path + f'Evoked_{data_type}/' + run_path.replace('it_fix', 'it_fix_subsampled')
+    epochs_it_save_path = epochs_it_load_path.replace('it_fix_vs', 'it_fix_vs_subsampled')
+    evoked_it_save_path = save_path + f'Evoked_{data_type}/' + run_path.replace('it_fix_vs', 'it_fix_vs_subsampled')
 
     # Save figures paths
-    epochs_fig_path = plot_path + f'Epochs_{data_type}/' + run_path.replace('it_fix', 'it_fix_subsampled')
-    evoked_fig_path = plot_path + f'Evoked_{data_type}/' + run_path.replace('it_fix', 'it_fix_subsampled')
+    epochs_fig_path = plot_path + f'Epochs_{data_type}/' + run_path.replace('it_fix_vs', 'it_fix_vs_subsampled')
+    evoked_fig_path = plot_path + f'Evoked_{data_type}/' + run_path.replace('it_fix_vs', 'it_fix_vs_subsampled')
 
     # Data filenames
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
