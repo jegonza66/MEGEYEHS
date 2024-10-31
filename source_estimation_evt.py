@@ -29,16 +29,16 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': ['tgt_fix_vs'],  # use'+' to mix conditions (red+blue)
+trial_params = {'epoch_id': 'cross2',  # use'+' to mix conditions (red+blue)
                 'corrans': None,
                 'tgtpres': None,
-                'mss': [1, 2, 4],
+                'mss': [1, 4],
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
                 'evtdur': None}
 
 meg_params = {'chs_id': 'mag',
-              'band_id': None,
-              'filter_sensors': None,
+              'band_id': 'Alpha',
+              'filter_sensors': True,
               'filter_method': 'iir',
               'data_type': 'ICA'
               }
@@ -61,17 +61,16 @@ run_comparison = True
 # Source estimation parameters
 force_fsaverage = False
 model_name = 'lcmv'
-surf_vol = 'volume'
-ico = 5
+surf_vol = 'surface'
+ico = 4
 spacing = 5.  # Only for volume source estimation
 pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
 source_power = False
-source_estimation = 'evk'  # 'epo' / 'evk' / 'cov' / 'trf'
-estimate_source_tf = False
+source_estimation = 'cov'  # 'epo' / 'evk' / 'cov' / 'trf'
 visualize_alignment = False
 
 # Baseline
-if source_power or source_estimation == 'cov' or estimate_source_tf:
+if source_power or source_estimation == 'cov':
     bline_mode_subj = 'db'
 else:
     bline_mode_subj = 'mean'
@@ -245,7 +244,7 @@ for param in param_values.keys():
                     meg_data = load.meg(subject=subject, meg_params=meg_params, save_data=save_data)
 
                 else:
-                    if source_estimation == 'epo' or estimate_source_tf:
+                    if source_estimation == 'epo':
                         epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
                         # Pick meg channels for source modeling
                         epochs.pick('mag')
