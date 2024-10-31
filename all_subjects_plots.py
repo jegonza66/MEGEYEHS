@@ -92,10 +92,11 @@ for subject_code in exp_info.subjects_ids:
     all_corr_ans = pd.concat([all_corr_ans, corr_ans])
 
 # Define all subjects class instance
-subjects = setup.all_subjects(all_fixations, all_saccades, all_bh_data, all_rt, all_corr_ans, all_mss)
+subjects = setup.all_subjects(all_fixations, all_saccades, all_bh_data, all_rt.values, all_corr_ans.values, all_mss)
 
 plot_preproc.first_fixation_delay(subject=subjects)
 plot_preproc.pupil_size_increase(subject=subjects)
+plot_preproc.performance(subject=subjects)
 
 plt.rcParams.update({'font.size': 12})
 fig, axs = plt.subplots(2, 2, figsize=(12, 7))
