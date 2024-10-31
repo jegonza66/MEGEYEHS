@@ -447,8 +447,9 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
                        vsend={'tmin': -2, 'tmax': cross1_dur + 1, 'plot_xlim': (-2 + plot_edge, cross1_dur + 1 - plot_edge)},
                        sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.2 + plot_edge, 0.3 - plot_edge)},
                        fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
-                       blue={'tmin': -0.5, 'tmax': 5, 'plot_xlim': (-0.5 + plot_edge, 5 - plot_edge)},
-                       red={'tmin': -0.5, 'tmax': 5, 'plot_xlim': (-0.5 + plot_edge, 5 - plot_edge)})
+                       blue={'tmin': -1, 'tmax': 1.9, 'plot_xlim': (-1 + plot_edge, 1.9 - plot_edge)},
+                       red={'tmin': -1, 'tmax': 1.9, 'plot_xlim': (-1 + plot_edge, 1.9 - plot_edge)})
+
             if 'fix' in epoch_id:
                 tmin = map['fix']['tmin']
                 tmax = map['fix']['tmax']
@@ -490,7 +491,7 @@ def get_baseline_duration(epoch_id, mss, tmin, tmax, cross1_dur, mss_duration, c
     else:
         if 'sac' in epoch_id:
             baseline = (tmin, 0)
-        elif 'fix' in epoch_id or 'fix' in epoch_id:
+        elif 'fix' in epoch_id:
             baseline = (tmin, -0.05)
         elif 'ms' in epoch_id:
             baseline = (-cross1_dur, 0)
@@ -517,16 +518,16 @@ def get_baseline_duration(epoch_id, mss, tmin, tmax, cross1_dur, mss_duration, c
     if baseline[1] > tmax:
         baseline = (baseline[1], tmax)
     if baseline[0] > baseline[1]:
-        print('Baseline start is greater than end. Setting to (0, 0)')
-        baseline = (0, 0)
+        print('Baseline start is greater than end. Setting to (tmin)')
+        baseline = (tmin, tmin)
 
     if plot_baseline[0] < tmin:
         plot_baseline = (tmin, plot_baseline[1])
     if plot_baseline[1] > tmax:
         plot_baseline = (plot_baseline[0], tmax)
     if plot_baseline[0] > plot_baseline[1]:
-        print('Plot_baseline start is greater than end. Setting to (0, 0)')
-        plot_baseline = (0, 0)
+        print('Plot_baseline start is greater than end. Setting to (tmin)')
+        plot_baseline = (tmin, tmin)
 
     return baseline, plot_baseline
 
