@@ -33,19 +33,22 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': 'it_fix_vs',  # use'+' to mix conditions (red+blue)
+trial_params = {'epoch_id': ['it_fix_ms+tgt_fix_ms'],  # use'+' to mix conditions (red+blue)
                 'corrans': None,
                 'tgtpres': None,
-                'mss': [1, 4],
+                'mss': [1, 2, 4],
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
                 'evtdur': None}
 
 meg_params = {'regions_id': 'all',
               'band_id': None,
-              'filter_sensors': False,
+              'filter_sensors': None,
               'filter_method': 'iir',
               'data_type': 'ICA'
               }
+
+# Define active time limits
+active_times = None
 
 # Get TF frequency limits
 if meg_params['band_id'] is None:
@@ -64,18 +67,21 @@ labels_mode = 'pca_flip'
 ico = 4
 spacing = 5.  # Only for volume source estimation
 pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
-source_estimation = 'epo'  # 'epo' / 'evk' / 'cov' / 'trf'
+source_estimation = 'epo'
 estimate_source_tf = True
 visualize_alignment = False
 
 # Baseline
 bline_mode_subj = 'db'
-bline_mode_ga = 'mean'  # 'mean' or None
 plot_edge = 0.15
 
 # Plot
-plot_individuals = True
+plot_individuals = False
 plot_ga = True
+
+fontsize = 22
+params = {'font.size': fontsize}
+plt.rcParams.update(params)
 
 # Permutations test
 run_permutations_GA = True
@@ -123,6 +129,13 @@ aparc_region_labels = {'occipital': ['cuneus', 'lateraloccipital', 'lingual', 'p
 
 aparc_region_labels['all'] = [value for key in aparc_region_labels.keys() for value in aparc_region_labels[key]]
 
+# Extract region labels data
+region_labels = [element for region in meg_params['regions_id'].split('_') for element in aparc_region_labels[region]]
+
+# Get parcelation labels
+fsaverage_labels = functions_analysis.get_labels(parcelation='aparc', subjects_dir=subjects_dir, surf_vol=surf_vol)
+fsaverage_labels = [label for label in fsaverage_labels for label_id in region_labels if label.name.startswith(label_id + '-')]
+
 # Get param to compute difference from params dictionary
 param_values = {key: value for key, value in trial_params.items() if type(value) == list}
 # Exception in case no comparison
@@ -158,11 +171,12 @@ for param in param_values.keys():
         run_params['tmin'], run_params['tmax'], _ = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], plot_edge=plot_edge)
 
         # Get baseline duration for epoch_id
-        # map = dict(sac={'tmin': -0.0, 'tmax': 0.15, 'plot_xlim': (-0.2 + plot_edge, 0.3 - plot_edge)})
+        bline_map = dict(red={'baseline': (run_params['tmax'] - cross1_dur - plot_edge, run_params['tmax']),
+                              'plot_baseline': (run_params['tmax'] - cross1_dur - plot_edge, run_params['tmax'] - plot_edge)})
         run_params['baseline'], run_params['plot_baseline'] = functions_general.get_baseline_duration(epoch_id=run_params['epoch_id'], mss=run_params['mss'],
                                                                                                       tmin=run_params['tmin'], tmax=run_params['tmax'],
                                                                                                       cross1_dur=cross1_dur, mss_duration=mss_duration,
-                                                                                                      cross2_dur=cross2_dur, plot_edge=plot_edge)
+                                                                                                      cross2_dur=cross2_dur, plot_edge=plot_edge, map=bline_map)
 
         # Paths
         run_path = (f"Band_{meg_params['band_id']}/{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}_"
@@ -188,9 +202,6 @@ for param in param_values.keys():
         # Define fig path
         fig_path = paths().plots_path() + f"Source_Space_{meg_params['data_type']}_TF/" + run_path + source_model_path
 
-        # Get parcelation labels
-        fsaverage_labels = functions_analysis.get_labels(parcelation='aparc', subjects_dir=subjects_dir, surf_vol=surf_vol)
-
         # Save source estimates time courses on default's subject source space
         stcs_default_dict[param][param_value] = []
 
@@ -209,7 +220,7 @@ for param in param_values.keys():
             if os.path.isfile(source_data_path + subj_source_data_fname):
                 print(f'Loading TF data from participant {subject_code}')
                 # Load data
-                source_tf = mne.time_frequency.read_tfrs(source_data_path + subj_source_data_fname)
+                source_tf = mne.time_frequency.read_tfrs(source_data_path + subj_source_data_fname, condition=0)
 
                 # Append data for GA
                 stcs_default_dict[param][param_value].append(source_tf)
@@ -241,23 +252,15 @@ for param in param_values.keys():
 
                 # Source data path
                 sources_path_subject = paths().sources_path() + subject.subject_id
+
                 # Load forward model
-                if surf_vol == 'volume':
-                    fname_fwd = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}-fwd.fif'
-                elif surf_vol == 'surface':
-                    fname_fwd = sources_path_subject + f'/{subject_code}_surface_ico{ico}-fwd.fif'
-                elif surf_vol == 'mixed':
-                    fname_fwd = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}-fwd.fif'
+                fname_fwd = paths().fwd_path(subject=subject, subject_code=subject_code, ico=ico, spacing=spacing, surf_vol=surf_vol)
                 fwd = mne.read_forward_solution(fname_fwd)
                 src = fwd['src']
 
                 # Load filter
-                if surf_vol == 'volume':
-                    fname_filter = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
-                elif surf_vol == 'surface':
-                    fname_filter = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-{model_name}.fif'
-                elif surf_vol == 'mixed':
-                    fname_filter = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
+                fname_filter = paths().filter_path(subject=subject, subject_code=subject_code, ico=ico, spacing=spacing, surf_vol=surf_vol, pick_ori=pick_ori,
+                                                   model_name=model_name)
                 filters = mne.beamformer.read_beamformer(fname_filter)
 
                 # Get epochs and evoked
@@ -313,7 +316,6 @@ for param in param_values.keys():
                         epochs.pick('mag')
 
                 # --------- Source estimation ---------#
-
                 # Redefine stc epochs to iterate over
                 stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
 
@@ -338,7 +340,7 @@ for param in param_values.keys():
                 # Average the source estimates within each label using sign-flips to reduce signal cancellations
                 label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=used_labels, src=src, mode=labels_mode, return_generator=False)
 
-                # Estimate TF
+                # Time-Frequency computation
                 region_source_array = np.array(label_ts)
                 freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)
                 n_cycles = freqs / 4.
@@ -398,8 +400,9 @@ for param in param_values.keys():
         GA_stcs[param][param_value] = GA_stc
 
         # --------- Permutations test and plot --------- #
+        sig_regions = []
         # Iterate, test and plot each region
-        for i, region in enumerate(used_labels):
+        for i, region in enumerate(fsaverage_labels):
 
             # --------- Cluster permutations test ---------#
             if run_permutations_GA and pick_ori != 'vector':
@@ -409,13 +412,16 @@ for param in param_values.keys():
                 region_subj_data = np.expand_dims(region_subj_data, axis=-1)  # Need shape (n_subjects, n_freqs, n_times, n_channels,)
 
                 # Run clusters permutations test
-                clusters_mask, clusters_mask_plot = functions_analysis.run_time_frequency_test(data=region_subj_data, pval_threshold=p_threshold,
+                clusters_mask, clusters_mask_plot, significant_pvalues = functions_analysis.run_time_frequency_test(data=region_subj_data, pval_threshold=p_threshold,
                                                                                                t_thresh=t_thresh, n_permutations=n_permutations)
 
                 if isinstance(t_thresh, dict):
                     fname = f'GA_{region.name}_{l_freq}_{h_freq}_tTFCE_pval{p_threshold}'
                 else:
                     fname = f'GA_{region.name}_{l_freq}_{h_freq}_t{round(t_thresh, 2)}_pval{p_threshold}'
+
+                # Define image title
+                title = fname + f'_{significant_pvalues}'
 
             else:
                 clusters_mask_plot = None
@@ -425,12 +431,15 @@ for param in param_values.keys():
                 else:
                     fname = f'GA_{region.name}_{l_freq}_{h_freq}'
 
+                # Define title
+                title = fname
+
             # --------- Plot --------- #
             ga_tf_region = GA_stc.pick(GA_stc.ch_names[0])
             ga_tf_region.data = np.expand_dims(GA_stc_data[i], axis=0)
 
             fig, ax = plt.subplots(figsize=(10, 7))
-            ga_tf_region.plot(axes=ax, mask=clusters_mask_plot, mask_style='contour', show=display_figs)[0]
+            ga_tf_region.plot(axes=ax, mask=clusters_mask_plot, mask_style='contour', show=display_figs, title=title)[0]
             ax.vlines(x=0, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyles='--', colors='gray')
             fig.suptitle(fname)
 
@@ -441,6 +450,27 @@ for param in param_values.keys():
 
             # Free up memory
             plt.close(fig)
+
+            # Save significant regions to plot brain
+            if isinstance(clusters_mask_plot, np.ndarray):
+                sig_regions.append(region)
+
+        # Plot brain with marked regions
+        if len(sig_regions):
+            try:
+                mne.viz.close_all_3d_figures()
+            except:
+                pass
+
+            Brain = mne.viz.get_brain_class()
+            brain = Brain("fsaverage", hemi="split", surf="pial", views=['lat', 'med'], subjects_dir=subjects_dir, size=(1080, 720))
+            for label in sig_regions:
+                brain.add_label(label, borders=False)
+
+            # Save
+            if save_fig:
+                brain.save_image(filename=fig_path + 'sig/' + 'brain_regions.png')
+                brain.save_image(filename=fig_path + 'sig/svg/' + 'brain_regions.pdf')
 
 
 #----- Difference between conditions -----#
@@ -462,7 +492,14 @@ for param in param_values.keys():
             # Get subjects difference
             stcs_diff = []
             for i in range(len(stcs_default_dict[param][comparison[0]])):
-                stcs_diff.append(stcs_default_dict[param][comparison[0]][i] - stcs_default_dict[param][comparison[1]][i])
+                # Crop to active times
+                if active_times:
+                    subject_data_0 = stcs_default_dict[param][comparison[0]][i].crop(tmin=active_times[0], tmax=active_times[1])
+                    subject_data_1 = stcs_default_dict[param][comparison[1]][i].crop(tmin=active_times[0], tmax=active_times[1])
+                else:
+                    subject_data_0 = stcs_default_dict[param][comparison[0]][i]
+                    subject_data_1 = stcs_default_dict[param][comparison[1]][i]
+                stcs_diff.append(subject_data_0 - subject_data_1)
 
             # Average evoked stcs
             all_subj_diff_data = np.zeros(tuple([len(stcs_diff)]+[size for size in stcs_diff[0].data.shape]))
@@ -478,8 +515,9 @@ for param in param_values.keys():
             GA_stc_diff.data = GA_stc_diff_data
             GA_stc_diff.subject = 'fsaverage'
 
+            sig_regions = []
             # Iterate, test and plot each region
-            for i, region in enumerate(used_labels):
+            for i, region in enumerate(fsaverage_labels):
 
                 #--------- Cluster permutations test ---------#
                 if run_permutations_diff and pick_ori != 'vector':
@@ -489,27 +527,37 @@ for param in param_values.keys():
                     region_subj_diff_data = np.expand_dims(region_subj_diff_data, axis=-1)  # Need shape (n_subjects, n_freqs, n_times, n_channels,)
 
                     # Run clusters permutations test
-                    clusters_mask, clusters_mask_plot = functions_analysis.run_time_frequency_test(data=region_subj_diff_data, pval_threshold=p_threshold, t_thresh=t_thresh, n_permutations=n_permutations)
+                    clusters_mask, clusters_mask_plot, significant_pvalues = functions_analysis.run_time_frequency_test(data=region_subj_diff_data, pval_threshold=p_threshold, t_thresh=t_thresh, n_permutations=n_permutations)
 
                     if isinstance(t_thresh, dict):
                         fname = f'GA_{region.name}_{l_freq}_{h_freq}_tTFCE_pval{p_threshold}'
                     else:
                         fname = f'GA_{region.name}_{l_freq}_{h_freq}_t{round(t_thresh, 2)}_pval{p_threshold}'
 
+                    # Define image title
+                    title = fname + f'_{significant_pvalues}'
+
                 else:
                     clusters_mask_plot = None
                     clusters_mask = None
+                    significant_pvalues = None
                     if isinstance(t_thresh, dict):
                         fname = f'GA_{region.name}_{l_freq}_{h_freq}'
                     else:
                         fname = f'GA_{region.name}_{l_freq}_{h_freq}'
 
+                    title = fname
+
+                if active_times:
+                    fname += f"_{active_times[0]}_{active_times[1]}"
+
                 # --------- Plot --------- #
                 ga_tf_diff_region = GA_stc_diff.pick(GA_stc_diff.ch_names[0])
                 ga_tf_diff_region.data = np.expand_dims(GA_stc_diff_data[i], axis=0)
 
+
                 fig, ax = plt.subplots(figsize=(10, 7))
-                ga_tf_diff_region.plot(axes=ax, mask=clusters_mask_plot, mask_style='contour', show=display_figs)[0]
+                ga_tf_diff_region.plot(axes=ax, mask=clusters_mask_plot, mask_style='contour', show=display_figs, title=title)[0]
                 ax.vlines(x=0, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyles='--', colors='gray')
                 fig.suptitle(fname)
 
@@ -518,3 +566,23 @@ for param in param_values.keys():
                     if isinstance(clusters_mask_plot, np.ndarray):
                         save.fig(fig=fig, path=fig_path_diff + 'sig/', fname=fname)
 
+                # Save significant regions to plot brain
+                if isinstance(clusters_mask_plot, np.ndarray):
+                    sig_regions.append(region)
+
+            # Plot brain with marked regions
+            if len(sig_regions):
+                try:
+                    mne.viz.close_all_3d_figures()
+                except:
+                    pass
+
+                Brain = mne.viz.get_brain_class()
+                brain = Brain("fsaverage", hemi="split", surf="pial", views=['lat', 'med'], subjects_dir=subjects_dir, size=(1080, 720))
+                for label in sig_regions:
+                    brain.add_label(label, borders=False)
+
+                # Save
+                if save_fig:
+                    brain.save_image(filename=fig_path_diff + 'sig/' + 'brain_regions.png')
+                    brain.save_image(filename=fig_path_diff + 'sig/svg/' + 'brain_regions.pdf')
