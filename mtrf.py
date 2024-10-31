@@ -1,12 +1,9 @@
 import functions_analysis
 import functions_general
 import load
-import save
 import setup
 from paths import paths
 import matplotlib.pyplot as plt
-import numpy as np
-import mne
 
 
 #----- Path -----#
@@ -30,14 +27,14 @@ trial_params = {'corrans': None,
                 }
 
 meg_params = {'chs_id': 'parietal_occipital',
-              'band_id': 'HGamma',
+              'band_id': 'Theta',
               'data_type': 'ICA'
               }
 
 # TRF parameters
-trf_params = {'input_features': ['sac_cross1', 'fix_cross1', 'sac_ms', 'it_fix_ms+tgt_fix_ms', 'sac_cross2', 'fix_cross2', 'sac_vs', 'it_fix_vs+tgt_fix_vs'],   # Select features (events)
+trf_params = {'input_features': ['sac_vs', 'fix_vs'],   # Select features (events)
               'standarize': True,
-              'fit_power': False,
+              'fit_power': True,
               'alpha': None,
               'tmin': -0.3,
               'tmax': 0.6,
