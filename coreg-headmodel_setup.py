@@ -291,3 +291,34 @@ for subject_code in exp_info.subjects_ids:
         else:
             fname_lmcv = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-lcmv.fif'
         filters.save(fname=fname_lmcv, overwrite=True)
+
+## Plot Parcelation
+import os
+import mne
+from paths import paths
+import functions_analysis
+
+# Define Subjects_dir as Freesurfer output folder
+mri_path = paths().mri_path()
+subjects_dir = os.path.join(mri_path, 'FreeSurfer_out')
+Brain = mne.viz.get_brain_class()
+brain = Brain("fsaverage", hemi="split", surf="pial", views=['lat', 'med'], subjects_dir=subjects_dir, size=(1080, 720))
+# Get parcelation labels
+fsaverage_labels = functions_analysis.get_labels(parcelation='aparc', subjects_dir=subjects_dir, surf_vol='surface')
+
+for label in fsaverage_labels:
+    print(label.name)
+
+theta_label_names = ['cuneus-lh', 'cuneus-rh', 'inferiorparietal-lh', 'lateraloccipital-lh', 'lingual-lh', 'pericalcarine-lh', 'pericalcarine-rh', 'precuneus-lh',
+                     'precuneus-rh', 'superiorparietal-lh']
+
+beta_label_names = ['caudalanteriorcingulate-rh', 'entorhinal-rh', 'fusiform-rh', 'inferiortemporal-rh', 'insula-lh', 'insula-rh', 'lateraloccipital-rh', 'lingual-rh',
+                    'middletemporal-rh', 'paracentral-lh', 'parahippocampal-rh', 'posteriorcingulate-lh', 'precentral-rh', 'superiorfrontal-rh']
+
+selected_labels = [label for label in fsaverage_labels if label.name in beta_label_names]
+
+for label in selected_labels:
+    brain.add_label(label, borders=False)
+
+brain.save_image(filename='brain_regions_beta.png')
+brain.save_image(filename='brain_regions_beta.pdf')
