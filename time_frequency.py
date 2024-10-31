@@ -33,29 +33,29 @@ else:
 use_ica_data = True
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
-trial_params = {'epoch_id': ['tgt_fix_vs', 'it_fix_vs_subsampled'],
-                'corrans': True,
-                'tgtpres': True,
-                'mss': None,
+trial_params = {'epoch_id': 'vs',
+                'corrans': None,
+                'tgtpres': None,
+                'mss': [4],
                 'reject': None,
                 'evtdur': None,
                 'rel_sac': None
                 }
-run_comparison = True
+run_comparison = False
 
 # Select channels
-chs_ids = ['central_parietal']  # region_hemisphere
+chs_ids = ['parietal', 'occipital']  # region_hemisphere
 
 # Power time frequency params
 l_freq = 1
 h_freq = 40
-run_itc = True
+run_itc = False
 plot_edge = 0.15
 
 # Plots parameters
 # Colorbar
-vmax_power = None
-vmin_power = None
+vmax_power = 0.2
+vmin_power = -0.2
 vmin_itc, vmax_itc = None, None
 # plot_joint max and min topoplots
 plot_max, plot_min = True, True
@@ -365,7 +365,9 @@ for param in param_values.keys():
                                                              vmax=None, display_figs=display_figs, save_fig=save_fig, trf_fig_path=trf_fig_path_subj, fname=fname)
 
                 # Free up memory
-                del(power, itc)
+                del power
+                if run_itc:
+                    del itc
 
             # Compute grand average
             grand_avg_power = mne.grand_average(power_data[param][param_value])
@@ -418,7 +420,7 @@ for param in param_values.keys():
                     min_sig_chs = len(picks) * significant_channels
 
                     # Run clusters permutations test
-                    clusters_mask, clusters_mask_plot = functions_analysis.run_time_frequency_test(data=permutations_test_data_array, pval_threshold=pval_threshold,
+                    clusters_mask, clusters_mask_plot, significant_pvalues = functions_analysis.run_time_frequency_test(data=permutations_test_data_array, pval_threshold=pval_threshold,
                                                                                                    t_thresh=pval_threshold, n_permutations=n_permutations, min_sig_chs=min_sig_chs)
 
                     # Define image args to plot mask
