@@ -30,9 +30,9 @@ else:
 #----- Parameters -----#
 # Trial selection
 trial_params = {'epoch_id': 'cross2',  # use'+' to mix conditions (red+blue)
-                'corrans': None,
+                'corrans': [True, False],
                 'tgtpres': None,
-                'mss': [1, 4],
+                'mss': 4,
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
                 'evtdur': None}
 
@@ -61,13 +61,14 @@ run_comparison = True
 # Source estimation parameters
 force_fsaverage = False
 model_name = 'lcmv'
-surf_vol = 'surface'
-ico = 4
+surf_vol = 'volume'
+ico = 5
 spacing = 5.  # Only for volume source estimation
 pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
 source_power = False
 source_estimation = 'cov'  # 'epo' / 'evk' / 'cov' / 'trf'
 visualize_alignment = False
+active_times = [-1, 0]
 
 # Baseline
 if source_power or source_estimation == 'cov':
@@ -81,7 +82,7 @@ plot_edge = 0.15
 initial_time = 0.1
 difference_initial_time = 0.3
 positive_cbar = None  # None for free determination, False to include negative values
-plot_individuals = True
+plot_individuals = False
 plot_ga = True
 
 # Permutations test
@@ -149,7 +150,9 @@ for param in param_values.keys():
             run_params['trialdur'] = None  # Change to trial_dur = None to use all trials for no 'vs' epochs
 
         # Get time windows from epoch_id name
-        run_params['tmin'], run_params['tmax'], _ = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], plot_edge=plot_edge)
+        map_times = dict(cross2={'tmin': -cross1_dur - mss_duration[run_params['mss']], 'tmax': cross2_dur, 'plot_xlim': (-1, 0)})
+        run_params['tmin'], run_params['tmax'], _ = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'],
+                                                                                                          plot_edge=plot_edge, map=map_times)
 
         # Get baseline duration for epoch_id
         # map = dict(sac={'tmin': -0.0, 'tmax': 0.15, 'plot_xlim': (-0.2 + plot_edge, 0.3 - plot_edge)})
@@ -173,11 +176,22 @@ for param in param_values.keys():
 
         # Define path
         if surf_vol == 'volume' or surf_vol == 'mixed':
-            fig_path = paths().plots_path() + (f"Source_Space_{meg_params['data_type']}/" + run_path + f"{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_"
+            fig_path = paths().plots_path() + (f"Source_Space_{meg_params['data_type']}/" + run_path +
+                                               f"{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_"
                                                f"{pick_ori}_{bline_mode_subj}_{source_estimation}/")
         else:
-            fig_path = paths().plots_path() + (f"Source_Space_{meg_params['data_type']}/" + run_path + f"{model_name}_{surf_vol}_ico{ico}_{pick_ori}_"
+            fig_path = paths().plots_path() + (f"Source_Space_{meg_params['data_type']}/" + run_path +
+                                               f"{model_name}_{surf_vol}_ico{ico}_{pick_ori}_"
                                                f"{bline_mode_subj}_{source_estimation}/")
+
+        # Rename fig path to specify plot times
+        if source_estimation == 'cov':
+            if active_times:
+                fig_path = fig_path.replace(f"{run_params['tmin']}_{run_params['tmax']}", f"{active_times[0]}_{active_times[1]}")
+            else:
+                # Define active times
+                active_times = [0, run_params['tmax']]
+                fig_path = fig_path.replace(f"{run_params['tmin']}_{run_params['tmax']}", f"{active_times[0]}_{active_times[1]}")
 
         # Get parcelation labels
         fsaverage_labels = functions_analysis.get_labels(parcelation='aparc', subjects_dir=subjects_dir, surf_vol=surf_vol)
@@ -316,9 +330,6 @@ for param in param_values.keys():
                 rank = sum([ch_type == 'mag' for ch_type in channel_types]) - len(bad_channels)
                 if meg_params['data_type'] == 'ICA':
                     rank -= len(subject.ex_components)
-
-                # Define active times
-                active_times = [0, run_params['tmax']]
 
                 # Covariance fnames
                 cov_baseline_fname = f"Subject_{subject.subject_id}_times{run_params['baseline']}_{cov_method}_{rank}-cov.fif"
