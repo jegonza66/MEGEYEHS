@@ -228,7 +228,7 @@ def fixation_duration(subject, ax=None, display_fig=False, save_fig=True):
 
     fixations_dur = subject.fixations['duration']
 
-    ax.hist(fixations_dur, bins=100, range=(0, 1), edgecolor='black', linewidth=1.2, density=True, stacked=True)
+    ax.hist(fixations_dur, bins=100, range=(0, 1), edgecolor='black', linewidth=0.3, density=True, stacked=True)
     ax.set_title('Fixation duration')
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Density')
@@ -257,7 +257,7 @@ def saccades_amplitude(subject, ax=None, display_fig=False, save_fig=True):
 
     saccades_amp = subject.saccades['amp']
 
-    ax.hist(saccades_amp, bins=100, range=(0, 20), edgecolor='black', linewidth=1.2, density=True, stacked=True)
+    ax.hist(saccades_amp, bins=100, range=(0, 20), edgecolor='black', linewidth=0.3, density=True, stacked=True)
     ax.set_title('Saccades amplitude')
     ax.set_xlabel('Amplitude (deg)')
     ax.set_ylabel('Density')
@@ -268,19 +268,22 @@ def saccades_amplitude(subject, ax=None, display_fig=False, save_fig=True):
         save.fig(fig=fig, path=save_path, fname=fname)
 
 
-def saccades_dir_hist(subject, fig=None, ax=None, display_fig=False, save_fig=True):
+def saccades_dir_hist(subject, fig=None, axs=None, ax_idx=None, display_fig=False, save_fig=True):
 
     print('Plotting saccades direction histogram')
 
     # Use provided axes (or not)
-    if ax is None:
+    if axs is None or ax_idx is None:
         fig = plt.figure()
         ax = plt.subplot(polar=True)
     else:
         display_fig = True
         save_fig = False
+        n_rows = axs.shape[0]
+        n_cols = axs.shape[1]
+        ax = axs.ravel()[ax_idx]
         ax.set_axis_off()
-        ax = fig.add_subplot(2, 2, 3, projection='polar')
+        ax = fig.add_subplot(n_rows, n_cols, ax_idx + 1, projection='polar')
 
     if display_fig:
         plt.ion()
@@ -326,8 +329,15 @@ def sac_main_seq(subject, hline=None, ax=None, display_fig=False, save_fig=True)
     saccades_peack_vel = subject.saccades['peak_vel']
     saccades_amp = subject.saccades['amp']
 
-    ax.plot(saccades_amp, saccades_peack_vel, '.', alpha=0.1, markersize=2)
+    # ax.plot(saccades_amp, saccades_peack_vel, '.', alpha=0.1, markersize=2)
+
+    # Logarithmic bins
+    XL = np.log10(25)  # Adjusted to fit the xlim
+    YL = np.log10(1000)  # Adjusted to fit the ylim
+    # Create a 2D histogram with logarithmic bins
+    ax.hist2d(saccades_amp, saccades_peack_vel, bins=[np.logspace(np.log10(0.2), XL, 300), np.logspace(np.log10(20), YL, 300)], cmap='Blues')
     ax.set_xlim(0.01)
+
     if hline:
         ax.hlines(y=hline, xmin=plt.gca().get_xlim()[0], xmax=plt.gca().get_xlim()[1], colors='grey', linestyles='--', label=hline)
         ax.legend()
@@ -337,6 +347,11 @@ def sac_main_seq(subject, hline=None, ax=None, display_fig=False, save_fig=True)
     ax.set_xlabel('Amplitude (deg)')
     ax.set_ylabel('Peak velocity (deg)')
     ax.grid()
+
+    # Set the limits of the axes
+    ax.set_xlim(0.2, 25)
+    ax.set_ylim(20, 1000)
+    ax.set_aspect('equal')
 
     if save_fig:
         save_path = paths().plots_path() + 'Preprocessing/' + subject.subject_id + '/'
@@ -382,9 +397,17 @@ def pupil_size_increase(subject, display_fig=False, save_fig=True):
         plt.savefig(save_path + f'{subject.subject_id} Pupil size increase.png')
 
 
-def performance(subject, display=False, save_fig=True):
+def performance(subject, axs=None, display=False, save_fig=True):
 
     print('Plotting performance')
+
+    # Use provided axes (or not)
+    if axs is None:
+        fig, axs = plt.subplots(2, sharex=True)
+    else:
+        display = True
+        save_fig = False
+
     if display:
         plt.ion()
     else:
@@ -418,8 +441,7 @@ def performance(subject, display=False, save_fig=True):
     corr4_std = np.std(corr_4)
 
     # Plot
-    fig, axs = plt.subplots(2, sharex=True)
-    fig.suptitle(f'Performance {subject.subject_id}')
+    axs[0].set_title(f'Performance {subject.subject_id}')
 
     axs[0].plot([1, 2, 4], [corr1_mean, corr2_mean, corr4_mean], 'o')
     axs[0].errorbar(x=[1, 2, 4], y=[corr1_mean, corr2_mean, corr4_mean], yerr=[corr1_std, corr2_std, corr4_std],
@@ -441,6 +463,39 @@ def performance(subject, display=False, save_fig=True):
         fname = f'/{subject.subject_id} Performance'
         save.fig(fig=fig, path=save_path, fname=fname)
 
+    return corr1_mean, corr2_mean, corr4_mean, rt1_mean, rt2_mean, rt4_mean
+
+
+def all_subj_performance(axs, all_acc, all_response_times, save_fig=False):
+    # Use provided axes (or not)
+    if axs is None:
+        fig, axs = plt.subplots(2, sharex=True)
+    else:
+        display = True
+        save_fig = False
+
+    axs[0, 0].set_title(f'Performance')
+    axs[0, 0].plot([1, 2, 4], [np.mean(all_acc[1]), np.mean(all_acc[2]), np.mean(all_acc[4])], 'o')
+    axs[0, 0].errorbar(x=[1, 2, 4], y=[np.mean(all_acc[1]), np.mean(all_acc[2]), np.mean(all_acc[4])], yerr=[np.std(all_acc[1]), np.std(all_acc[2]), np.std(all_acc[4])],
+                       color='black', linewidth=0.5)
+    # axs[0, 0].set_ylim([0, 1])
+    axs[0, 0].set_ylabel('Accuracy')
+    axs[0, 0].set_xlabel('MSS')
+    axs[0, 0].set_xticks([1, 2, 4])
+
+    axs[1, 0].plot([1, 2, 4], [np.mean(all_response_times[1]), np.mean(all_response_times[2]), np.mean(all_response_times[4])], 'o')
+    axs[1, 0].errorbar(x=[1, 2, 4], y=[np.mean(all_response_times[1]), np.mean(all_response_times[2]), np.mean(all_response_times[4])],
+                       yerr=[np.std(all_response_times[1]), np.std(all_response_times[2]), np.std(all_response_times[4])],
+                       color='black', linewidth=0.5)
+    # axs[1, 0].set_ylim([0, 10])
+    axs[1, 0].set_ylabel('Rt')
+    axs[1, 0].set_xlabel('MSS')
+    axs[1, 0].set_xticks([1, 2, 4])
+
+    if save_fig:
+        save_path = paths().plots_path() + 'Preprocessing/All_Subjects'
+        fname = f'/All_Subjects Performance'
+        save.fig(fig=fig, path=save_path, fname=fname)
 
 def trial_gaze(raw, subject, et_channels_meg, trial_idx, display_fig=False, save_fig=True):
 
