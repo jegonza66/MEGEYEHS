@@ -1,6 +1,7 @@
 import os
 import matplotlib.pyplot as plt
 import mne
+import functions_analysis
 import functions_general
 import plot_general
 import load
@@ -32,23 +33,46 @@ use_ica_data = True
 # Frequency band
 band_id = None
 chs_id = 'mag'
-# Id
-epoch_id = 'it_fix_vs'
-corr_ans = True
-tgt_pres = True
-mss = None
-trial_dur = None
-evt_dur = None
-reject = None
-
 
 # Get time windows from epoch_id name
-tmin, tmax, plot_xlim = 0.25, 0.35, (0.25, 0.25)
+tmin, tmax = -0.3, 0.6
 # Baseline
-baseline = (tmin, 0.25)
+baseline = (-0.3, -0.05)
+
+
+# Trial selection
+trial_params = {'epoch_id': 'it_fix_vs',  # use'+' to mix conditions (red+blue)
+                'corrans': True,
+                'tgtpres': True,
+                'mss': None,
+                'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
+                'evtdur': None,
+                'trialdur': None,
+                'rel_sac': None}
+
+# Base condition
+trial_params_base = {'epoch_id': 'tgt_fix_vs',  # use'+' to mix conditions (red+blue)
+                     'corrans': True,
+                     'tgtpres': True,
+                     'mss': None,
+                     'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
+                     'evtdur': None,
+                     'trialdur': None,
+                     'rel_sac': None}
+
+meg_params = {'chs_id': 'mag',
+              'band_id': None,
+              'filter_sensors': True,
+              'filter_method': 'iir',
+              'data_type': 'ICA'
+              }
 
 # Specific run path for saving data and plots
-run_path = f'/Band_{band_id}/{epoch_id}_mss{mss}_corrans{corr_ans}_tgtpres{tgt_pres}_trialdur{trial_dur}_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}/'
+run_path = (f'/Band_{band_id}/{trial_params["epoch_id"]}_mss{trial_params["mss"]}_corrans{trial_params["corrans"]}_tgtpres{trial_params["tgtpres"]}_'
+            f'trialdur{trial_params["trialdur"]}_evtdur{trial_params["evtdur"]}_{tmin}_{tmax}_bline{baseline}/')
+# Specific run path for saving data and plots
+run_path_base = (f'/Band_{band_id}/{trial_params_base["epoch_id"]}_mss{trial_params_base["mss"]}_corrans{trial_params_base["corrans"]}_tgtpres{trial_params_base["tgtpres"]}_'
+            f'trialdur{trial_params_base["trialdur"]}_evtdur{trial_params_base["evtdur"]}_{tmin}_{tmax}_bline{baseline}/')
 
 # Data type
 if use_ica_data:
@@ -72,16 +96,16 @@ for subject_code in exp_info.subjects_ids:
         subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
 
     # Load data paths
-    epochs_tgt_load_path = save_path + f'Epochs_{data_type}/' + run_path.replace('it_fix', 'tgt_fix').replace(f'Band_{band_id}', 'Band_None')
-    epochs_it_load_path = save_path + f'Epochs_{data_type}/' + run_path
+    epochs_base_path = save_path + f'Epochs_{data_type}/' + run_path_base
+    epochs_path = save_path + f'Epochs_{data_type}/' + run_path
 
     # Save data paths
-    epochs_it_save_path = epochs_it_load_path.replace('it_fix_vs', 'it_fix_vs_subsampled')
-    evoked_it_save_path = save_path + f'Evoked_{data_type}/' + run_path.replace('it_fix_vs', 'it_fix_vs_subsampled')
+    epochs_new_path = epochs_path.replace(trial_params["epoch_id"], f'{trial_params["epoch_id"]}_subsampled')
+    evoked_new_path = save_path + f'Evoked_{data_type}/' + run_path.replace(trial_params["epoch_id"], f'{trial_params["epoch_id"]}_subsampled')
 
     # Save figures paths
-    epochs_fig_path = plot_path + f'Epochs_{data_type}/' + run_path.replace('it_fix_vs', 'it_fix_vs_subsampled')
-    evoked_fig_path = plot_path + f'Evoked_{data_type}/' + run_path.replace('it_fix_vs', 'it_fix_vs_subsampled')
+    epochs_fig_path = epochs_new_path.replace(save_path, plot_path)
+    evoked_fig_path = evoked_new_path.replace(save_path, plot_path)
 
     # Data filenames
     epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
@@ -89,38 +113,60 @@ for subject_code in exp_info.subjects_ids:
     grand_avg_data_fname = f'Grand_average_ave.fif'
 
     # Load epoched data
-    epochs_tgt = mne.read_epochs(epochs_tgt_load_path + epochs_data_fname)
-    epochs_it = mne.read_epochs(epochs_it_load_path + epochs_data_fname)
+    try:
+        epochs_base = mne.read_epochs(epochs_base_path + epochs_data_fname)
+    except:
+        # Load MEG
+        meg_data = load.meg(subject=subject, meg_params=meg_params, save_data=save_data)
+        epochs_base, _ = functions_analysis.epoch_data(subject=subject, meg_data=meg_data, mss=trial_params_base['mss'], corr_ans=trial_params_base['corrans'],
+                                                       tgt_pres=trial_params_base['tgtpres'], epoch_id=trial_params_base['epoch_id'], rel_sac=trial_params_base['rel_sac'],
+                                                       tmin=tmin, trial_dur=trial_params_base['trialdur'], evt_dur=trial_params_base['evtdur'],
+                                                       tmax=tmax, reject=trial_params_base['reject'], baseline=baseline,
+                                                       save_data=save_data, epochs_save_path=epochs_base_path,
+                                                       epochs_data_fname=epochs_data_fname)
+    try:
+        epochs = mne.read_epochs(epochs_path + epochs_data_fname)
+    except:
+        # Load MEG
+        meg_data = load.meg(subject=subject, meg_params=meg_params, save_data=save_data)
+        epochs, _ = functions_analysis.epoch_data(subject=subject, meg_data=meg_data, mss=trial_params['mss'], corr_ans=trial_params['corrans'],
+                                                       tgt_pres=trial_params['tgtpres'], epoch_id=trial_params['epoch_id'],
+                                                       rel_sac=trial_params['rel_sac'],
+                                                       tmin=tmin, trial_dur=trial_params['trialdur'], evt_dur=trial_params['evtdur'],
+                                                       tmax=tmax, reject=trial_params['reject'], baseline=baseline,
+                                                       save_data=save_data, epochs_save_path=epochs_path,
+                                                       epochs_data_fname=epochs_data_fname)
+
 
     # Extract metadata and subsample
-    tgt_metadata = epochs_tgt.metadata
-    it_metadata = epochs_it.metadata
-    it_metadata_subsampled = it_metadata.sample(n=len(tgt_metadata))
+    base_metadata = epochs_base.metadata
+    epochs_metadata = epochs.metadata
+    epochs_metadata_subsampled = epochs_metadata.sample(n=len(base_metadata))
     # it_metadata_subsampled = it_metadata.sort_values(by='duration', ascending=False).iloc[:len(tgt_metadata)]
 
     # Plot duration histogram
     hist_bins = 10
     fig, ax = plt.subplots()
     plt.title('Fixation duration distribution')
-    tgt_metadata['duration'].plot.hist(bins=np.linspace(0, max(tgt_metadata['duration']), hist_bins), ax=ax, alpha=0.5, label='Target')
-    it_metadata_subsampled['duration'].plot.hist(bins=np.linspace(0, max(tgt_metadata['duration']), hist_bins), ax=ax, alpha=0.5, label='Distractor')
+    base_metadata['duration'].plot.hist(bins=np.linspace(0, max(base_metadata['duration']), hist_bins), ax=ax, alpha=0.5, label='Target')
+    epochs_metadata_subsampled['duration'].plot.hist(bins=np.linspace(0, max(base_metadata['duration']), hist_bins), ax=ax, alpha=0.5, label='Distractor')
     plt.legend()
     if save_fig:
         save.fig(fig=fig, path=epochs_fig_path, fname=f'{subject_code}_fixation_duration_distribution')
 
     # Get epoch ids of epochs to keep
-    epochs_subsampled_ids = it_metadata_subsampled['id']
+    epochs_subsampled_ids = epochs_metadata_subsampled['id']
 
     # Get epochs mask of epochs to drop
-    drop_epochs_mask = [False if id in epochs_subsampled_ids.values else True for id in it_metadata['id']]
+    drop_epochs_mask = [False if id in epochs_subsampled_ids.values else True for id in epochs_metadata['id']]
 
     # Drop extra epochs
-    epochs_subsampled = epochs_it.copy()
+    epochs_subsampled = epochs.copy()
     epochs_subsampled.drop(drop_epochs_mask)
 
     # Append to list to compare GA results
     epochs_list_it_sub.append(epochs_subsampled)
-    epochs_list_tgt.append(epochs_tgt)
+    epochs_list_tgt.append(epochs_base)
 
     # Average epochs and append to evokeds list
     evoked_subsampled = epochs_subsampled.average()
@@ -128,50 +174,9 @@ for subject_code in exp_info.subjects_ids:
 
     if save_data:
         # Save epoched data
-        os.makedirs(epochs_it_save_path, exist_ok=True)
-        epochs_subsampled.save(epochs_it_save_path + epochs_data_fname, overwrite=True)
+        os.makedirs(epochs_new_path, exist_ok=True)
+        epochs_subsampled.save(epochs_new_path + epochs_data_fname, overwrite=True)
 
         # Save evoked data
-        os.makedirs(evoked_it_save_path, exist_ok=True)
-        evoked_subsampled.save(evoked_it_save_path + evoked_data_fname, overwrite=True)
-
-## Not working because epochs bads must match
-# Define epochs for GA
-ga_tgt_epochs = mne.concatenate_epochs(epochs_list_tgt)
-ga_it_sub_epochs = mne.concatenate_epochs(epochs_list_it_sub)
-
-# Get metadata
-ga_tgt_metadata = ga_tgt_epochs.metadata
-ga_it_sub_metadata = ga_it_sub_epochs.metadata
-
-# Plot GA duration histogram
-hist_bins = 10
-fig, ax = plt.subplots()
-plt.title('Fixation duration distribution')
-ga_tgt_metadata['duration'].plot.hist(bins=np.linspace(0, max(ga_tgt_metadata['duration']), hist_bins), ax=ax, alpha=0.5, label='Target')
-ga_it_sub_metadata['duration'].plot.hist(bins=np.linspace(0, max(ga_tgt_metadata['duration']), hist_bins), ax=ax, alpha=0.5, label='Distractor')
-plt.legend()
-if save_fig:
-    save.fig(fig=fig, path=epochs_fig_path, fname='GA_fixation_duration_distribution')
-
-# Compute grand average
-grand_avg = mne.grand_average(evokeds, interpolate_bads=True)
-
-# Save grand average
-if save_data:
-    os.makedirs(evoked_it_save_path, exist_ok=True)
-    grand_avg.save(evoked_it_save_path + grand_avg_data_fname, overwrite=True)
-
-# Separate MEG and misc channels
-grand_avg_meg = grand_avg.copy().pick('mag')
-grand_avg_misc = grand_avg.copy().pick('misc')
-
-# Plot evoked
-fname = f'Grand_average_{chs_id}'
-picks = functions_general.pick_chs(chs_id=chs_id, info=grand_avg_meg.info)
-plot_general.evoked(evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
-                    plot_gaze=False, plot_xlim=plot_xlim, display_figs=display_figs, save_fig=save_fig,
-                    fig_path=evoked_fig_path, fname=fname)
-
-
-
+        os.makedirs(evoked_new_path, exist_ok=True)
+        evoked_subsampled.save(evoked_new_path + evoked_data_fname, overwrite=True)
