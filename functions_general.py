@@ -438,17 +438,17 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
         try:
             cross1_dur, cross2_dur, mss_duration, vs_dur = get_duration()
 
-            map = dict(cross1={'tmin': 0, 'tmax': cross1_dur, 'plot_xlim': (plot_edge, cross1_dur - plot_edge)},
-                       ms={'tmin': -cross1_dur, 'tmax': mss_duration[mss], 'plot_xlim': (-cross1_dur + plot_edge, mss_duration[mss] - plot_edge)},
+            map = dict(cross1={'tmin': 0, 'tmax': cross1_dur, 'plot_xlim': [plot_edge, cross1_dur - plot_edge]},
+                       ms={'tmin': -cross1_dur, 'tmax': mss_duration[mss], 'plot_xlim': [-cross1_dur + plot_edge, mss_duration[mss] - plot_edge]},
                        cross2={'tmin': -cross1_dur - mss_duration[mss], 'tmax': cross2_dur,
-                               'plot_xlim': (plot_edge, cross2_dur - plot_edge)},
+                               'plot_xlim': [plot_edge, cross2_dur - plot_edge]},
                        vs={'tmin': -cross1_dur - mss_duration[mss] - cross2_dur, 'tmax': vs_dur[mss][0],
-                           'plot_xlim': (-cross1_dur - mss_duration[mss] - cross2_dur + plot_edge, vs_dur[mss][0] - plot_edge)},
-                       vsend={'tmin': -2, 'tmax': cross1_dur + 1, 'plot_xlim': (-2 + plot_edge, cross1_dur + 1 - plot_edge)},
-                       sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': (-0.2 + plot_edge, 0.3 - plot_edge)},
-                       fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
-                       blue={'tmin': -1, 'tmax': 1.9, 'plot_xlim': (-1 + plot_edge, 1.9 - plot_edge)},
-                       red={'tmin': -1, 'tmax': 1.9, 'plot_xlim': (-1 + plot_edge, 1.9 - plot_edge)})
+                           'plot_xlim': [-cross1_dur - mss_duration[mss] - cross2_dur + plot_edge, vs_dur[mss][0] - plot_edge]},
+                       vsend={'tmin': -2, 'tmax': cross1_dur + 1, 'plot_xlim': [-2 + plot_edge, cross1_dur + 1 - plot_edge]},
+                       sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': [-0.2 + plot_edge, 0.3 - plot_edge]},
+                       fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': [-0.3 + plot_edge, 0.6 - plot_edge]},
+                       blue={'tmin': -1, 'tmax': 1.9, 'plot_xlim': [-1 + plot_edge, 1.9 - plot_edge]},
+                       red={'tmin': -1, 'tmax': 1.9, 'plot_xlim': [-1 + plot_edge, 1.9 - plot_edge]})
 
             if 'fix' in epoch_id:
                 tmin = map['fix']['tmin']
