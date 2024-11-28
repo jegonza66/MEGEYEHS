@@ -310,15 +310,16 @@ for label in fsaverage_labels:
     print(label.name)
 
 theta_label_names = ['cuneus-lh', 'cuneus-rh', 'inferiorparietal-lh', 'lateraloccipital-lh', 'lingual-lh', 'pericalcarine-lh', 'pericalcarine-rh', 'precuneus-lh',
-                     'precuneus-rh', 'superiorparietal-lh']
+                     'precuneus-rh', 'superiorparietal-lh', 'superiorparietal-rh']
 
-beta_label_names = ['caudalanteriorcingulate-rh', 'entorhinal-rh', 'fusiform-rh', 'inferiortemporal-rh', 'insula-lh', 'insula-rh', 'lateraloccipital-rh', 'lingual-rh',
-                    'middletemporal-rh', 'paracentral-lh', 'parahippocampal-rh', 'posteriorcingulate-lh', 'precentral-rh', 'superiorfrontal-rh']
+beta_label_names = ['caudalanteriorcingulate-lh', 'caudalanteriorcingulate-rh', 'entorhinal-rh', 'fusiform-rh', 'inferiortemporal-rh', 'insula-lh', 'insula-rh',
+                    'lateraloccipital-rh', 'lingual-rh', 'middletemporal-rh', 'paracentral-lh', 'parahippocampal-rh', 'posteriorcingulate-lh', 'precentral-rh',
+                    'superiorfrontal-rh', 'superiortemporal-lh']
 
-selected_labels = [label for label in fsaverage_labels if label.name in beta_label_names]
+selected_labels = [label for label in fsaverage_labels if label.name in theta_label_names]
 
 for label in selected_labels:
     brain.add_label(label, borders=False)
 
-brain.save_image(filename='brain_regions_beta.png')
-brain.save_image(filename='brain_regions_beta.pdf')
+brain.save_image(filename='brain_regions_theta.png')
+brain.save_image(filename='brain_regions_theta.pdf')
