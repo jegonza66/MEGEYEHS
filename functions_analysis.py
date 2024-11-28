@@ -56,6 +56,9 @@ def define_events(subject, meg_data, epoch_id, trial_num=None, evt_dur=None, epo
                 except:
                     print('Trial selection skipped. Epoch_id does not contain trial number.')
 
+            if len(epoch_keys) == 0:
+                raise ValueError('No valid epoch_ids provided.')
+
             # Set duration limit
             if 'fix' in epoch_sub_id:
                 metadata = subject.fixations
@@ -117,6 +120,8 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
     # Trials
     if not trial_num:
         trial_num, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=mss, trial_dur=trial_dur, corr_ans=corr_ans, tgt_pres=tgt_pres)
+    elif isinstance(trial_num, int):
+        trial_num = [str(trial_num)]
 
     # Redefine epoch id
     if rel_sac and 'sac' in epoch_id:
