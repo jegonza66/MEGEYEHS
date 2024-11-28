@@ -1,6 +1,6 @@
 ## Surface Time-Frequency
-
 import os
+import shutil
 import functions_analysis
 import functions_general
 import mne
@@ -12,10 +12,12 @@ import setup
 import numpy as np
 import plot_general
 import matplotlib.pyplot as plt
-from scipy.signal import hilbert
 import itertools
 import scipy
-from mne.stats import permutation_cluster_1samp_test
+from sklearn.cluster import KMeans
+import umap
+import pandas as pd
+import seaborn as sns
 
 # Load experiment info
 exp_info = setup.exp_info()
@@ -33,12 +35,13 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': ['it_fix_ms+tgt_fix_ms'],  # use'+' to mix conditions (red+blue)
-                'corrans': None,
+trial_params = {'epoch_id': 'cross2',  # use'+' to mix conditions (red+blue)
+                'corrans': [True, False],
                 'tgtpres': None,
-                'mss': [1, 2, 4],
+                'mss': 4,
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
-                'evtdur': None}
+                'evtdur': None,
+                'rel_sac': None}
 
 meg_params = {'regions_id': 'all',
               'band_id': None,
@@ -77,14 +80,14 @@ plot_edge = 0.15
 
 # Plot
 plot_individuals = False
-plot_ga = True
+plot_ga = False
 
 fontsize = 22
 params = {'font.size': fontsize}
 plt.rcParams.update(params)
 
 # Permutations test
-run_permutations_GA = True
+run_permutations_GA = False
 run_permutations_diff = True
 n_permutations = 1024
 desired_tval = 0.01
@@ -93,6 +96,7 @@ p_threshold = 0.05
 t_thresh = scipy.stats.t.ppf(1 - desired_tval / 2, df=degrees_of_freedom)
 # t_thresh = dict(start=0, step=0.2)
 
+n_clusters = 3
 
 #--------- Setup ---------#
 
@@ -145,11 +149,13 @@ if param_values == {}:
 # Save source estimates time courses on FreeSurfer
 stcs_default_dict = {}
 GA_stcs = {}
+epochs_num = {}
 
 # --------- Run ---------#
 for param in param_values.keys():
     stcs_default_dict[param] = {}
     GA_stcs[param] = {}
+    epochs_num[param] = {}
     for param_value in param_values[param]:
 
         # Get run parameters from trial params including all comparison between different parameters
@@ -161,6 +167,10 @@ for param in param_values.keys():
         # Set comparison key value
         run_params[param] = param_value
 
+        # Redefine epoch id
+        if 'rel_sac' in run_params.keys() and run_params['rel_sac'] != None:
+            run_params['epoch_id'] = run_params['epoch_id'].replace('fix', 'sac')
+
         # Define trial duration for VS screen analysis
         if 'vs' in run_params['epoch_id'] and 'fix' not in run_params['epoch_id'] and 'sac' not in run_params['epoch_id']:
             run_params['trialdur'] = vs_dur[run_params['mss']]
@@ -168,7 +178,8 @@ for param in param_values.keys():
             run_params['trialdur'] = None  # Change to trial_dur = None to use all trials for no 'vs' epochs
 
         # Get time windows from epoch_id name
-        run_params['tmin'], run_params['tmax'], _ = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], plot_edge=plot_edge)
+        map_times = {'it_sac_vs': {'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)}}
+        run_params['tmin'], run_params['tmax'], _ = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], plot_edge=plot_edge, map=map_times)
 
         # Get baseline duration for epoch_id
         bline_map = dict(red={'baseline': (run_params['tmax'] - cross1_dur - plot_edge, run_params['tmax']),
@@ -179,8 +190,11 @@ for param in param_values.keys():
                                                                                                       cross2_dur=cross2_dur, plot_edge=plot_edge, map=bline_map)
 
         # Paths
-        run_path = (f"Band_{meg_params['band_id']}/{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}_"
+        run_path = (f"{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}_"
                     f"trialdur{run_params['trialdur']}_evtdur{run_params['evtdur']}_{run_params['tmin']}_{run_params['tmax']}_bline{run_params['baseline']}/")
+        # Redefine save id
+        if 'rel_sac' in run_params.keys() and run_params['rel_sac'] != None:
+            run_path = run_params['rel_sac'] + '_' + run_path
 
         # Source paths
         if surf_vol == 'volume' or surf_vol == 'mixed':
@@ -192,18 +206,19 @@ for param in param_values.keys():
                 source_model_path = f"{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{bline_mode_subj}_{source_estimation}/"
 
         # Sources data path
-        source_data_path = paths().save_path() + f"Source_Space_{meg_params['data_type']}_TF/" + run_path + source_model_path
+        source_data_path = paths().save_path() + f"Source_Space_{meg_params['data_type']}_TF/Band_{meg_params['band_id']}/" + run_path + source_model_path
 
         # Data paths
-        epochs_save_path = paths().save_path() + f"Epochs_{meg_params['data_type']}/" + run_path
-        evoked_save_path = paths().save_path() + f"Evoked_{meg_params['data_type']}/" + run_path
-        cov_save_path = paths().save_path() + f"Cov_Epochs_{meg_params['data_type']}/" + run_path
+        epochs_save_path = paths().save_path() + f"Epochs_{meg_params['data_type']}/Band_{meg_params['band_id']}/" + run_path
+        evoked_save_path = paths().save_path() + f"Evoked_{meg_params['data_type']}/Band_{meg_params['band_id']}/" + run_path
+        cov_save_path = paths().save_path() + f"Cov_Epochs_{meg_params['data_type']}/Band_{meg_params['band_id']}/" + run_path
 
         # Define fig path
-        fig_path = paths().plots_path() + f"Source_Space_{meg_params['data_type']}_TF/" + run_path + source_model_path
+        fig_path = paths().plots_path() + f"Source_Space_{meg_params['data_type']}_TF/Band_{meg_params['band_id']}/" + run_path + source_model_path
 
         # Save source estimates time courses on default's subject source space
         stcs_default_dict[param][param_value] = []
+        epochs_num[param][param_value] = []
 
         # Iterate over participants
         for subject_code in exp_info.subjects_ids:
@@ -224,6 +239,7 @@ for param in param_values.keys():
 
                 # Append data for GA
                 stcs_default_dict[param][param_value].append(source_tf)
+                epochs_num[param][param_value].append(source_tf.nave)
 
             # Compute subjects data
             else:
@@ -297,8 +313,9 @@ for param in param_values.keys():
                         meg_data = load.meg(subject=subject, meg_params=meg_params, save_data=save_data)
 
                         # Epoch data
-                        epochs, events = functions_analysis.epoch_data(subject=subject, meg_data=meg_data, mss=run_params['mss'], corr_ans=run_params['corrans'], tgt_pres=run_params['tgtpres'],
-                                                                       epoch_id=run_params['epoch_id'],  tmin=run_params['tmin'], trial_dur=run_params['trialdur'],
+                        epochs, events = functions_analysis.epoch_data(subject=subject, meg_data=meg_data, mss=run_params['mss'], corr_ans=run_params['corrans'],
+                                                                       tgt_pres=run_params['tgtpres'], epoch_id=run_params['epoch_id'], rel_sac=run_params['rel_sac'],
+                                                                       tmin=run_params['tmin'], trial_dur=run_params['trialdur'], evt_dur=run_params['evtdur'],
                                                                        tmax=run_params['tmax'], reject=run_params['reject'], baseline=run_params['baseline'],
                                                                        save_data=save_data, epochs_save_path=epochs_save_path,
                                                                        epochs_data_fname=epochs_data_fname)
@@ -367,6 +384,7 @@ for param in param_values.keys():
 
                 # Append data for GA
                 stcs_default_dict[param][param_value].append(source_tf)
+                epochs_num[param][param_value].append(len(epochs))
 
             # Plot power time-frequency
             if plot_individuals:
@@ -516,6 +534,9 @@ for param in param_values.keys():
             GA_stc_diff.subject = 'fsaverage'
 
             sig_regions = []
+            sig_data = []
+            sig_tfr = []
+            clusters_masks = []
             # Iterate, test and plot each region
             for i, region in enumerate(fsaverage_labels):
 
@@ -555,7 +576,6 @@ for param in param_values.keys():
                 ga_tf_diff_region = GA_stc_diff.pick(GA_stc_diff.ch_names[0])
                 ga_tf_diff_region.data = np.expand_dims(GA_stc_diff_data[i], axis=0)
 
-
                 fig, ax = plt.subplots(figsize=(10, 7))
                 ga_tf_diff_region.plot(axes=ax, mask=clusters_mask_plot, mask_style='contour', show=display_figs, title=title)[0]
                 ax.vlines(x=0, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyles='--', colors='gray')
@@ -569,20 +589,98 @@ for param in param_values.keys():
                 # Save significant regions to plot brain
                 if isinstance(clusters_mask_plot, np.ndarray):
                     sig_regions.append(region)
+                    sig_data.append(GA_stc_diff_data[i].flatten())
+                    sig_tfr.append(ga_tf_diff_region.copy())
+                    clusters_masks.append(clusters_mask_plot)
 
             # Plot brain with marked regions
             if len(sig_regions):
-                try:
-                    mne.viz.close_all_3d_figures()
-                except:
-                    pass
 
-                Brain = mne.viz.get_brain_class()
-                brain = Brain("fsaverage", hemi="split", surf="pial", views=['lat', 'med'], subjects_dir=subjects_dir, size=(1080, 720))
-                for label in sig_regions:
-                    brain.add_label(label, borders=False)
+                # Delete previous clusters plots
+                stop = False
+                i = 0
+                while not stop:
+                    if os.path.exists(fig_path_diff + f'sig/{i}'):
+                        shutil.rmtree(fig_path_diff + f'sig/')
+                        i += 1
+                    else:
+                        stop = True
 
-                # Save
+                # Cluster regions
+                X = np.array(sig_data)
+                final_n_clusters = min(n_clusters, len(sig_regions))
+
+                # Run clustering
+                kmeans = KMeans(n_clusters=final_n_clusters, random_state=0, n_init="auto").fit(X)
+
+                # Lower data dimensionality
+                X_2d = umap.UMAP(random_state=42).fit_transform(X)
+
+                # Visualize clustering
+                clusters = pd.DataFrame({'x': X_2d[:, 0], 'y': X_2d[:, 1], 'c': kmeans.labels_})
+                fname = f'Clusters_{final_n_clusters}'
+
+                cluster_fig, ax = plt.subplots(figsize=(8, 5))
+                sns.scatterplot(data=clusters, x='x', y='y', hue='c', ax = ax)
+                ax.legend(bbox_to_anchor=(1., 1), loc='upper left')
+                ax.set_title(fname)
+                cluster_fig.tight_layout()
+
                 if save_fig:
-                    brain.save_image(filename=fig_path_diff + 'sig/' + 'brain_regions.png')
-                    brain.save_image(filename=fig_path_diff + 'sig/svg/' + 'brain_regions.pdf')
+                    save.fig(fig=cluster_fig, path=fig_path_diff + f'sig/', fname=fname)
+
+                for cluster in np.unique(kmeans.labels_):
+
+                    # Close mne 3d figures
+                    try:
+                        mne.viz.close_all_3d_figures()
+                    except:
+                        pass
+
+                    # Define brain for plotting
+                    Brain = mne.viz.get_brain_class()
+                    brain = Brain("fsaverage", hemi="split", surf="pial", views=['lat', 'med'], subjects_dir=subjects_dir, size=(1080, 720))
+
+                    # Get clusters regions
+                    cluster_regions_idx = np.where(kmeans.labels_ == cluster)[0]
+                    # Get cluster's regions data
+                    sig_cluster_regions = [sig_regions[idx] for idx in cluster_regions_idx]
+                    sig_cluster_tfr = [sig_tfr[idx] for idx in cluster_regions_idx]
+                    sig_tf_clusters = [clusters_masks[idx] for idx in cluster_regions_idx]
+
+                    # Iterate over clsuter's regions
+                    for region, tfr, plot_mask in zip(sig_cluster_regions, sig_cluster_tfr, sig_tf_clusters):
+
+                        # Define figure name
+                        fname = f'GA_{region.name}_{l_freq}_{h_freq}'
+                        title = fname
+                        if active_times:
+                            fname += f"_{active_times[0]}_{active_times[1]}"
+
+                        # Plot
+                        fig, ax = plt.subplots(figsize=(10, 7))
+                        tfr.plot(axes=ax, mask=plot_mask, mask_style='contour', show=display_figs, title=title)[0]
+                        ax.vlines(x=0, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyles='--', colors='gray')
+                        fig.suptitle(fname)
+
+                        if save_fig:
+                            save.fig(fig=fig, path=fig_path_diff + f'sig/{cluster}/', fname=fname)
+
+                        # plot brain regions
+                        brain.add_label(region, borders=False)
+
+                    # Save brain plot
+                    if save_fig:
+                        brain.save_image(filename=fig_path_diff + f'sig/{cluster}/' + 'brain_regions.png')
+                        brain.save_image(filename=fig_path_diff + f'sig/{cluster}/svg/' + 'brain_regions.pdf')
+
+
+# Final print
+print(trial_params)
+print(meg_params)
+
+for param in param_values.keys():
+    print(param)
+    for param_value in param_values[param]:
+        print(param_value)
+        print(f"Average epochs: {np.mean(epochs_num[param][param_value])} +/- {np.std(epochs_num[param][param_value])}")
