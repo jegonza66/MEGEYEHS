@@ -6,6 +6,7 @@ import setup
 import load
 import save
 import matplotlib.pyplot as plt
+import numpy as np
 
 save_fig = False
 save_path = paths().save_path()
@@ -26,6 +27,8 @@ all_saccades_end = pd.DataFrame()
 all_fixations_target = pd.DataFrame()
 all_response_times_end = pd.DataFrame()
 
+all_acc = {1: [], 2: [], 4: []}
+all_response_times = {1: [], 2: [], 4: []}
 
 for subject_code in exp_info.subjects_ids:
 
@@ -91,20 +94,32 @@ for subject_code in exp_info.subjects_ids:
     all_mss = pd.concat([all_mss, trial_mss])
     all_corr_ans = pd.concat([all_corr_ans, corr_ans])
 
+    # Plot performance to extract values and save for GA
+    corr1_mean, corr2_mean, corr4_mean, rt1_mean, rt2_mean, rt4_mean = plot_preproc.performance(subject=subject, display=False, save_fig=False)
+
+    all_acc[1].append(corr1_mean)
+    all_acc[2].append(corr2_mean)
+    all_acc[4].append(corr4_mean)
+
+    all_response_times[1].append(rt1_mean)
+    all_response_times[2].append(rt2_mean)
+    all_response_times[4].append(rt4_mean)
+
 # Define all subjects class instance
 subjects = setup.all_subjects(all_fixations, all_saccades, all_bh_data, all_rt.values, all_corr_ans.values, all_mss)
 
 plot_preproc.first_fixation_delay(subject=subjects)
 plot_preproc.pupil_size_increase(subject=subjects)
-plot_preproc.performance(subject=subjects)
 
-plt.rcParams.update({'font.size': 12})
-fig, axs = plt.subplots(2, 2, figsize=(12, 7))
 
-plot_preproc.fixation_duration(subject=subjects, ax=axs[0, 0])
-plot_preproc.saccades_amplitude(subject=subjects, ax=axs[0, 1])
-plot_preproc.saccades_dir_hist(subject=subjects, fig=fig, ax=axs[1, 0])
-plot_preproc.sac_main_seq(subject=subjects, ax=axs[1, 1])
+plt.rcParams.update({'font.size': 16})
+fig, axs = plt.subplots(2, 3, figsize=(12, 7))
+
+plot_preproc.all_subj_performance(axs, all_acc, all_response_times)
+plot_preproc.fixation_duration(subject=subjects, ax=axs[0, 1])
+plot_preproc.saccades_amplitude(subject=subjects, ax=axs[0, 2])
+plot_preproc.saccades_dir_hist(subject=subjects, fig=fig, axs=axs, ax_idx=4)
+plot_preproc.sac_main_seq(subject=subjects, ax=axs[1, 2])
 
 fig.tight_layout()
 
