@@ -627,10 +627,10 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': 'tgt_fix_vs',  # use'+' to mix conditions (red+blue)
-                'corrans': True,
-                'tgtpres': True,
-                'mss': [1, 2, 4],
+trial_params = {'epoch_id': 'it_fix_vs+tgt_fix_vs',  # use'+' to mix conditions (red+blue)
+                'corrans': None,
+                'tgtpres': None,
+                'mss': None,
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
                 'evtdur': None,
                 'trialdur': None,
@@ -684,7 +684,7 @@ plot_edge = 0.15
 initial_time = 0.1
 difference_initial_time = 0.3
 positive_cbar = None  # None for free determination, False to include negative values
-plot_individuals = True
+plot_individuals = False
 plot_ga = True
 
 # Permutations test
@@ -1155,12 +1155,9 @@ pval_threshold = 0.05
 used_voxels_mm = src_default[0]['rr'][src_default[0]['inuse'].astype(bool)] * 1000
 
 # Plot
-selected_box = {0: {'x': (-10, 0), 'y': (9, 19), 'z': (37, 47)},
-                1: {'x': (0, 10), 'y': (9, 19), 'z': (37, 47)},
-                2: {'x': (-33, -23), 'y': (-11, -1), 'z': (59, 69)},
-                3: {'x': (25, 35), 'y': (-5, 5), 'z': (55, 65)}}
+selected_box = {0: {'x': (-10, 10), 'y': (-90, -75), 'z': (0, 15)}}
 
-titles = ['DACCL', 'DACCR', 'FEFL', 'FEFR']
+titles = ['V1']
 
 fontsize = 22
 
@@ -1231,7 +1228,6 @@ for j in selected_box.keys():
                 axs[i].yaxis.set_tick_params(labelsize=fontsize)
 
                 # Title
-
                 axs[i].set_title(f'{comparison}' + str(p_tfce[good_clusters_idx]), fontsize=fontsize)
 
                 # Remove blank space before and after
@@ -1245,6 +1241,51 @@ for j in selected_box.keys():
             # Save
             save.fig(fig=fig, path=fig_path_diff, fname=titles[j])
 
+        else:
+            fig, ax = plt.subplots(figsize=(10, 5))
+            test_data = []
+
+            # Get data for every subject in the selected voxels
+            voxels_data = []
+            for stc in stcs_default_dict[param][param_values[param][0]]:
+                stc_df = stc.to_data_frame()
+                voxels_columns = [f'VOL_{selected_voxel}' for selected_voxel in selected_voxels]
+                voxel_data = stc_df.loc[:, stc_df.columns.isin(voxels_columns)].values
+                voxels_data.append(voxel_data)
+
+            # Convert data to array
+            voxels_data = np.array(voxels_data)
+
+            # Average over voxels
+            subects_data = voxels_data.mean(axis=2)
+
+            # Extract mean and std over subjects
+            ga_data = subects_data.mean(axis=0)
+            ga_std = subects_data.std(axis=0) / np.sqrt(len(subects_data))  # Dividir por sqrt(len(subjects))
+
+            # Plot
+            ax.plot(stc.times, ga_data, label=param_values[param])
+            ax.fill_between(x=stc.times, y1=ga_data - ga_std, y2=ga_data + ga_std, alpha=0.4)
+
+            # Set labels
+            ax.set_xlabel('time (s)', fontsize=fontsize)
+            ax.set_ylabel('Activation', fontsize=fontsize)
+            ax.xaxis.set_tick_params(labelsize=fontsize)
+            ax.yaxis.set_tick_params(labelsize=fontsize)
+
+            # Title
+            ax.set_title(f'{param_values[param]}', fontsize=fontsize)
+
+            # Remove blank space before and after
+            ax.set_xlim(-0.2, 0.5)
+
+            # Title
+            fig.suptitle(f'{titles[j]}\n{str(selected_box[j])}\n(t_thres: {round(t_thresh, 2)} - p_thresh: {pval_threshold}', fontsize=fontsize)
+
+            fig.tight_layout()
+
+            # Save
+            save.fig(fig=fig, path=fig_path_diff, fname=titles[j])
 
 ## it vs tgt all channels FRF
 import load
