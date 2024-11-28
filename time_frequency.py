@@ -33,10 +33,10 @@ else:
 use_ica_data = True
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
-trial_params = {'epoch_id': 'vs',
-                'corrans': None,
+trial_params = {'epoch_id': 'cross2',
+                'corrans': [True, False],
                 'tgtpres': None,
-                'mss': [4],
+                'mss': 4,
                 'reject': None,
                 'evtdur': None,
                 'rel_sac': None
