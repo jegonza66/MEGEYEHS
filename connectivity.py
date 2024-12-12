@@ -30,10 +30,10 @@ else:
     plt.ioff()
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
-trial_params = {'epoch_id': ['it_fix_vs_subsampled', 'tgt_fix_vs'],
+trial_params = {'epoch_id': ['it_fix_vs_subsampled'],
                 'corrans': True,
-                'tgtpres': True,
-                'mss': None,
+                'tgtpres': None,
+                'mss': [1, 4],
                 'reject': None,
                 'evtdur': None,
                 }
@@ -58,7 +58,9 @@ pick_ori = None  # 'vector' For dipoles, 'max_power' for
 parcelation = 'aparc'
 
 # Connectivity parameters
-label_extraction_mode = 'pca_flip'
+compute_tmin = 0.
+compute_tmax = 0.2
+labels_mode = 'pca_flip'
 envelope_connectivity = False
 downsample_ts = False
 if envelope_connectivity:
@@ -71,6 +73,19 @@ standarize_con = True
 
 # Windows durations
 cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
+
+# Path for envelope or signal connectivity
+if envelope_connectivity:
+    main_path = 'Connectivity_Env'
+    # Modify path if downsample ts
+    if downsample_ts:
+        downsample_path = f'ds{desired_sfreq}'
+    else:
+        downsample_path = f'dsFalse'
+    final_path = f'{orthogonalization}_{downsample_path}_{labels_mode}_{connectivity_method}'
+else:
+    main_path = 'Connectivity'
+    final_path = f'{labels_mode}_{connectivity_method}'
 
 # Save data of each id
 subj_matrices = {}
@@ -107,23 +122,26 @@ for param in param_values.keys():
         fmin, fmax = functions_general.get_freq_band(band_id=meg_params['band_id'])
 
         # Get time windows from epoch_id name
-        map = dict(cross1={'tmin': 0, 'tmax': cross1_dur, 'plot_xlim': (None, None)},
+        map_times = dict(cross1={'tmin': 0, 'tmax': cross1_dur, 'plot_xlim': (None, None)},
                    ms={'tmin': 0, 'tmax': mss_duration[run_params['mss']], 'plot_xlim': (None, None)},
                    cross2={'tmin': 0, 'tmax': cross2_dur, 'plot_xlim': (None, None)},
-                   vs={'tmin': 0, 'tmax': vs_dur[run_params['mss']][0], 'plot_xlim': (None, None)},
-                   it_fix_vs_subsampled={'tmin': 0.25, 'tmax': 0.35, 'plot_xlim': (None, None)},
-                   tgt_fix_vs={'tmin': 0.25, 'tmax': 0.35, 'plot_xlim': (None, None)})
-
-        tmin, tmax, _ = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], map=map)
+                   vs={'tmin': 0, 'tmax': vs_dur[run_params['mss']][0], 'plot_xlim': (None, None)})
+        tmin, tmax, _ = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], map=map_times)
 
         # Get baseline duration for epoch_id
         baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=run_params['epoch_id'], mss=run_params['mss'], tmin=tmin, tmax=tmax,
                                                                           cross1_dur=cross1_dur, mss_duration=mss_duration,
                                                                           cross2_dur=cross2_dur, plot_edge=None)
 
-        # Connectivity tmin relative to epochs tmin time (label_ts restarts time to 0)s
-        con_tmin = 0
-        con_tmax = tmax - tmin
+        # Connectivity tmin relative to epochs tmin time (label_ts restarts time to 0)
+        if compute_tmin == None:
+            con_tmin = 0
+        else:
+            con_tmin = compute_tmin - tmin
+        if compute_tmax == None:
+            con_tmax = tmax - tmin
+        else:
+            con_tmax = compute_tmax - tmin
 
         # Load experiment info
         exp_info = setup.exp_info()
@@ -138,37 +156,26 @@ for param in param_values.keys():
         elif not envelope_connectivity:
             band_path = 'None'
 
+        # Run path
         run_path_data = f"Band_{band_path}/{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}" \
                         f"_trialdur{trialdur}_evtdur{run_params['evtdur']}_{tmin}_{tmax}"
 
+        # Epochs path
         epochs_save_path = paths().save_path() + f"Epochs_{meg_params['data_type']}/{run_path_data}_bline{baseline}/"
 
         # Source plots and data paths
-        run_path_plot = run_path_data.replace('Band_None', f"Band_{meg_params['band_id']}")  # Replace band id for None because Epochs are the same on all bands
+        run_path_plot = run_path_data.replace('Band_None', f"Band_{meg_params['band_id']}")
+        if compute_tmin or compute_tmax:
+            run_path_plot = run_path_plot.replace(f"{tmin}_{tmax}", f"{compute_tmin}_{compute_tmax}") # Replace band id for None because Epochs are the same on all bands
 
-        # Set path for envelope or signal connectivity
-        if envelope_connectivity:
-            main_path = 'Connectivity_Env'
-            # Modify path if downsample ts
-            if downsample_ts:
-                downsample_path = f'ds{desired_sfreq}'
-            else:
-                downsample_path = f'dsFalse'
-            final_path = f'{orthogonalization}_{downsample_path}_{label_extraction_mode}_{connectivity_method}'
-        else:
-            main_path = 'Connectivity'
-            final_path = f'{label_extraction_mode}_{connectivity_method}'
+        # Source estimation path
+        source_model_path = f"{model_name}_{surf_vol}_ico{ico}_{pick_ori}"
+        labels_model_path = source_model_path + f"_{parcelation}_{labels_mode}/"
+        label_ts_save_path = paths().save_path() + f"Source_labels_{meg_params['data_type']}/{run_path_data}_bline{baseline}/" + labels_model_path
 
-        if surf_vol == 'volume':
-            fig_path = paths().plots_path() + f"{main_path}_{meg_params['data_type']}/" + run_path_plot + \
-                       f"/{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{parcelation}_{final_path}_std{standarize_con}/"
-            save_path = paths().save_path() + f"{main_path}_{meg_params['data_type']}/" + run_path_plot + \
-                        f"/{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{parcelation}_{final_path}/"
-        elif surf_vol == 'surface':
-            fig_path = paths().plots_path() + f"{main_path}_{meg_params['data_type']}/" + run_path_plot + \
-                       f"/{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{parcelation}_{final_path}_std{standarize_con}/"
-            save_path = paths().save_path() + f"{main_path}_{meg_params['data_type']}/" + run_path_plot + \
-                        f"/{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{parcelation}_{final_path}/"
+        # Connectivity matrices plots and save paths
+        fig_path = paths().plots_path() + f"{main_path}_{meg_params['data_type']}/" + run_path_plot + source_model_path + f"_{parcelation}_{final_path}_std{standarize_con}/"
+        save_path = paths().save_path() + f"{main_path}_{meg_params['data_type']}/" + run_path_plot + source_model_path + f"_{parcelation}_{final_path}/"
 
         # Save conectivity matrices
         subj_matrices[param][param_value] = []
@@ -195,7 +202,6 @@ for param in param_values.keys():
                 fsaverage_labels[0].pop(drop_idx)
                 fsaverage_labels[1].pop(drop_idx)
             con_matrix = np.zeros((len(exp_info.subjects_ids), len(fsaverage_labels[0]), len(fsaverage_labels[0])))
-
 
         # --------- Run ---------#
         for subj_num, subject_code in enumerate(exp_info.subjects_ids):
@@ -224,6 +230,8 @@ for param in param_values.keys():
             # --------- Paths ---------#
             # Data filenames
             epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+            labels_ts_data_fname = f'Subject_{subject.subject_id}.pkl'
+
             # Save figures path
             fig_path_subj = fig_path + f'{subject.subject_id}/'
             # Connectivity data fname
@@ -240,58 +248,57 @@ for param in param_values.keys():
             # Get sources from forward model
             src = fwd['src']
 
-            try:
-                # Load connectivity matrix
+            # Parcellation labels
+            if surf_vol == 'volume':
+                labels = subjects_dir + f'/{subject_code}/mri/aparc+aseg.mgz'
+            elif subject_code != 'fsaverage':
+                # Get labels for FreeSurfer cortical parcellation
+                labels = mne.read_labels_from_annot(subject=subject_code, parc=parcelation, subjects_dir=subjects_dir)
+            else:
+                labels = fsaverage_labels
+
+            # Load connectivity matrix
+            if os.path.isfile(fname_con):
                 con = mne_connectivity.read_connectivity(fname_con)
 
-                # Parcellation labels
-                if surf_vol == 'volume':
-                    labels = subjects_dir + f'/{subject_code}/mri/aparc+aseg.mgz'
-                elif subject_code != 'fsaverage':
-                    # Get labels for FreeSurfer cortical parcellation
-                    labels = mne.read_labels_from_annot(subject=subject_code, parc=parcelation, subjects_dir=subjects_dir)
+            else:
+                # Load labels ts data
+                if os.path.isfile(label_ts_save_path + labels_ts_data_fname):
+                    label_ts = load.var(file_path=label_ts_save_path + labels_ts_data_fname)
                 else:
-                    labels = fsaverage_labels
+                    # Load epochs data
+                    if os.path.isfile(epochs_save_path + epochs_data_fname):
+                        epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
+                    else:
+                        # Load MEG data
+                        meg_data = load.meg(subject=subject, meg_params=meg_params, save_data=save_data)
 
-            except:
-                try:
-                    # Load data
-                    epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
-                except:
-                    meg_data = load.meg(subject=subject, meg_params=meg_params, save_data=save_data)
+                        # Epoch data
+                        epochs, events = functions_analysis.epoch_data(subject=subject, mss=run_params['mss'], corr_ans=run_params['corrans'], tgt_pres=run_params['tgtpres'],
+                                                                       epoch_id=run_params['epoch_id'], meg_data=meg_data, trial_dur=trialdur,
+                                                                       tmin=tmin, tmax=tmax, baseline=baseline, reject=run_params['reject'],
+                                                                       save_data=False, epochs_save_path=epochs_save_path,
+                                                                       epochs_data_fname=epochs_data_fname)
 
-                    # Epoch data
-                    epochs, events = functions_analysis.epoch_data(subject=subject, mss=run_params['mss'], corr_ans=run_params['corrans'], tgt_pres=run_params['tgtpres'],
-                                                                   epoch_id=run_params['epoch_id'], meg_data=meg_data, trial_dur=trialdur,
-                                                                   tmin=tmin, tmax=tmax, baseline=baseline, reject=run_params['reject'],
-                                                                   save_data=False, epochs_save_path=epochs_save_path,
-                                                                   epochs_data_fname=epochs_data_fname)
+                    # Pick meg channels for source modeling
+                    epochs.pick('meg')
 
-                # Pick meg channels for source modeling
-                epochs.pick('meg')
+                    # --------- Source estimation ---------#
+                    # Load filter
+                    fname_filter = paths().filter_path(subject=subject, subject_code=subject_code, ico=ico, spacing=spacing, surf_vol=surf_vol, pick_ori=pick_ori,
+                                                       model_name=model_name)
+                    filters = mne.beamformer.read_beamformer(fname_filter)
 
-                # --------- Source estimation ---------#
-                # Load filter
-                if surf_vol == 'volume':
-                    fname_filter = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
-                elif surf_vol == 'surface':
-                    fname_filter = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-{model_name}.fif'
-                filters = mne.beamformer.read_beamformer(fname_filter)
+                    # Apply filter and get source estimates
+                    stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
 
-                # Apply filter and get source estimates
-                stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
+                    # Average the source estimates within each label using sign-flips to reduce signal cancellations
+                    label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=labels, src=src, mode=labels_mode, return_generator=False)
 
-                # --------- Connectivity ---------#
-                if surf_vol == 'volume':
-                    labels = subjects_dir + f'/{subject_code}/mri/aparc+aseg.mgz'
-                elif subject_code != 'fsaverage':
-                    # Get labels for FreeSurfer cortical parcellation
-                    labels = mne.read_labels_from_annot(subject=subject_code, parc=parcelation, subjects_dir=subjects_dir)
-                else:
-                    labels = fsaverage_labels
-
-                # Average the source estimates within each label using sign-flips to reduce signal cancellations
-                label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=labels, src=src, mode=label_extraction_mode, return_generator=False)
+                    # Save
+                    if save_data:
+                        os.makedirs(save_path, exist_ok=True)
+                        save.var(var=label_ts, path=label_ts_save_path, fname=labels_ts_data_fname)
 
                 if envelope_connectivity:
                     if downsample_ts:
@@ -385,6 +392,8 @@ for param in param_values.keys():
 for param in param_values.keys():
     if len(param_values[param]) > 1 and run_comparison:
         for comparison in list(itertools.combinations(param_values[param], 2)):
+            if all(type(element) == int for element in comparison):
+                comparison = sorted(comparison, reverse=True)
 
             # Redefine figure save path
             if param == 'epoch_id':
@@ -415,7 +424,7 @@ for param in param_values.keys():
 
             # Make 1D arrays to run FDR correction
             ravel_p_values = p_values.ravel()
-            rejected, corrected_pval = fdrcorrection(pvals=ravel_p_values, alpha=p_threshold)
+            rejected, corrected_pval = fdrcorrection(pvals=ravel_p_values, alpha=p_threshold)  # rejected refers to null hypothesis
 
             # Reshape to regions x regions array
             corrected_pval = np.reshape(corrected_pval, newshape=p_values.shape)
