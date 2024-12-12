@@ -150,9 +150,9 @@ for param in param_values.keys():
             run_params['trialdur'] = None  # Change to trial_dur = None to use all trials for no 'vs' epochs
 
         # Get time windows from epoch_id name
-        map_times = dict(cross2={'tmin': -cross1_dur - mss_duration[run_params['mss']], 'tmax': cross2_dur, 'plot_xlim': (-1, 0)})
+        # map_times = dict(cross2={'tmin': -cross1_dur - mss_duration[run_params['mss']], 'tmax': cross2_dur, 'plot_xlim': (-1, 0)})
         run_params['tmin'], run_params['tmax'], _ = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'],
-                                                                                                          plot_edge=plot_edge, map=map_times)
+                                                                                                          plot_edge=plot_edge)
 
         # Get baseline duration for epoch_id
         # map = dict(sac={'tmin': -0.0, 'tmax': 0.15, 'plot_xlim': (-0.2 + plot_edge, 0.3 - plot_edge)})
@@ -242,12 +242,8 @@ for param in param_values.keys():
             src = fwd['src']
 
             # Load filter
-            if surf_vol == 'volume':
-                fname_filter = sources_path_subject + f'/{subject_code}_volume_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
-            elif surf_vol == 'surface':
-                fname_filter = sources_path_subject + f'/{subject_code}_surface_ico{ico}_{pick_ori}-{model_name}.fif'
-            elif surf_vol == 'mixed':
-                fname_filter = sources_path_subject + f'/{subject_code}_mixed_ico{ico}_{int(spacing)}_{pick_ori}-{model_name}.fif'
+            fname_filter = paths().filter_path(subject=subject, subject_code=subject_code, ico=ico, spacing=spacing, surf_vol=surf_vol, pick_ori=pick_ori,
+                                               model_name=model_name)
             filters = mne.beamformer.read_beamformer(fname_filter)
 
             # Get epochs and evoked
