@@ -14,10 +14,8 @@ import plot_general
 import matplotlib.pyplot as plt
 import itertools
 import scipy
-from sklearn.cluster import KMeans
-import umap
 import pandas as pd
-import seaborn as sns
+
 
 # Load experiment info
 exp_info = setup.exp_info()
@@ -35,13 +33,13 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': 'cross2',  # use'+' to mix conditions (red+blue)
+trial_params = {'epoch_id': 'tgt_fix_ms_subsampled',  # use'+' to mix conditions (red+blue)
                 'corrans': [True, False],
-                'tgtpres': None,
-                'mss': 4,
+                'tgtpres': True,
+                'mss': None,
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
                 'evtdur': None,
-                'rel_sac': None}
+                'rel_sac': 'prev'}
 
 meg_params = {'regions_id': 'all',
               'band_id': None,
@@ -73,15 +71,18 @@ pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the di
 source_estimation = 'epo'
 estimate_source_tf = True
 visualize_alignment = False
+parcelation='aparc'
 
+# Time freqcuency computation
+tf_output = 'phase'  # 'phase' / 'avg_power'
+n_cycles_div = 4.
 # Baseline
-bline_mode_subj = 'db'
+bline_mode_subj = False  # 'db'
 plot_edge = 0.15
 
 # Plot
 plot_individuals = False
 plot_ga = False
-
 fontsize = 22
 params = {'font.size': fontsize}
 plt.rcParams.update(params)
@@ -96,7 +97,14 @@ p_threshold = 0.05
 t_thresh = scipy.stats.t.ppf(1 - desired_tval / 2, df=degrees_of_freedom)
 # t_thresh = dict(start=0, step=0.2)
 
+# Regions clustering
+run_clustering = False
 n_clusters = 3
+run_quadrants = True
+time_limit = 0.2
+freq_limit = 15
+sig_chs_percent = 0.5
+
 
 #--------- Setup ---------#
 
@@ -137,7 +145,7 @@ aparc_region_labels['all'] = [value for key in aparc_region_labels.keys() for va
 region_labels = [element for region in meg_params['regions_id'].split('_') for element in aparc_region_labels[region]]
 
 # Get parcelation labels
-fsaverage_labels = functions_analysis.get_labels(parcelation='aparc', subjects_dir=subjects_dir, surf_vol=surf_vol)
+fsaverage_labels = functions_analysis.get_labels(parcelation=parcelation, subjects_dir=subjects_dir, surf_vol=surf_vol)
 fsaverage_labels = [label for label in fsaverage_labels for label_id in region_labels if label.name.startswith(label_id + '-')]
 
 # Get param to compute difference from params dictionary
@@ -150,12 +158,14 @@ if param_values == {}:
 stcs_default_dict = {}
 GA_stcs = {}
 epochs_num = {}
-
+fixations_duration = {}
+hist_data = None
 # --------- Run ---------#
 for param in param_values.keys():
     stcs_default_dict[param] = {}
     GA_stcs[param] = {}
     epochs_num[param] = {}
+    fixations_duration[param] = {}
     for param_value in param_values[param]:
 
         # Get run parameters from trial params including all comparison between different parameters
@@ -178,7 +188,8 @@ for param in param_values.keys():
             run_params['trialdur'] = None  # Change to trial_dur = None to use all trials for no 'vs' epochs
 
         # Get time windows from epoch_id name
-        map_times = {'it_sac_vs': {'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)}}
+        map_times = {'it_sac_vs': {'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
+                     'it_sac_vs_subsampled': {'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)}}
         run_params['tmin'], run_params['tmax'], _ = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], plot_edge=plot_edge, map=map_times)
 
         # Get baseline duration for epoch_id
@@ -197,28 +208,24 @@ for param in param_values.keys():
             run_path = run_params['rel_sac'] + '_' + run_path
 
         # Source paths
-        if surf_vol == 'volume' or surf_vol == 'mixed':
-            source_model_path = f"{model_name}_{surf_vol}_ico{ico}_{int(spacing)}_{pick_ori}_{bline_mode_subj}_{source_estimation}/"
-        else:
-            if labels_mode:
-                source_model_path = f"{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{bline_mode_subj}_{source_estimation}_{labels_mode}/"
-            else:
-                source_model_path = f"{model_name}_{surf_vol}_ico{ico}_{pick_ori}_{bline_mode_subj}_{source_estimation}/"
-
-        # Sources data path
-        source_data_path = paths().save_path() + f"Source_Space_{meg_params['data_type']}_TF/Band_{meg_params['band_id']}/" + run_path + source_model_path
+        source_model_path = f"{model_name}_{surf_vol}_ico{ico}_{pick_ori}"
+        labels_model_path = source_model_path + f"_{parcelation}_{labels_mode}/"
+        source_tf_path = source_model_path + f"_{bline_mode_subj}_{source_estimation}_{labels_mode}/"
 
         # Data paths
         epochs_save_path = paths().save_path() + f"Epochs_{meg_params['data_type']}/Band_{meg_params['band_id']}/" + run_path
         evoked_save_path = paths().save_path() + f"Evoked_{meg_params['data_type']}/Band_{meg_params['band_id']}/" + run_path
         cov_save_path = paths().save_path() + f"Cov_Epochs_{meg_params['data_type']}/Band_{meg_params['band_id']}/" + run_path
+        label_ts_save_path = paths().save_path() + f"Source_labels_{meg_params['data_type']}/Band_{meg_params['band_id']}/" + run_path + labels_model_path
+        source_tf_save_path = paths().save_path() + f"Source_Space_{meg_params['data_type']}_TF/Band_{meg_params['band_id']}/" + run_path + source_tf_path
 
         # Define fig path
-        fig_path = paths().plots_path() + f"Source_Space_{meg_params['data_type']}_TF/Band_{meg_params['band_id']}/" + run_path + source_model_path
+        fig_path = paths().plots_path() + f"Source_Space_{meg_params['data_type']}_TF/Band_{meg_params['band_id']}/" + run_path + source_tf_path + f'{tf_output}/'
 
         # Save source estimates time courses on default's subject source space
         stcs_default_dict[param][param_value] = []
         epochs_num[param][param_value] = []
+        fixations_duration[param][param_value] = []
 
         # Iterate over participants
         for subject_code in exp_info.subjects_ids:
@@ -231,11 +238,22 @@ for param in param_values.keys():
 
             # Subject's data fname
             subj_source_data_fname = f"Power_{subject_code}_{l_freq}_{h_freq}_{meg_params['regions_id']}_tfr.h5"
+            if tf_output != 'avg_power':
+                subj_source_data_fname = subj_source_data_fname.replace('Power', tf_output)
+
+            # Data filenames
+            epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+            evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
+
             # Load subjects data
-            if os.path.isfile(source_data_path + subj_source_data_fname):
+            if os.path.isfile(source_tf_save_path + subj_source_data_fname):
                 print(f'Loading TF data from participant {subject_code}')
                 # Load data
-                source_tf = mne.time_frequency.read_tfrs(source_data_path + subj_source_data_fname, condition=0)
+                source_tf = mne.time_frequency.read_tfrs(source_tf_save_path + subj_source_data_fname, condition=0)
+
+                # Get next fixation start time and save
+                if 'fix' in run_params['epoch_id']:
+                    epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
 
                 # Append data for GA
                 stcs_default_dict[param][param_value].append(source_tf)
@@ -244,9 +262,6 @@ for param in param_values.keys():
             # Compute subjects data
             else:
                 print(f'Computing TF for participant {subject_code}')
-                # Data filenames
-                epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
-                evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
 
                 # --------- Coord systems alignment ---------#
                 if force_fsaverage:
@@ -360,8 +375,10 @@ for param in param_values.keys():
                 # Time-Frequency computation
                 region_source_array = np.array(label_ts)
                 freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)
-                n_cycles = freqs / 4.
-                source_tf_array = mne.time_frequency.tfr_array_morlet(region_source_array, sfreq=epochs.info['sfreq'], freqs=freqs, n_cycles=n_cycles, output='avg_power')
+                n_cycles = freqs / n_cycles_div
+                source_tf_array = mne.time_frequency.tfr_array_morlet(region_source_array, sfreq=epochs.info['sfreq'], freqs=freqs, n_cycles=n_cycles, output=tf_output)
+                if tf_output == 'phase':
+                    source_tf_array = source_tf_array.mean(axis=0)
                 source_tf = mne.time_frequency.AverageTFR(info=epochs.copy().pick(epochs.ch_names[:region_source_array.shape[1]]).info, data=source_tf_array,
                                                           times=epochs.times, freqs=freqs, nave=len(label_ts))
 
@@ -379,25 +396,34 @@ for param in param_values.keys():
 
                 if save_data:
                     # Save trf data
-                    os.makedirs(source_data_path, exist_ok=True)
-                    source_tf.save(source_data_path + subj_source_data_fname, overwrite=True)
+                    os.makedirs(source_tf_save_path, exist_ok=True)
+                    source_tf.save(source_tf_save_path + subj_source_data_fname, overwrite=True)
 
                 # Append data for GA
                 stcs_default_dict[param][param_value].append(source_tf)
                 epochs_num[param][param_value].append(len(epochs))
 
+            # Get next fixation start time and save
+            if 'fix' in run_params['epoch_id']:
+                epochs.metadata['next_sac_dur'] = epochs.metadata['next_sac'].apply(lambda x: subject.saccades.loc[int(x), 'duration'] if pd.notna(x) else 0)
+                epochs.metadata['total_duration'] = epochs.metadata['duration'] + epochs.metadata['next_sac_dur']
+                fixations_duration[param][param_value].append(epochs.metadata['total_duration'])
+            elif 'sac' in run_params['epoch_id']:
+                epochs.metadata['total_duration'] = epochs.metadata['duration']
+                fixations_duration[param][param_value].append(epochs.metadata['total_duration'])
+
             # Plot power time-frequency
             if plot_individuals:
 
                 fname = f"Power_{subject.subject_id}_{meg_params['regions_id']}_{bline_mode_subj}_{l_freq}_{h_freq}"
-                fig, ax = plt.subplots(figsize=(10, 7))
-                fig = source_tf.plot(axes=ax, show=display_figs, combine='mean')[0]
-                ax.vlines(x=0, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyles='--', colors='gray')
-                fig.suptitle(fname)
+                if tf_output != 'Power':
+                    fname = fname.replace('Power', tf_output)
 
-                if save_fig:
-                    save.fig(fig=fig, path=fig_path, fname=fname)
+                hist_data = epochs.metadata['total_duration']
+                fig = plot_general.source_tf(tf=source_tf, hist_data=hist_data, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path, fname=fname)
 
+                # Free up memory
+                plt.close(fig)
 
         # Grand Average: Average evoked stcs from this epoch_id
         all_subj_source_data = np.zeros(tuple([len(stcs_default_dict[param][param_value])] + [size for size in stcs_default_dict[param][param_value][0].data.shape]))
@@ -455,16 +481,11 @@ for param in param_values.keys():
             # --------- Plot --------- #
             ga_tf_region = GA_stc.pick(GA_stc.ch_names[0])
             ga_tf_region.data = np.expand_dims(GA_stc_data[i], axis=0)
+            if 'fix' in run_params['epoch_id'] or 'sac' in run_params['epoch_id']:
+                hist_data = pd.concat(fixations_duration[param][param_value])
 
-            fig, ax = plt.subplots(figsize=(10, 7))
-            ga_tf_region.plot(axes=ax, mask=clusters_mask_plot, mask_style='contour', show=display_figs, title=title)[0]
-            ax.vlines(x=0, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyles='--', colors='gray')
-            fig.suptitle(fname)
-
-            if save_fig:
-                save.fig(fig=fig, path=fig_path, fname=fname)
-                if isinstance(clusters_mask_plot, np.ndarray):
-                    save.fig(fig=fig, path=fig_path + 'sig/', fname=fname)
+            fig = plot_general.source_tf(tf=ga_tf_region, clusters_mask_plot=clusters_mask_plot, hist_data=hist_data, display_figs=display_figs,
+                                         save_fig=save_fig, fig_path=fig_path, fname=fname, title=title)
 
             # Free up memory
             plt.close(fig)
@@ -533,10 +554,18 @@ for param in param_values.keys():
             GA_stc_diff.data = GA_stc_diff_data
             GA_stc_diff.subject = 'fsaverage'
 
+            # Delete previous significance plots
+            if os.path.exists(fig_path_diff + f'sig/'):
+                shutil.rmtree(fig_path_diff + f'sig/')
+
+            # Define TF quadrants
+            quadrants_regions = {'early_low': [], 'late_low': [], 'early_high': [], 'late_high': []}
+
             sig_regions = []
             sig_data = []
             sig_tfr = []
             clusters_masks = []
+
             # Iterate, test and plot each region
             for i, region in enumerate(fsaverage_labels):
 
@@ -575,104 +604,47 @@ for param in param_values.keys():
                 # --------- Plot --------- #
                 ga_tf_diff_region = GA_stc_diff.pick(GA_stc_diff.ch_names[0])
                 ga_tf_diff_region.data = np.expand_dims(GA_stc_diff_data[i], axis=0)
+                hist_data = pd.concat(fixations_duration[param][comparison[0]] + fixations_duration[param][comparison[1]])
 
-                fig, ax = plt.subplots(figsize=(10, 7))
-                ga_tf_diff_region.plot(axes=ax, mask=clusters_mask_plot, mask_style='contour', show=display_figs, title=title)[0]
-                ax.vlines(x=0, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyles='--', colors='gray')
-                fig.suptitle(fname)
+                fig = plot_general.source_tf(tf=ga_tf_diff_region, clusters_mask_plot=clusters_mask_plot, hist_data=hist_data, display_figs=display_figs,
+                                             save_fig=save_fig, fig_path=fig_path_diff, fname=fname, title=title)
 
-                if save_fig:
-                    save.fig(fig=fig, path=fig_path_diff, fname=fname)
-                    if isinstance(clusters_mask_plot, np.ndarray):
-                        save.fig(fig=fig, path=fig_path_diff + 'sig/', fname=fname)
+                # Close figure
+                if not display_figs:
+                    plt.close(fig)
 
-                # Save significant regions to plot brain
+                # Save significant regions to plot brain and run clustering / quadrants
                 if isinstance(clusters_mask_plot, np.ndarray):
                     sig_regions.append(region)
                     sig_data.append(GA_stc_diff_data[i].flatten())
                     sig_tfr.append(ga_tf_diff_region.copy())
                     clusters_masks.append(clusters_mask_plot)
 
+                    # Find quadrant
+                    time_limit_idx, _ = functions_general.find_nearest(ga_tf_diff_region.times, time_limit)
+                    freq_limit_idx, _ = functions_general.find_nearest(ga_tf_diff_region.freqs, freq_limit)
+
+                    if clusters_mask_plot[:freq_limit_idx, :time_limit_idx].any():
+                        quadrants_regions['early_low'].append(region)
+                    if clusters_mask_plot[freq_limit_idx:, :time_limit_idx:].any():
+                        quadrants_regions['early_high'].append(region)
+                    if clusters_mask_plot[:freq_limit_idx, time_limit_idx:].any():
+                        quadrants_regions['late_low'].append(region)
+                    if clusters_mask_plot[freq_limit_idx:, time_limit_idx:].any():
+                        quadrants_regions['late_high'].append(region)
+
             # Plot brain with marked regions
             if len(sig_regions):
 
-                # Delete previous clusters plots
-                stop = False
-                i = 0
-                while not stop:
-                    if os.path.exists(fig_path_diff + f'sig/{i}'):
-                        shutil.rmtree(fig_path_diff + f'sig/')
-                        i += 1
-                    else:
-                        stop = True
-
-                # Cluster regions
-                X = np.array(sig_data)
-                final_n_clusters = min(n_clusters, len(sig_regions))
-
-                # Run clustering
-                kmeans = KMeans(n_clusters=final_n_clusters, random_state=0, n_init="auto").fit(X)
-
-                # Lower data dimensionality
-                X_2d = umap.UMAP(random_state=42).fit_transform(X)
-
-                # Visualize clustering
-                clusters = pd.DataFrame({'x': X_2d[:, 0], 'y': X_2d[:, 1], 'c': kmeans.labels_})
-                fname = f'Clusters_{final_n_clusters}'
-
-                cluster_fig, ax = plt.subplots(figsize=(8, 5))
-                sns.scatterplot(data=clusters, x='x', y='y', hue='c', ax = ax)
-                ax.legend(bbox_to_anchor=(1., 1), loc='upper left')
-                ax.set_title(fname)
-                cluster_fig.tight_layout()
-
-                if save_fig:
-                    save.fig(fig=cluster_fig, path=fig_path_diff + f'sig/', fname=fname)
-
-                for cluster in np.unique(kmeans.labels_):
-
-                    # Close mne 3d figures
-                    try:
-                        mne.viz.close_all_3d_figures()
-                    except:
-                        pass
-
-                    # Define brain for plotting
-                    Brain = mne.viz.get_brain_class()
-                    brain = Brain("fsaverage", hemi="split", surf="pial", views=['lat', 'med'], subjects_dir=subjects_dir, size=(1080, 720))
-
-                    # Get clusters regions
-                    cluster_regions_idx = np.where(kmeans.labels_ == cluster)[0]
-                    # Get cluster's regions data
-                    sig_cluster_regions = [sig_regions[idx] for idx in cluster_regions_idx]
-                    sig_cluster_tfr = [sig_tfr[idx] for idx in cluster_regions_idx]
-                    sig_tf_clusters = [clusters_masks[idx] for idx in cluster_regions_idx]
-
-                    # Iterate over clsuter's regions
-                    for region, tfr, plot_mask in zip(sig_cluster_regions, sig_cluster_tfr, sig_tf_clusters):
-
-                        # Define figure name
-                        fname = f'GA_{region.name}_{l_freq}_{h_freq}'
-                        title = fname
-                        if active_times:
-                            fname += f"_{active_times[0]}_{active_times[1]}"
-
-                        # Plot
-                        fig, ax = plt.subplots(figsize=(10, 7))
-                        tfr.plot(axes=ax, mask=plot_mask, mask_style='contour', show=display_figs, title=title)[0]
-                        ax.vlines(x=0, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyles='--', colors='gray')
-                        fig.suptitle(fname)
-
-                        if save_fig:
-                            save.fig(fig=fig, path=fig_path_diff + f'sig/{cluster}/', fname=fname)
-
-                        # plot brain regions
-                        brain.add_label(region, borders=False)
-
-                    # Save brain plot
-                    if save_fig:
-                        brain.save_image(filename=fig_path_diff + f'sig/{cluster}/' + 'brain_regions.png')
-                        brain.save_image(filename=fig_path_diff + f'sig/{cluster}/svg/' + 'brain_regions.pdf')
+                if run_clustering:
+                    functions_analysis.cluster_regions(n_clusters=n_clusters, sig_data=sig_data, sig_regions=sig_regions, sig_tfr=sig_tfr, clusters_masks=clusters_masks,
+                                                       l_freq=l_freq, h_freq=h_freq, active_times=active_times, subjects_dir=subjects_dir,
+                                                       display_figs=display_figs, save_fig=save_fig, fig_path_diff=fig_path_diff)
+                if run_quadrants:
+                    functions_analysis.quadrant_regions(quadrants_regions=quadrants_regions, sig_regions=sig_regions, sig_tfr=sig_tfr, clusters_masks=clusters_masks,
+                                                        sig_chs_percent=sig_chs_percent, l_freq=l_freq, h_freq=h_freq, active_times=active_times,
+                                                        hist_data=hist_data, subjects_dir=subjects_dir,
+                                                        display_figs=display_figs, save_fig=save_fig, fig_path_diff=fig_path_diff)
 
 
 # Final print
@@ -684,3 +656,6 @@ for param in param_values.keys():
     for param_value in param_values[param]:
         print(param_value)
         print(f"Average epochs: {np.mean(epochs_num[param][param_value])} +/- {np.std(epochs_num[param][param_value])}")
+
+for quadrants in quadrants_regions.keys():
+    print(f"{quadrants}: {len(quadrants_regions[quadrants])}")
