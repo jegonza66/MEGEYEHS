@@ -13,6 +13,11 @@ from scipy import stats as stats
 from mne.stats import spatio_temporal_cluster_1samp_test, summarize_clusters_stc
 from tqdm import tqdm
 from mne.stats import permutation_cluster_1samp_test
+from sklearn.cluster import KMeans
+import umap
+import pandas as pd
+import seaborn as sns
+import plot_general
 
 
 # ---------- Epoch Data ---------- #
@@ -80,7 +85,7 @@ def define_events(subject, meg_data, epoch_id, trial_num=None, evt_dur=None, epo
                 epoch_keys = subject.saccades.loc[epoch_keys_idx, 'id']
                 epoch_keys = epoch_keys[epoch_keys != 'None'].to_list()
 
-    # Get events and ids matchig selection
+    # Get events and ids matching selection
     metadata, events, events_id = mne.epochs.make_metadata(events=all_events, event_id=all_event_id, row_events=epoch_keys, tmin=0, tmax=0, sfreq=meg_data.info['sfreq'])
 
     if 'fix' in epoch_id and not rel_sac:
@@ -125,10 +130,50 @@ def epoch_data(subject, mss, corr_ans, tgt_pres, epoch_id, meg_data, tmin, tmax,
 
     # Redefine epoch id
     if rel_sac and 'sac' in epoch_id:
-        epoch_id = epoch_id.replace('sac', 'fix')
+        fix_epoch_id = epoch_id.replace('sac', 'fix')
 
-    # Define events
-    metadata, events, events_id, metadata_sup = define_events(subject=subject, meg_data=meg_data, epoch_id=epoch_id, evt_dur=evt_dur, trial_num=trial_num, rel_sac=rel_sac)
+        # If running subsampled rel saccades epochs, try to load the fixations data to extract relative saccades from it. If no defined subsampled fixations epochs, run subsampling script
+        try:
+            # load fixations epochs (in case subsampled)
+            # Get time windows from epoch_id name
+            fix_tmin, fix_tmax, _ = functions_general.get_time_lims(epoch_id=fix_epoch_id, mss=mss)
+
+            # Windows durations
+            cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
+            # Get baseline duration for epoch_id
+            fix_bline, _ = functions_general.get_baseline_duration(epoch_id=fix_epoch_id, mss=mss, tmin=tmin, tmax=tmax, cross1_dur=cross1_dur, mss_duration=mss_duration,
+                                                                   cross2_dur=cross2_dur)
+
+            # Correct epochs path for fixations
+            fix_epochs_save_path = epochs_save_path.replace(f'{rel_sac}_', '').replace('sac', 'fix')
+            fix_epochs_save_path = fix_epochs_save_path.replace(f'{tmin}_{tmax}', f'{fix_tmin}_{fix_tmax}').replace(fix_epochs_save_path.split('bline')[-1], f'{fix_bline}/')
+
+            # Load epochs
+            fix_epochs = mne.read_epochs(fix_epochs_save_path + epochs_data_fname)
+
+            # Extract rel sac epoch keys from metadata
+            fix_metadata = fix_epochs.metadata
+            epoch_keys_idx = fix_metadata[f'{rel_sac}_sac']
+            epoch_keys_idx.dropna(inplace=True)
+            epoch_keys = subject.saccades.loc[epoch_keys_idx, 'id']
+            epoch_keys = epoch_keys[epoch_keys != 'None'].to_list()
+
+            # Get events from annotations
+            all_events, all_event_id = mne.events_from_annotations(meg_data, verbose=False)
+
+            # Get events and ids matching selection
+            metadata, events, events_id = mne.epochs.make_metadata(events=all_events, event_id=all_event_id, row_events=epoch_keys, tmin=0, tmax=0,
+                                                                   sfreq=meg_data.info['sfreq'])
+            metadata_sup = subject.saccades
+        except:
+
+            # Define events
+            metadata, events, events_id, metadata_sup = define_events(subject=subject, meg_data=meg_data, epoch_id=fix_epoch_id, evt_dur=evt_dur, trial_num=trial_num, rel_sac=rel_sac)
+
+    else:
+        # Define events
+        metadata, events, events_id, metadata_sup = define_events(subject=subject, meg_data=meg_data, epoch_id=epoch_id, evt_dur=evt_dur, trial_num=trial_num,
+                                                                  rel_sac=rel_sac)
 
     # Reject based on channel amplitude
     if reject == False:
@@ -980,3 +1025,147 @@ def get_labels(parcelation, subjects_dir, surf_vol='surface'):
             fsaverage_labels[1].pop(drop_idx)
 
     return fsaverage_labels
+
+
+def cluster_regions(n_clusters, sig_data, sig_regions, sig_tfr, clusters_masks, l_freq, h_freq, active_times, subjects_dir, display_figs, save_fig, fig_path_diff):
+    # Cluster regions
+    X = np.array(sig_data)
+    final_n_clusters = min(n_clusters, len(sig_regions))
+
+    # Run clustering
+    kmeans = KMeans(n_clusters=final_n_clusters, random_state=0, n_init="auto").fit(X)
+
+    # Lower data dimensionality
+    X_2d = umap.UMAP(random_state=42).fit_transform(X)
+
+    # Visualize clustering
+    clusters = pd.DataFrame({'x': X_2d[:, 0], 'y': X_2d[:, 1], 'c': kmeans.labels_})
+    fname = f'Clusters_{final_n_clusters}'
+
+    cluster_fig, ax = plt.subplots(figsize=(8, 5))
+    sns.scatterplot(data=clusters, x='x', y='y', hue='c', ax=ax)
+    ax.legend(bbox_to_anchor=(1., 1), loc='upper left')
+    ax.set_title(fname)
+    cluster_fig.tight_layout()
+
+    if save_fig:
+        save.fig(fig=cluster_fig, path=fig_path_diff + f'sig/', fname=fname)
+
+    for cluster in np.unique(kmeans.labels_):
+
+        # Close mne 3d figures
+        try:
+            mne.viz.close_all_3d_figures()
+        except:
+            pass
+
+        # Define brain for plotting
+        Brain = mne.viz.get_brain_class()
+        brain = Brain("fsaverage", hemi="split", surf="pial", views=['lat', 'med'], subjects_dir=subjects_dir, size=(1080, 720))
+
+        # Get clusters regions
+        cluster_regions_idx = np.where(kmeans.labels_ == cluster)[0]
+        # Get cluster's regions data
+        sig_cluster_regions = [sig_regions[idx] for idx in cluster_regions_idx]
+        sig_cluster_tfr = [sig_tfr[idx] for idx in cluster_regions_idx]
+        sig_tf_clusters = [clusters_masks[idx] for idx in cluster_regions_idx]
+
+        # Iterate over clsuter's regions
+        for region, tfr, plot_mask in zip(sig_cluster_regions, sig_cluster_tfr, sig_tf_clusters):
+
+            # Define figure name
+            fname = f'GA_{region.name}_{l_freq}_{h_freq}'
+            title = fname
+            if active_times:
+                fname += f"_{active_times[0]}_{active_times[1]}"
+
+            # Plot
+            fig, ax = plt.subplots(figsize=(10, 7))
+            tfr.plot(axes=ax, mask=plot_mask, mask_style='contour', show=display_figs, title=title)[0]
+            ax.vlines(x=0, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyles='--', colors='gray')
+            fig.suptitle(fname)
+
+            if save_fig:
+                save.fig(fig=fig, path=fig_path_diff + f'sig/{cluster}/', fname=fname)
+
+            # plot brain regions
+            brain.add_label(region, borders=False)
+
+        # Save brain plot
+        if save_fig:
+            brain.save_image(filename=fig_path_diff + f'sig/{cluster}/' + 'brain_regions.png')
+            brain.save_image(filename=fig_path_diff + f'sig/{cluster}/svg/' + 'brain_regions.pdf')
+
+def quadrant_regions(quadrants_regions, sig_regions, sig_tfr, clusters_masks, sig_chs_percent, l_freq, h_freq, active_times, hist_data, subjects_dir, display_figs, save_fig, fig_path_diff):
+
+    for quadrant in quadrants_regions.keys():
+
+        # Get clusters regions
+        quadrant_regions = quadrants_regions[quadrant]
+        quadrant_regions_idx = [i for i in range(len(sig_regions)) if sig_regions[i] in quadrant_regions]
+
+        if len(quadrant_regions_idx):
+
+            # Close mne 3d figures
+            try:
+                mne.viz.close_all_3d_figures()
+            except:
+                pass
+
+            # Define brain for plotting
+            Brain = mne.viz.get_brain_class()
+            brain = Brain("fsaverage", hemi="split", surf="pial", views=['lat', 'med'], subjects_dir=subjects_dir, size=(1080, 720))
+
+            # Get cluster's regions data
+            sig_quadrant_regions = [sig_regions[idx] for idx in quadrant_regions_idx]
+            sig_quadrant_tfr = [sig_tfr[idx] for idx in quadrant_regions_idx]
+            sig_tf_quadrant = [clusters_masks[idx] for idx in quadrant_regions_idx]
+
+            # Iterate over quadrant's regions
+            for region, tfr, plot_mask in zip(sig_quadrant_regions, sig_quadrant_tfr, sig_tf_quadrant):
+
+                # Define figure name
+                fname = f'GA_{region.name}_{l_freq}_{h_freq}'
+                title = fname
+                if active_times:
+                    fname += f"_{active_times[0]}_{active_times[1]}"
+
+                # Plot
+                fig = plot_general.source_tf(tf=tfr, clusters_mask_plot=plot_mask, hist_data=hist_data, display_figs=display_figs,
+                                             save_fig=save_fig, fig_path=fig_path_diff + f'sig/{quadrant}/', fname=fname, title=title)
+
+                # Close figure
+                if not display_figs:
+                        plt.close(fig)
+
+                # plot brain regions
+                brain.add_label(region, borders=False)
+
+            # Quadrant average
+            avg_quadrant_tfr = tfr.copy()
+            avg_quadrant_tfr.data = np.array([quadrant_tfr.data for quadrant_tfr in sig_quadrant_tfr]).mean(axis=0)
+
+            # Quadrant clusters
+            min_sig_chs = sig_chs_percent * len(sig_quadrant_regions)
+            quadrant_mask = np.array(sig_tf_quadrant).sum(axis=0) > min_sig_chs
+
+            # Define figure name
+            fname = f'Avg_{quadrant}'
+            title = fname
+            if active_times:
+                fname += f"_{active_times[0]}_{active_times[1]}"
+
+            # Plot
+            fig = plot_general.source_tf(tf=avg_quadrant_tfr, clusters_mask_plot=quadrant_mask, hist_data=hist_data, display_figs=display_figs,
+                                         save_fig=save_fig, fig_path=fig_path_diff + f'sig/{quadrant}/', fname=fname, title=title)
+
+            if save_fig:
+                save.fig(fig=fig, path=fig_path_diff + f'sig/{quadrant}/', fname=fname)
+
+                # Save brain plot
+                brain.save_image(filename=fig_path_diff + f'sig/{quadrant}/' + 'brain_regions.png')
+                brain.save_image(filename=fig_path_diff + f'sig/{quadrant}/svg/' + 'brain_regions.pdf')
+
+            # Close figure
+            if not display_figs:
+                plt.close(fig)
