@@ -30,7 +30,7 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': 'ms',  # use'+' to mix conditions (red+blue)
+trial_params = {'epoch_id': 'it_fix_vs_subsampled',  # use'+' to mix conditions (red+blue)
                 'corrans': None,
                 'tgtpres': None,
                 'mss': 1,
@@ -45,11 +45,11 @@ meg_params = {'chs_id': 'occipital',
               }
 
 # Define PAC parameters
-l_freq_amp, h_freq_amp = 15, 100
-width_amp = 10
-step_amp = 2
+l_freq_amp, h_freq_amp = 15, 30
+width_amp = 5
+step_amp = 1
 
-l_freq_pha, h_freq_pha = 2, 8
+l_freq_pha, h_freq_pha = 8, 12
 width_pha = 2
 step_pha = .2
 
@@ -123,6 +123,10 @@ for param in param_values.keys():
         pac_subjects_cross2 = []
         pac_subjects_vs = []
         erpac_subjects = []
+
+        # Save source estimates time courses on default's subject source space
+        stcs_default_dict[param][param_value] = []
+        GA_stcs[param][param_value] = []
 
         # Iterate over subjects
         for subject_code in exp_info.subjects_ids:
