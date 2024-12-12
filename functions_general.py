@@ -445,7 +445,7 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
                        vs={'tmin': -cross1_dur - mss_duration[mss] - cross2_dur, 'tmax': vs_dur[mss][0],
                            'plot_xlim': [-cross1_dur - mss_duration[mss] - cross2_dur + plot_edge, vs_dur[mss][0] - plot_edge]},
                        vsend={'tmin': -2, 'tmax': cross1_dur + 1, 'plot_xlim': [-2 + plot_edge, cross1_dur + 1 - plot_edge]},
-                       sac={'tmin': -0.2, 'tmax': 0.3, 'plot_xlim': [-0.2 + plot_edge, 0.3 - plot_edge]},
+                       sac={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': [-0.3 + plot_edge, 0.6 - plot_edge]},
                        fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': [-0.3 + plot_edge, 0.6 - plot_edge]},
                        blue={'tmin': -1, 'tmax': 1.9, 'plot_xlim': [-1 + plot_edge, 1.9 - plot_edge]},
                        red={'tmin': -1, 'tmax': 1.9, 'plot_xlim': [-1 + plot_edge, 1.9 - plot_edge]})
@@ -482,7 +482,7 @@ def get_duration():
     return cross1_dur, cross2_dur, mss_duration, vs_dur
 
 
-def get_baseline_duration(epoch_id, mss, tmin, tmax, cross1_dur, mss_duration, cross2_dur, plot_edge=None, map=None):
+def get_baseline_duration(epoch_id, mss, tmin, tmax, mss_duration=2, cross1_dur=0.75, cross2_dur=1, plot_edge=None, map=None):
     # Baseline duration
     if map and epoch_id in map.keys():
         baseline = (map[epoch_id]['baseline'][0], map[epoch_id]['baseline'][1])
