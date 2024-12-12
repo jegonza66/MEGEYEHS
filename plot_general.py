@@ -10,6 +10,8 @@ import mne
 import mne_connectivity
 from nilearn import plotting
 from itertools import compress
+import pandas as pd
+import matplotlib.gridspec as gridspec
 
 
 save_path = paths().save_path()
@@ -959,6 +961,58 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
                     pass
 
     return brain
+
+
+def source_tf(tf, clusters_mask_plot=None, hist_data=None, display_figs=False, save_fig=True, fig_path=None, fname=None, title=None):
+
+    # Sanity check
+    if save_fig and (not fig_path):
+        raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
+
+    if isinstance(hist_data, pd.Series):
+        # Create the figure and gridspec for custom subplot sizes
+        fig = plt.figure(figsize=(10, 7))
+
+        # Define gridspec
+        gs = gridspec.GridSpec(3, 1, height_ratios=[3, 1, 0.1])
+
+        # Upper subplot
+        ax1 = fig.add_subplot(gs[0, 0])  # First row, first column
+        tf.plot(axes=ax1, mask=clusters_mask_plot, mask_style='contour', show=display_figs, title=title, combine='mean')[0]
+        ax1.vlines(x=0, ymin=ax1.get_ylim()[0], ymax=ax1.get_ylim()[1], linestyles='--', colors='gray')
+
+        # Capture the position of the modified axis
+        pos1 = ax1.get_position()
+
+        # Calculate the position for the second subplot
+        # Use the same width and align it with the adjusted position of the first subplot
+        ax2_bottom = pos1.y0 - (pos1.height / 2)  # Place below ax1, taking 1/3 of the height
+        ax2_height = pos1.height / 3
+
+        # Add the lower subplot using the captured size
+        ax2 = fig.add_axes([pos1.x0, ax2_bottom, pos1.width, ax2_height], sharex=ax1)
+        ax2.hist(hist_data, bins=100, edgecolor='black', linewidth=0.3, stacked=True)
+        ax2.set_xlabel('Time (s)')
+
+        # Remove the x-axis labels of the first plot
+        ax1.tick_params(labelbottom=False)
+        ax1.set_xlabel("")  # Remove the x-axis label
+
+    else:
+        fig, ax = plt.subplots(figsize=(10, 7))
+        fig = source_tf.plot(axes=ax, mask=clusters_mask_plot, mask_style='contour', show=display_figs, combine='mean', title=title)[0]
+        ax.vlines(x=0, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyles='--', colors='gray')
+
+    fig.suptitle(fname)
+
+    if save_fig:
+        save.fig(fig=fig, path=fig_path, fname=fname)
+        if isinstance(clusters_mask_plot, np.ndarray):
+            if 'sig/' not in fig_path:
+                save.fig(fig=fig, path=fig_path + 'sig/', fname=fname)
+            else:
+                save.fig(fig=fig, path=fig_path, fname=fname)
+    return fig
 
 
 def add_task_lines(y_text, fontsize=10, color='white', ax=None):
