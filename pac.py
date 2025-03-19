@@ -1,5 +1,4 @@
 import os.path
-
 from tensorpac import Pac
 from tensorpac import EventRelatedPac
 import functions_general
@@ -30,42 +29,73 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': 'it_fix_vs_subsampled',  # use'+' to mix conditions (red+blue)
-                'corrans': None,
+trial_params = {'epoch_id': 'it_fix_vs_sub',  # use'+' to mix conditions (red+blue)
+                'corrans': True,
                 'tgtpres': None,
-                'mss': 1,
+                'mss': [1, 4],
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
                 'evtdur': None,
                 'trialdur': None}
 
-meg_params = {'chs_id': 'occipital',
-              'filter_sensors': True,
-              'filter_method': 'iir',
+meg_params = {'band_id': None,
+              'regions_id': 'all',
               'data_type': 'ICA'
               }
+
+# Source estimation parameters
+force_fsaverage = False
+model_name = 'lcmv'
+surf_vol = 'surface'
+ico = 4
+spacing = 5.  # Only for volume source estimation
+pick_ori = None
+parcelation='aparc'
+labels_mode = 'pca_flip'
 
 # Define PAC parameters
 l_freq_amp, h_freq_amp = 15, 30
 width_amp = 5
 step_amp = 1
 
-l_freq_pha, h_freq_pha = 8, 12
-width_pha = 2
-step_pha = .2
+l_freq_pha, h_freq_pha = 7, 13
+width_pha = 1
+step_pha = .1
 
 #--------- Setup ---------#
 
 # Windows durations
 cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
 
-# Get time limits based on epoch id
-time_map = {'vs': dict(tmin=0, tmax=2, plot_xlim=(0, 2)),
-            'ms': dict(tmin=-0.75, tmax=5, plot_xlim=(0, 5))}
-
 if 'vs' in trial_params['epoch_id'] and 'fix' not in trial_params['epoch_id'] and 'sac' not in trial_params['epoch_id']:
     trial_dur = vs_dur[trial_params['mss']]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
 else:
     trial_dur = None
+
+# Adapt to hfreq model
+if meg_params['band_id'] == 'HGamma' or ((isinstance(meg_params['band_id'], list) or isinstance(meg_params['band_id'], tuple)) and meg_params['band_id'][0] > 40):
+    model_name = 'hfreq-' + model_name
+
+# --------- Freesurfer Path ---------#
+# Define Subjects_dir as Freesurfer output folder
+subjects_dir = os.path.join(paths().mri_path(), 'FreeSurfer_out')
+os.environ["SUBJECTS_DIR"] = subjects_dir
+
+# Surface labels id by region
+aparc_region_labels = {'occipital': ['cuneus', 'lateraloccipital', 'lingual', 'pericalcarine'],
+                       'parietal': ['postcentral', 'superiorparietal', 'supramarginal', 'inferiorparietal', 'precuneus'],
+                       'temporal': ['inferiortemporal', 'middletemporal', 'superiortemporal', 'bankssts', 'transversetemporal', 'fusiform', 'entorhinal', 'parahippocampal', 'temporalpole'],
+                       'frontal': ['precentral', 'caudalmiddlefrontal', 'superiorfrontal', 'rostralmiddlefrontal', 'lateralorbitofrontal', 'parstriangularis', 'parsorbitalis', 'parsopercularis', 'medialorbitofrontal', 'paracentral', 'frontalpole'],
+                       'insula': ['insula'],
+                       'cingulate': ['isthmuscingulate', 'posteriorcingulate', 'caudalanteriorcingulate', 'rostralanteriorcingulate']}
+
+aparc_region_labels['all'] = [value for key in aparc_region_labels.keys() for value in aparc_region_labels[key]]
+
+# Extract region labels data
+region_labels = [element for region in meg_params['regions_id'].split('_') for element in aparc_region_labels[region]]
+
+# Get parcelation labels
+fsaverage_labels = functions_analysis.get_labels(parcelation=parcelation, subjects_dir=subjects_dir, surf_vol=surf_vol)
+fsaverage_labels = [label for label in fsaverage_labels for label_id in region_labels if label.name.startswith(label_id + '-')]
 
 # Define PAC computer
 p_obj = Pac(idpac=(6, 0, 0), f_pha=(l_freq_pha, h_freq_pha, width_pha, step_pha), f_amp=(l_freq_amp, h_freq_amp, width_amp, step_amp))
@@ -98,7 +128,7 @@ for param in param_values.keys():
         # Set comparison key value
         run_params[param] = param_value
 
-        run_params['tmin'], run_params['tmax'], plot_xlim = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], map=time_map)
+        run_params['tmin'], run_params['tmax'], plot_xlim = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'])
 
         # Get baseline duration for epoch_id
         run_params['baseline'], run_params['plot_baseline'] = functions_general.get_baseline_duration(epoch_id=run_params['epoch_id'], mss=run_params['mss'],
@@ -106,22 +136,25 @@ for param in param_values.keys():
                                                                                                       cross1_dur=cross1_dur, mss_duration=mss_duration,
                                                                                                       cross2_dur=cross2_dur)
 
-        # Save ids
-        save_id = f"{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}_trialdur{trial_dur}_evtdur{run_params['evtdur']}"
+        # Paths
+        run_path = (f"{run_params['epoch_id']}_mss{run_params['mss']}_corrans{run_params['corrans']}_tgtpres{run_params['tgtpres']}_"
+                    f"trialdur{run_params['trialdur']}_evtdur{run_params['evtdur']}_{run_params['tmin']}_{run_params['tmax']}_bline{run_params['baseline']}/")
         # Redefine save id
         if 'rel_sac' in run_params.keys() and run_params['rel_sac'] != None:
-            save_id = run_params['rel_sac'] + '_' + save_id
+            run_path = run_params['rel_sac'] + '_' + run_path
 
-        epochs_save_path = paths().save_path() + f"Epochs_{meg_params['data_type']}/Band_None/{save_id}_{run_params['tmin']}_{run_params['tmax']}_bline{run_params['baseline']}/"
+        # Source paths
+        source_model_path = f"{model_name}_{surf_vol}_ico{ico}_{pick_ori}"
+        labels_model_path = source_model_path + f"_{parcelation}_{labels_mode}/"
+
+        epochs_save_path = paths().save_path() + f"Epochs_{meg_params['data_type']}/Band_None/{run_path}/"
+        label_ts_save_path = paths().save_path() + f"Source_labels_{meg_params['data_type']}/Band_{meg_params['band_id']}/" + run_path + labels_model_path
 
         # Save figures paths
-        fig_path = paths().plots_path() + f"PAC_{meg_params['data_type']}/" + save_id + f"_{l_freq_pha}-{h_freq_pha}_{l_freq_amp}-{h_freq_amp}/{meg_params['chs_id']}"
+        fig_path = paths().plots_path() + f"PAC_{meg_params['data_type']}/" + run_path + f"{l_freq_pha}-{h_freq_pha}_{l_freq_amp}-{h_freq_amp}/{labels_model_path}"
 
         # Save pac across subjects
-        pac_subjects_cross1 = []
-        pac_subjects_ms = []
-        pac_subjects_cross2 = []
-        pac_subjects_vs = []
+        pac_subjects = []
         erpac_subjects = []
 
         # Save source estimates time courses on default's subject source space
@@ -141,118 +174,111 @@ for param in param_values.keys():
 
             # Data filenames
             epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
+            labels_ts_data_fname = f'Subject_{subject.subject_id}.pkl'
 
-            if os.path.isfile(epochs_save_path + epochs_data_fname):
-                # Load epoched data
+            # Load labels ts data
+            if os.path.isfile(label_ts_save_path + labels_ts_data_fname):
+                label_ts = load.var(file_path=label_ts_save_path + labels_ts_data_fname)
                 epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
             else:
-                # Load meg data
-                if meg_params['data_type']:
-                    meg_data = load.ica_data(subject=subject)
+                # Source data path
+                sources_path_subject = paths().sources_path() + subject.subject_id
+
+                # Load forward model
+                fname_fwd = paths().fwd_path(subject=subject, subject_code=subject_code, ico=ico, spacing=spacing, surf_vol=surf_vol)
+                fwd = mne.read_forward_solution(fname_fwd)
+                src = fwd['src']
+
+                # Load filter
+                fname_filter = paths().filter_path(subject=subject, subject_code=subject_code, ico=ico, spacing=spacing, surf_vol=surf_vol, pick_ori=pick_ori,
+                                                   model_name=model_name)
+                filters = mne.beamformer.read_beamformer(fname_filter)
+
+                if os.path.isfile(epochs_save_path + epochs_data_fname):
+                    # Load epoched data
+                    epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
                 else:
-                    meg_data = subject.load_preproc_meg_data()
+                    # Load meg data
+                    if meg_params['data_type']:
+                        meg_data = load.ica_data(subject=subject)
+                    else:
+                        meg_data = subject.load_preproc_meg_data()
 
-                # Epoch data
-                epochs, events = functions_analysis.epoch_data(subject=subject, mss=run_params['mss'], corr_ans=run_params['corrans'], trial_dur=trial_dur,
-                                                               tgt_pres=run_params['tgtpres'], baseline=run_params['baseline'], reject=run_params['reject'],
-                                                               evt_dur=run_params['evtdur'], epoch_id=run_params['epoch_id'],
-                                                               meg_data=meg_data, tmin=run_params['tmin'], tmax=run_params['tmax'], save_data=save_data,
-                                                               epochs_save_path=epochs_save_path, epochs_data_fname=epochs_data_fname)
+                    # Epoch data
+                    epochs, events = functions_analysis.epoch_data(subject=subject, mss=run_params['mss'], corr_ans=run_params['corrans'], trial_dur=trial_dur,
+                                                                   tgt_pres=run_params['tgtpres'], baseline=run_params['baseline'], reject=run_params['reject'],
+                                                                   evt_dur=run_params['evtdur'], epoch_id=run_params['epoch_id'],
+                                                                   meg_data=meg_data, tmin=run_params['tmin'], tmax=run_params['tmax'], save_data=save_data,
+                                                                   epochs_save_path=epochs_save_path, epochs_data_fname=epochs_data_fname)
 
-            # Pick channels
-            picks = functions_general.pick_chs(chs_id=meg_params['chs_id'], info=epochs.info)
-            epochs.pick(picks)
+                # --------- Source estimation ---------#
+                # Redefine stc epochs to iterate over
+                stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
 
-            pac_electrodes_cross1 = []
-            pac_electrodes_ms = []
-            pac_electrodes_cross2 = []
-            pac_electrodes_vs = []
-            # Compute PAC over electrodes
+                # Extract region labels data
+
+                if surf_vol == 'volume':
+                    labels_path = subjects_dir + f'/{subject_code}/mri/aparc+aseg.mgz'
+                    labels = mne.get_volume_labels_from_aseg(labels_path, return_colors=False)
+                    used_labels = [label for label in labels for label_id in region_labels if label_id in label]
+                    used_labels = [labels_path, used_labels]
+
+                elif subject_code != 'fsaverage':
+                    # Get labels for FreeSurfer cortical parcellation
+                    labels = mne.read_labels_from_annot(subject=subject_code, parc=parcelation, subjects_dir=subjects_dir)
+                    used_labels = [label for label in labels for label_id in region_labels if label.name.startswith(label_id + '-')]
+
+                else:
+                    labels = fsaverage_labels
+                    used_labels = [label for label in labels for label_id in region_labels if label.name.startswith(label_id + '-')]
+
+                # Average the source estimates within each label using sign-flips to reduce signal cancellations
+                label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=used_labels, src=src, mode=labels_mode, return_generator=False)
+
+            label_ts_array = np.array(label_ts)
+            pac_regions = []
+            # Compute PAC over regions
             print('Computing PAC')
-            for e in tqdm(range(len(epochs.ch_names))):
+            for e in tqdm(range(len(label_ts[0]))):
 
-                epochs_data = epochs.get_data()[:, e, :].squeeze()
+                region_data = label_ts_array[:, e, :]
+                # epochs_data = epochs.get_data()[:, e, :].squeeze()
 
                 # Extract all phases and amplitudes
-                epochs_pha = p_obj.filter(epochs.info['sfreq'], epochs_data, ftype='phase')
-                epochs_amp = p_obj.filter(epochs.info['sfreq'], epochs_data, ftype='amplitude')
-
-                # Change_times
-                screen_change_times = [epochs.times[0] + cross1_dur,
-                                       epochs.times[0] + cross1_dur + mss_duration[run_params['mss']],
-                                       epochs.times[0] + cross1_dur + + mss_duration[run_params['mss']] + cross2_dur]
-
-                screen_onsets, _ = functions_general.find_nearest(epochs.times, screen_change_times)
-
-                # Extract screens data
-                time_cross1 = slice(0, screen_onsets[0])
-                time_ms = slice(screen_onsets[0], screen_onsets[1])
-                time_cross2 = slice(screen_onsets[1], screen_onsets[2])
-                time_vs = slice(screen_onsets[2], len(epochs.times))
-
-                epochs_pha_cross1, epochs_amp_cross1 = epochs_pha[..., time_cross1], epochs_amp[..., time_cross1]
-                epochs_pha_ms, epochs_amp_ms= epochs_pha[..., time_ms], epochs_amp[..., time_ms]
-                epochs_pha_cross2, epochs_amp_cross2 = epochs_pha[..., time_cross2], epochs_amp[..., time_cross2]
-                epochs_pha_vs, epochs_amp_vs = epochs_pha[..., time_vs], epochs_amp[..., time_vs]
+                epochs_pha = p_obj.filter(epochs.info['sfreq'], region_data, ftype='phase')
+                epochs_amp = p_obj.filter(epochs.info['sfreq'], region_data, ftype='amplitude')
 
                 # Compute PAC inside rest, planning, and execution
-                pac_cross1 = p_obj.fit(epochs_pha_cross1, epochs_amp_cross1, verbose=False).mean(-1)
-                pac_ms = p_obj.fit(epochs_pha_ms, epochs_amp_ms, verbose=False).mean(-1)
-                pac_cross2 = p_obj.fit(epochs_pha_cross2, epochs_amp_cross2, verbose=False).mean(-1)
-                pac_vs = p_obj.fit(epochs_pha_vs, epochs_amp_vs, verbose=False).mean(-1)
+                pac = p_obj.fit(epochs_pha, epochs_amp, verbose=False).mean(-1)
 
                 # Append
-                pac_electrodes_cross1.append(pac_cross1)
-                pac_electrodes_ms.append(pac_ms)
-                pac_electrodes_cross2.append(pac_cross2)
-                pac_electrodes_vs.append(pac_vs)
+                pac_regions.append(pac)
 
             # Average electrodes
-            pac_subject_cross1 = np.mean(np.array(pac_electrodes_cross1), axis=0).squeeze()
-            pac_subject_ms = np.mean(np.array(pac_electrodes_ms), axis=0).squeeze()
-            pac_subject_cross2 = np.mean(np.array(pac_electrodes_cross2), axis=0).squeeze()
-            pac_subject_vs = np.mean(np.array(pac_electrodes_vs), axis=0).squeeze()
+            pac_subject = np.mean(np.array(pac_regions), axis=0)
 
             # Plot
             fname = f'{subject.subject_id}_pac_cross1'
             fig = plt.figure()
-            p_obj.comodulogram(pac_subject_cross1)
+            p_obj.comodulogram(pac_subject)
             if save_fig:
                 save.fig(fig=fig, path=fig_path, fname=fname)
 
-            fname = f'{subject.subject_id}_pac_ms'
-            fig = plt.figure()
-            p_obj.comodulogram(pac_subject_ms)
-            if save_fig:
-                save.fig(fig=fig, path=fig_path, fname=fname)
-
-            fname = f'{subject.subject_id}_pac_cross2'
-            fig = plt.figure()
-            p_obj.comodulogram(pac_subject_cross2)
-            if save_fig:
-                save.fig(fig=fig, path=fig_path, fname=fname)
-
-            fname = f'{subject.subject_id}_pac_vs'
-            fig = plt.figure()
-            p_obj.comodulogram(pac_subject_vs)
-            if save_fig:
-                save.fig(fig=fig, path=fig_path, fname=fname)
-
-
-            erpac_electrodes = []
-            # Compute ERPAC over electrodes
+            erpac_regions = []
+            # Compute ERPAC over regions
             print('Computing ERPAC')
-            for e in tqdm(range(len(epochs.ch_names))):
-                epochs_data = epochs.get_data()[:, e, :].squeeze()
+            for e in tqdm(range(len(label_ts[0]))):
+
+                region_data = label_ts_array[:, e, :]
 
                 # Compute ERPac
-                erpac = rp_obj.filterfit(epochs.info['sfreq'], epochs_data, method='gc', smooth=100, verbose=False)
+                erpac = rp_obj.filterfit(epochs.info['sfreq'], region_data, method='gc', smooth=100, verbose=False)
 
                 # Append
-                erpac_electrodes.append(erpac)
+                erpac_regions.append(erpac)
 
             # Avergae electrodes
-            erpac_subject = np.mean(np.array(erpac_electrodes), axis=0).squeeze()
+            erpac_subject = np.mean(np.array(erpac_regions), axis=0).squeeze()
 
             # Plot
             fname = f'{subject.subject_id}_erpac'
@@ -264,50 +290,20 @@ for param in param_values.keys():
                 save.fig(fig=fig, path=fig_path, fname=fname)
 
             # Append to subjects data
-            pac_subjects_cross1.append(pac_subject_cross1)
-            pac_subjects_ms.append(pac_subject_ms)
-            pac_subjects_cross2.append(pac_subject_cross2)
-            pac_subjects_vs.append(pac_subject_vs)
-
+            pac_subjects.append(pac_subject)
             erpac_subjects.append(erpac_subject)
 
 
         # Convert to array
-        pac_subjects_cross1 = np.array(pac_subjects_cross1)
-        pac_subjects_ms = np.array(pac_subjects_ms)
-        pac_subjects_cross2 = np.array(pac_subjects_cross2)
-        pac_subjects_vs = np.array(pac_subjects_vs)
-
+        pac_subjects = np.array(pac_subjects)
         erpac_subjects = np.array(erpac_subjects)
 
-        pac_ga_cross1 = np.mean(pac_subjects_cross1, axis=0)
-        pac_ga_ms = np.mean(pac_subjects_ms, axis=0)
-        pac_ga_cross2 = np.mean(pac_subjects_cross2, axis=0)
-        pac_ga_vs = np.mean(pac_subjects_vs, axis=0)
-
+        pac_ga = np.mean(pac_subjects, axis=0)
         erpac_ga = np.mean(erpac_subjects, axis=0)
 
-        fname = 'GA_comodulogram_cross1'
+        fname = 'GA_comodulogram'
         fig = plt.figure()
-        p_obj.comodulogram(pac_ga_cross1)
-        if save_fig:
-            save.fig(fig=fig, path=fig_path, fname=fname)
-
-        fname = 'GA_comodulogram_ms'
-        fig = plt.figure()
-        p_obj.comodulogram(pac_ga_ms)
-        if save_fig:
-            save.fig(fig=fig, path=fig_path, fname=fname)
-
-        fname = 'GA_comodulogram_cross2'
-        fig = plt.figure()
-        p_obj.comodulogram(pac_ga_cross2)
-        if save_fig:
-            save.fig(fig=fig, path=fig_path, fname=fname)
-
-        fname = 'GA_comodulogram_vs'
-        fig = plt.figure()
-        p_obj.comodulogram(pac_ga_vs)
+        p_obj.comodulogram(pac_ga)
         if save_fig:
             save.fig(fig=fig, path=fig_path, fname=fname)
 
