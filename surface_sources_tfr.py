@@ -33,13 +33,13 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': 'tgt_fix_ms_subsampled',  # use'+' to mix conditions (red+blue)
-                'corrans': [True, False],
+trial_params = {'epoch_id': ['tgt_fix_vs_sub', 'it_fix_vs_sub'],  # use'+' to mix conditions (red+blue)
+                'corrans': True,
                 'tgtpres': True,
                 'mss': None,
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
-                'evtdur': None,
-                'rel_sac': 'prev'}
+                'evtdur': -0.8,
+                'rel_sac': None}
 
 meg_params = {'regions_id': 'all',
               'band_id': None,
@@ -74,10 +74,10 @@ visualize_alignment = False
 parcelation='aparc'
 
 # Time freqcuency computation
-tf_output = 'phase'  # 'phase' / 'avg_power'
+tf_output = 'avg_power'  # 'phase' / 'avg_power'
 n_cycles_div = 4.
 # Baseline
-bline_mode_subj = False  # 'db'
+bline_mode_subj = 'db'  # 'db'
 plot_edge = 0.15
 
 # Plot
@@ -120,16 +120,6 @@ if meg_params['band_id'] == 'HGamma' or ((isinstance(meg_params['band_id'], list
 # Define Subjects_dir as Freesurfer output folder
 subjects_dir = os.path.join(paths().mri_path(), 'FreeSurfer_out')
 os.environ["SUBJECTS_DIR"] = subjects_dir
-
-# Get Source space for default subject
-if surf_vol == 'volume':
-    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_volume_ico{ico}_{int(spacing)}-src.fif'
-elif surf_vol == 'surface':
-    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_surface_ico{ico}-src.fif'
-elif surf_vol == 'mixed':
-    fname_src = paths().sources_path() + 'fsaverage' + f'/fsaverage_mixed_ico{ico}_{int(spacing)}-src.fif'
-
-src_default = mne.read_source_spaces(fname_src)
 
 # Surface labels id by region
 aparc_region_labels = {'occipital': ['cuneus', 'lateraloccipital', 'lingual', 'pericalcarine'],
@@ -189,7 +179,7 @@ for param in param_values.keys():
 
         # Get time windows from epoch_id name
         map_times = {'it_sac_vs': {'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
-                     'it_sac_vs_subsampled': {'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)}}
+                     'it_sac_vs_sub': {'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)}}
         run_params['tmin'], run_params['tmax'], _ = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'], plot_edge=plot_edge, map=map_times)
 
         # Get baseline duration for epoch_id
@@ -244,6 +234,7 @@ for param in param_values.keys():
             # Data filenames
             epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
             evoked_data_fname = f'Subject_{subject.subject_id}_ave.fif'
+            labels_ts_data_fname = f'Subject_{subject.subject_id}.pkl'
 
             # Load subjects data
             if os.path.isfile(source_tf_save_path + subj_source_data_fname):
@@ -262,115 +253,123 @@ for param in param_values.keys():
             # Compute subjects data
             else:
                 print(f'Computing TF for participant {subject_code}')
-
-                # --------- Coord systems alignment ---------#
-                if force_fsaverage:
-                    subject_code = 'fsaverage'
-                    dig = False
+                # Load labels ts data
+                if os.path.isfile(label_ts_save_path + labels_ts_data_fname):
+                    label_ts = load.var(file_path=label_ts_save_path + labels_ts_data_fname)
                 else:
-                    # Check if subject has MRI data
-                    try:
-                        fs_subj_path = os.path.join(subjects_dir, subject.subject_id)
-                        os.listdir(fs_subj_path)
-                        dig = True
-                    except:
+                    # --------- Coord systems alignment ---------#
+                    if force_fsaverage:
                         subject_code = 'fsaverage'
                         dig = False
+                    else:
+                        # Check if subject has MRI data
+                        try:
+                            fs_subj_path = os.path.join(subjects_dir, subject.subject_id)
+                            os.listdir(fs_subj_path)
+                            dig = True
+                        except:
+                            subject_code = 'fsaverage'
+                            dig = False
 
-                # Plot alignment visualization
-                if visualize_alignment:
-                    plot_general.mri_meg_alignment(subject=subject, subject_code=subject_code, dig=dig, subjects_dir=subjects_dir)
+                    # Plot alignment visualization
+                    if visualize_alignment:
+                        plot_general.mri_meg_alignment(subject=subject, subject_code=subject_code, dig=dig, subjects_dir=subjects_dir)
 
-                # Source data path
-                sources_path_subject = paths().sources_path() + subject.subject_id
+                    # Source data path
+                    sources_path_subject = paths().sources_path() + subject.subject_id
 
-                # Load forward model
-                fname_fwd = paths().fwd_path(subject=subject, subject_code=subject_code, ico=ico, spacing=spacing, surf_vol=surf_vol)
-                fwd = mne.read_forward_solution(fname_fwd)
-                src = fwd['src']
+                    # Load forward model
+                    fname_fwd = paths().fwd_path(subject=subject, subject_code=subject_code, ico=ico, spacing=spacing, surf_vol=surf_vol)
+                    fwd = mne.read_forward_solution(fname_fwd)
+                    src = fwd['src']
 
-                # Load filter
-                fname_filter = paths().filter_path(subject=subject, subject_code=subject_code, ico=ico, spacing=spacing, surf_vol=surf_vol, pick_ori=pick_ori,
-                                                   model_name=model_name)
-                filters = mne.beamformer.read_beamformer(fname_filter)
+                    # Load filter
+                    fname_filter = paths().filter_path(subject=subject, subject_code=subject_code, ico=ico, spacing=spacing, surf_vol=surf_vol, pick_ori=pick_ori,
+                                                       model_name=model_name)
+                    filters = mne.beamformer.read_beamformer(fname_filter)
 
-                # Get epochs and evoked
-                try:
-                    # Load data
-                    epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
-                    # Pick meg channels for source modeling
-                    epochs.pick('mag')
-                    evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
-
-                    # Pick meg channels for source modeling
-                    evoked.pick('mag')
-
-                except:
-                    # Get epochs
+                    # Get epochs and evoked
                     try:
-                        # load epochs
+                        # Load data
                         epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
-
-                        # Define evoked from epochs
-                        evoked = epochs.average()
-
-                        # Save evoked data
-                        if save_data:
-                            os.makedirs(evoked_save_path, exist_ok=True)
-                            evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
+                        # Pick meg channels for source modeling
+                        epochs.pick('mag')
+                        evoked = mne.read_evokeds(evoked_save_path + evoked_data_fname, verbose=False)[0]
 
                         # Pick meg channels for source modeling
                         evoked.pick('mag')
-                        epochs.pick('mag')
 
                     except:
-                        # Load MEG
-                        meg_data = load.meg(subject=subject, meg_params=meg_params, save_data=save_data)
+                        # Get epochs
+                        try:
+                            # load epochs
+                            epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
 
-                        # Epoch data
-                        epochs, events = functions_analysis.epoch_data(subject=subject, meg_data=meg_data, mss=run_params['mss'], corr_ans=run_params['corrans'],
-                                                                       tgt_pres=run_params['tgtpres'], epoch_id=run_params['epoch_id'], rel_sac=run_params['rel_sac'],
-                                                                       tmin=run_params['tmin'], trial_dur=run_params['trialdur'], evt_dur=run_params['evtdur'],
-                                                                       tmax=run_params['tmax'], reject=run_params['reject'], baseline=run_params['baseline'],
-                                                                       save_data=save_data, epochs_save_path=epochs_save_path,
-                                                                       epochs_data_fname=epochs_data_fname)
+                            # Define evoked from epochs
+                            evoked = epochs.average()
 
-                        # Define evoked from epochs
-                        evoked = epochs.average()
+                            # Save evoked data
+                            if save_data:
+                                os.makedirs(evoked_save_path, exist_ok=True)
+                                evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
 
-                        # Save evoked data
-                        if save_data:
-                            os.makedirs(evoked_save_path, exist_ok=True)
-                            evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
+                            # Pick meg channels for source modeling
+                            evoked.pick('mag')
+                            epochs.pick('mag')
 
-                        # Pick meg channels for source modeling
-                        evoked.pick('mag')
-                        epochs.pick('mag')
+                        except:
+                            # Load MEG
+                            meg_data = load.meg(subject=subject, meg_params=meg_params, save_data=save_data)
 
-                # --------- Source estimation ---------#
-                # Redefine stc epochs to iterate over
-                stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
+                            # Epoch data
+                            epochs, events = functions_analysis.epoch_data(subject=subject, meg_data=meg_data, mss=run_params['mss'], corr_ans=run_params['corrans'],
+                                                                           tgt_pres=run_params['tgtpres'], epoch_id=run_params['epoch_id'], rel_sac=run_params['rel_sac'],
+                                                                           tmin=run_params['tmin'], trial_dur=run_params['trialdur'], evt_dur=run_params['evtdur'],
+                                                                           tmax=run_params['tmax'], reject=run_params['reject'], baseline=run_params['baseline'],
+                                                                           save_data=save_data, epochs_save_path=epochs_save_path,
+                                                                           epochs_data_fname=epochs_data_fname)
 
-                # Extract region labels data
-                region_labels = [element for region in meg_params['regions_id'].split('_') for element in aparc_region_labels[region]]
+                            # Define evoked from epochs
+                            evoked = epochs.average()
 
-                if surf_vol == 'volume':
-                    labels_path = subjects_dir + f'/{subject_code}/mri/aparc+aseg.mgz'
-                    labels = mne.get_volume_labels_from_aseg(labels_path, return_colors=False)
-                    used_labels = [label for label in labels for label_id in region_labels if label_id in label]
-                    used_labels = [labels_path, used_labels]
+                            # Save evoked data
+                            if save_data:
+                                os.makedirs(evoked_save_path, exist_ok=True)
+                                evoked.save(evoked_save_path + evoked_data_fname, overwrite=True)
 
-                elif subject_code != 'fsaverage':
-                    # Get labels for FreeSurfer cortical parcellation
-                    labels = mne.read_labels_from_annot(subject=subject_code, parc='aparc', subjects_dir=subjects_dir)
-                    used_labels = [label for label in labels for label_id in region_labels if label.name.startswith(label_id + '-')]
+                            # Pick meg channels for source modeling
+                            evoked.pick('mag')
+                            epochs.pick('mag')
 
-                else:
-                    labels = fsaverage_labels
-                    used_labels = [label for label in labels for label_id in region_labels if label.name.startswith(label_id + '-')]
+                    # --------- Source estimation ---------#
+                    # Redefine stc epochs to iterate over
+                    stc_epochs = beamformer.apply_lcmv_epochs(epochs=epochs, filters=filters, return_generator=True)
 
-                # Average the source estimates within each label using sign-flips to reduce signal cancellations
-                label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=used_labels, src=src, mode=labels_mode, return_generator=False)
+                    # Extract region labels data
+                    region_labels = [element for region in meg_params['regions_id'].split('_') for element in aparc_region_labels[region]]
+
+                    if surf_vol == 'volume':
+                        labels_path = subjects_dir + f'/{subject_code}/mri/{parcelation}+aseg.mgz'
+                        labels = mne.get_volume_labels_from_aseg(labels_path, return_colors=False)
+                        used_labels = [label for label in labels for label_id in region_labels if label_id in label]
+                        used_labels = [labels_path, used_labels]
+
+                    elif subject_code != 'fsaverage':
+                        # Get labels for FreeSurfer cortical parcellation
+                        labels = mne.read_labels_from_annot(subject=subject_code, parc=parcelation, subjects_dir=subjects_dir)
+                        used_labels = [label for label in labels for label_id in region_labels if label.name.startswith(label_id + '-')]
+
+                    else:
+                        labels = fsaverage_labels
+                        used_labels = [label for label in labels for label_id in region_labels if label.name.startswith(label_id + '-')]
+
+                    # Average the source estimates within each label using sign-flips to reduce signal cancellations
+                    label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=used_labels, src=src, mode=labels_mode, return_generator=False)
+
+                    # Save
+                    if save_data:
+                        os.makedirs(label_ts_save_path, exist_ok=True)
+                        save.var(var=label_ts, path=label_ts_save_path, fname=labels_ts_data_fname)
 
                 # Time-Frequency computation
                 region_source_array = np.array(label_ts)
@@ -561,6 +560,11 @@ for param in param_values.keys():
             # Define TF quadrants
             quadrants_regions = {'early_low': [], 'late_low': [], 'early_high': [], 'late_high': []}
 
+            # Define brain for plotting signifficant regions
+            Brain = mne.viz.get_brain_class()
+            brain = Brain("fsaverage", hemi="split", surf="pial", views=['lat', 'med', 'dorsal'], subjects_dir=subjects_dir, size=(1080, 720))
+
+            # Save signifficant variables
             sig_regions = []
             sig_data = []
             sig_tfr = []
@@ -615,6 +619,10 @@ for param in param_values.keys():
 
                 # Save significant regions to plot brain and run clustering / quadrants
                 if isinstance(clusters_mask_plot, np.ndarray):
+
+                    # plot brain regions
+                    brain.add_label(region, borders=False)
+
                     sig_regions.append(region)
                     sig_data.append(GA_stc_diff_data[i].flatten())
                     sig_tfr.append(ga_tf_diff_region.copy())
@@ -633,9 +641,18 @@ for param in param_values.keys():
                     if clusters_mask_plot[freq_limit_idx:, time_limit_idx:].any():
                         quadrants_regions['late_high'].append(region)
 
+            if save_fig:
+                # Save brain plot
+                brain.save_image(filename=fig_path_diff + f'sig/' + 'brain_regions.png')
+                brain.save_image(filename=fig_path_diff + f'sig/svg/' + 'brain_regions.pdf')
+
             # Plot brain with marked regions
             if len(sig_regions):
 
+                # Plot general average
+                plot_general.average_tf_and_significance_heatmap(generic_tfr=ga_tf_diff_region, sig_tfr=sig_tfr, sig_mask=clusters_masks, sig_regions=sig_regions,
+                                                                 sig_chs_percent=sig_chs_percent, hist_data=hist_data, active_times=active_times, l_freq=l_freq, h_freq=h_freq,
+                                                                 display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_diff + f'sig/')
                 if run_clustering:
                     functions_analysis.cluster_regions(n_clusters=n_clusters, sig_data=sig_data, sig_regions=sig_regions, sig_tfr=sig_tfr, clusters_masks=clusters_masks,
                                                        l_freq=l_freq, h_freq=h_freq, active_times=active_times, subjects_dir=subjects_dir,
@@ -645,6 +662,8 @@ for param in param_values.keys():
                                                         sig_chs_percent=sig_chs_percent, l_freq=l_freq, h_freq=h_freq, active_times=active_times,
                                                         hist_data=hist_data, subjects_dir=subjects_dir,
                                                         display_figs=display_figs, save_fig=save_fig, fig_path_diff=fig_path_diff)
+
+
 
 
 # Final print
