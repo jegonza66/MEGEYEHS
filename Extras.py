@@ -7,6 +7,27 @@ from paths import paths
 import setup
 
 
+exp_info = setup.exp_info()
+
+
+## Load MEG data
+
+duration = []
+bad_channels_num = []
+for subject_code in exp_info.subjects_ids:
+
+    subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
+    bad_channels_num.append(len(subject.bad_channels))
+
+    meg_data = load.ica_data(subject=subject)
+    duration.append(meg_data.times[-1] - meg_data.times[0])
+
+avg_seconds = np.mean(duration)
+avg_minutes = avg_seconds / 60
+
+avg_bad = np.mean(bad_channels_num)
+avg_std = np.std(bad_channels_num)
+
 ## Plot channels
 save_path = paths().save_path()
 ica_path = paths().ica_path()
