@@ -297,6 +297,8 @@ dependencies:
   - zfp=1.0.0=hd77b12b_0
   - zlib=1.2.13=hcfcfb64_5
   - zstd=1.5.5=hd43e919_2
+  - mne-rsa
+  - umap-learn
   - pip:
       - asttokens==2.4.1
       - exceptiongroup==1.2.1
@@ -311,4 +313,8 @@ dependencies:
       - stack-data==0.6.3
       - traitlets==5.14.3
       - wcwidth==0.2.13
+      - mni_to_atlas
+      - netplotbrain
+      - networkx
+      - skimage
 prefix: C:\Users\Joac\anaconda3\envs\MEGEYEDYN
