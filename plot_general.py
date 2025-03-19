@@ -12,6 +12,7 @@ from nilearn import plotting
 from itertools import compress
 import pandas as pd
 import matplotlib.gridspec as gridspec
+import netplotbrain
 
 
 save_path = paths().save_path()
@@ -641,7 +642,7 @@ def mri_meg_alignment(subject, subject_code, dig, subjects_dir=os.path.join(path
                                      coord_frame='meg', mri_fiducials=fids_path)
 
 
-def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, connectivity_method='pli', subject_code=None, display_figs=False, save_fig=False,
+def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, n_lines=100, connectivity_method='pli', subject_code=None, display_figs=False, save_fig=False,
                         fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fig_path):
@@ -655,19 +656,14 @@ def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, co
         params = {'axes.labelsize': ticksize, 'legend.fontsize': ticksize, 'xtick.labelsize': ticksize, 'ytick.labelsize': ticksize}
         plt.rcParams.update(params)
 
+    # Get parcelation labels positions
+    label_names = [label.name for label in labels]
+
     # Get colors for each label
-    if surf_vol == 'surface':
-        label_colors = [label.color for label in labels]
-    elif surf_vol == 'volume':
-        label_colors = labels[1]
+    label_colors = [label.color for label in labels]
 
     # Reorder the labels based on their location in the left hemi
-    if surf_vol == 'surface':
-        label_names = [label.name for label in labels]
-        lh_labels = [name for name in label_names if name.endswith('lh')]
-    elif surf_vol == 'volume':
-        label_names = labels[0]
-        lh_labels = [name for name in label_names if ('lh' in name or 'Left' in name)]
+    lh_labels = [name for name in label_names if ('lh' in name or 'Left' in name)]
 
     # Get the y-location of the label
     label_ypos = list()
@@ -680,10 +676,13 @@ def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, co
     lh_labels = [label for (yp, label) in sorted(zip(label_ypos, lh_labels))]
 
     # For the right hemi
-    rh_labels = [label[:-2] + 'rh' for label in lh_labels]
+    rh_labels = [label.replace('-lh', '-rh') for label in lh_labels]
 
     # Save the plot order and create a circular layout
     node_order = list()
+    # include first volume nodes that are in neither hemisphere
+    if surf_vol == 'volume':
+        node_order.extend([label for label in label_names if label not in lh_labels and label not in rh_labels])
     node_order.extend(lh_labels[::-1])  # reverse the order
     node_order.extend(rh_labels)
 
@@ -693,7 +692,19 @@ def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, co
     fig, ax = plt.subplots(figsize=(8, 8), facecolor='black', subplot_kw=dict(polar=True))
 
     # Plot
-    mne_connectivity.viz.plot_connectivity_circle(con, label_names, n_lines=50, vmin=vmin, vmax=vmax,
+    if not vmin:
+        sorted_con = con.flatten()
+        sorted_con.sort()
+        if isinstance(n_lines, int):
+            vmin = sorted_con[-n_lines]
+        elif isinstance(n_lines, float):
+            vmin = sorted_con[-int(n_lines * len(label_names))]
+
+    if not vmax:
+        sorted_con = con.flatten()
+        sorted_con.sort()
+        vmax = sorted_con[-1]
+    mne_connectivity.viz.plot_connectivity_circle(con, label_names, n_lines=n_lines, vmin=vmin, vmax=vmax,
                                                   node_angles=node_angles, node_colors=label_colors,
                                                   title=f'All-to-All Connectivity ({connectivity_method})', ax=ax,
                                                   show=display_figs)
@@ -708,7 +719,121 @@ def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, co
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_connectome', connections_num=.99,
+def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_connectome', connections_num=150,
+               template='MNI152NLin2009cAsym', template_style='glass', template_alpha=1, node_alpha=0.5, node_scale=30, node_color='red',
+               edge_alpha=1, edge_thresholddirection='above', edge_cmap=None, edge_widthscale=4, view='preset-3'):
+
+    # Sanity check
+    if save_fig and (not fig_path):
+        raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
+
+    # Get parcelation labels positions
+    label_names = [label.name for label in labels]
+    label_xpos = list()
+    label_ypos = list()
+    label_zpos = list()
+    for name in [label.name for label in labels]:
+        idx = label_names.index(name)
+        label_xpos.append(np.mean(labels[idx].pos[:, 0]) * 1100)
+        label_ypos.append(np.mean(labels[idx].pos[:, 1]) * 1100)
+        label_zpos.append(np.mean(labels[idx].pos[:, 2]) * 1100)
+
+    nodes_df = pd.DataFrame(data={'x': label_xpos,
+                                  'y': label_ypos,
+                                  'z': label_zpos})
+
+    # Plot only if at least 1 connection
+    if abs(adjacency_matrix).sum() > 0:
+        # Define threshold based on connections number
+        # Get the values that exceed the thresh and define edges to plot
+        # Extract retained edge values for vmin/vmax
+        if connections_num > 1:
+            if edge_thresholddirection == 'absabove':
+                edge_threshold = sorted(np.sort(np.abs(adjacency_matrix), axis=None))[-int(connections_num * 2) - 1]
+                retained_edges = adjacency_matrix[np.abs(adjacency_matrix) > edge_threshold]
+            elif edge_thresholddirection == 'above':
+                edge_threshold = sorted(np.sort(adjacency_matrix, axis=None))[-int(connections_num * 2) - 1]
+                retained_edges = adjacency_matrix[adjacency_matrix > edge_threshold]
+            elif edge_thresholddirection == 'below':
+                edge_threshold = sorted(np.sort(adjacency_matrix, axis=None))[int(connections_num * 2) + 1]
+                retained_edges = adjacency_matrix[adjacency_matrix < edge_threshold]
+        else:
+            edge_threshold = connections_num
+            if edge_thresholddirection == 'absabove':
+                retained_edges = adjacency_matrix[np.abs(adjacency_matrix) > edge_threshold]
+            elif edge_thresholddirection == 'above':
+                retained_edges = adjacency_matrix[adjacency_matrix > edge_threshold]
+            elif edge_thresholddirection == 'below':
+                retained_edges = adjacency_matrix[adjacency_matrix < edge_threshold]
+
+        # Determine vmin and vmax from retained edges
+        # Option 1: Signed values (for diverging colormap)
+        vmin = np.min(retained_edges)
+        vmax = np.max(retained_edges)
+
+        if edge_cmap is None:
+            if vmin < 0:
+                edge_cmap = 'coolwarm'
+                edge_colorvminvmax = 'minmax'
+            else:
+                edge_cmap = 'Greys'
+                vmin = 0
+                edge_colorvminvmax = [0, vmax]
+
+        # Corresponding node labels
+        nodes = [i for i in range(len(adjacency_matrix))]
+
+        # Convert matrix to long format (excluding diagonal)
+        i, j = np.triu_indices_from(adjacency_matrix, k=1)  # Get upper triangular indices
+        weights = adjacency_matrix[i, j]  # Get connectivity values
+
+        # Create DataFrame
+        weights_col_name = "weight"
+        connectivity_df = pd.DataFrame({
+            "i": [nodes[idx] for idx in i],  # Convert indices to node names
+            "j": [nodes[idx] for idx in j],
+            weights_col_name: weights
+        })
+
+        # Call netplotbrain to plot
+        fig, ax = netplotbrain.plot(
+            template=template,
+            template_style=template_style,
+            template_alpha=template_alpha,
+            nodes=nodes_df,
+            node_alpha=node_alpha,
+            node_scale=node_scale,
+            node_color=node_color,
+            edges=adjacency_matrix,
+            edges_df=connectivity_df,
+            edge_alpha=edge_alpha,
+            edge_thresholddirection=edge_thresholddirection,
+            edge_threshold=edge_threshold,
+            edge_color=weights_col_name,
+            edge_cmap=edge_cmap,
+            edge_colorvminvmax=edge_colorvminvmax,
+            edge_widthscale=edge_widthscale,
+            view=view
+        )
+
+        # Add a colorbar with calculated vmin and vmax
+        sm = plt.cm.ScalarMappable(cmap=edge_cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
+        sm.set_array([])
+        cbar = fig.colorbar(sm, ax=ax[-1], label='Connectivity Strength', shrink=0.5, aspect=20)
+
+        # Show the plot
+        plt.tight_layout()
+
+        # Save
+        if save_fig:
+            if not fname:
+                fname = f'{subject.subject_id}_connectome'
+            if subject_code == 'fsaverage' and 'fsaverage' not in fname:
+                fname += '_fsaverage'
+            save.fig(fig=fig, path=fig_path, fname=fname)
+
+
+def connectome_orig(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_connectome', connections_num=150,
                node_size=10, node_color='k', linewidth=2, cmap=None, edge_vmin=None, edge_vmax=None):
 
     # Sanity check
@@ -742,7 +867,7 @@ def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, 
             if edge_vmin < 0:
                 cmap = 'bwr'
             else:
-                cmap = 'Reds'
+                cmap = 'YlOrRd'
 
         elif connections_num < 1:
             edge_threshold = f'{connections_num*100}%'
@@ -756,7 +881,7 @@ def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, 
             else:
                 if not edge_vmin:
                     edge_vmin = sorted(np.sort(adjacency_matrix, axis=None))[-int((1 - connections_num) * len(np.sort(adjacency_matrix, axis=None))**2)]  # set colorbar minimum as twice smaller than plot minimum
-                cmap = 'Reds'
+                cmap = 'YlOrRd'
 
         # Plot connectome
         fig = plotting.plot_connectome(adjacency_matrix=adjacency_matrix, node_coords=nodes_pos, edge_threshold=edge_threshold, node_size=node_size, node_color=node_color,
@@ -818,12 +943,18 @@ def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, save_fig=Fa
     return sorted_matrix
 
 
-def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, subjects_dir, save_fig, fig_path, fname, threshold=1):
+def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, labels_fname, label_names_segmentation, subjects_dir, save_fig, fig_path, fname, threshold=1):
 
     try:
         mne.viz.close_all_3d_figures()
     except:
         pass
+
+    # Define save file name
+    if not fname:
+        fname = f'{subject.subject_id}_strength'
+    if subject_code == 'fsaverage' and 'fsaverage' not in fname:
+        fname += '_fsaverage'
 
     # Plot connectivity strength (connections from each region to other regions)
     degree = mne_connectivity.degree(connectivity=con, threshold_prop=threshold)
@@ -832,18 +963,24 @@ def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, sub
         stc = stc.in_label(mne.Label(src[0]["vertno"], hemi="lh") + mne.Label(src[1]["vertno"], hemi="rh"))
         hemi = 'split'
         views = ['lateral', 'med']
+        try:
+            brain = stc.plot(src=src, subject=subject_code, subjects_dir=subjects_dir, size=(1000, 500), clim=dict(kind="percent", lims=[50, 75, 95]), hemi=hemi, views=views)
+        except:
+            brain = stc.plot(src=src, subject=subject_code, subjects_dir=subjects_dir, size=(1000, 500), hemi=hemi, views=views)
 
     if surf_vol == 'volume':
-        stc = mne.VolSourceEstimate(degree, [src[0]["vertno"]], 0, 1, "bst_resting")
+        # stc = mne.VolSourceEstimate(degree, [src[0]["vertno"]], 0, 1, "bst_resting")
+        stc = mne.labels_to_stc(labels=(labels_fname, label_names_segmentation), values=degree, src=src)
+        # stc = stc.in_label(mne.Label(src[0]["vertno"]), mri=labels_fname, src=src)
         hemi = 'both'
         views = 'dorsal'
+        try:
+            brain = stc.plot_3d(src=src, subject=subject_code, subjects_dir=subjects_dir, size=(1000, 500), clim=dict(kind="percent", lims=[40, 75, 95]), hemi=hemi,
+                                views=views)
+        except:
+            brain = stc.plot_3d(src=src, subject=subject_code, subjects_dir=subjects_dir, size=(1000, 500), hemi=hemi, views=views)
 
-    brain = stc.plot(src=src, subject=subject_code, subjects_dir=subjects_dir, size=(1000, 500), clim=dict(kind="percent", lims=[50, 75, 95]), hemi=hemi, views=views)
     if save_fig:
-        if not fname:
-            fname = f'{subject.subject_id}_strength'
-        if subject_code == 'fsaverage' and 'fsaverage' not in fname:
-            fname += '_fsaverage'
         brain.save_image(filename=fig_path + fname + '.png')
         brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
 
@@ -963,7 +1100,7 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
     return brain
 
 
-def source_tf(tf, clusters_mask_plot=None, hist_data=None, display_figs=False, save_fig=True, fig_path=None, fname=None, title=None):
+def source_tf(tf, clusters_mask_plot=None, vlim=(None, None), cmap='RdBu_r', hist_data=None, display_figs=False, save_fig=True, fig_path=None, fname=None, title=None):
 
     # Sanity check
     if save_fig and (not fig_path):
@@ -971,14 +1108,14 @@ def source_tf(tf, clusters_mask_plot=None, hist_data=None, display_figs=False, s
 
     if isinstance(hist_data, pd.Series):
         # Create the figure and gridspec for custom subplot sizes
-        fig = plt.figure(figsize=(10, 7))
+        fig = plt.figure(figsize=(10, 4))
 
         # Define gridspec
-        gs = gridspec.GridSpec(3, 1, height_ratios=[3, 1, 0.1])
+        gs = gridspec.GridSpec(3, 1, height_ratios=[2, 1, 0.1])
 
         # Upper subplot
         ax1 = fig.add_subplot(gs[0, 0])  # First row, first column
-        tf.plot(axes=ax1, mask=clusters_mask_plot, mask_style='contour', show=display_figs, title=title, combine='mean')[0]
+        tf.plot(axes=ax1, combine='mean', cmap=cmap, vmin=vlim[0], vmax=vlim[1], mask=clusters_mask_plot, mask_style='contour', show=display_figs, title=title)[0]
         ax1.vlines(x=0, ymin=ax1.get_ylim()[0], ymax=ax1.get_ylim()[1], linestyles='--', colors='gray')
 
         # Capture the position of the modified axis
@@ -991,7 +1128,7 @@ def source_tf(tf, clusters_mask_plot=None, hist_data=None, display_figs=False, s
 
         # Add the lower subplot using the captured size
         ax2 = fig.add_axes([pos1.x0, ax2_bottom, pos1.width, ax2_height], sharex=ax1)
-        ax2.hist(hist_data, bins=100, edgecolor='black', linewidth=0.3, stacked=True)
+        ax2.hist(hist_data, range=(tf.tmin, tf.tmax), bins=50, edgecolor='black', linewidth=0.3, stacked=True)
         ax2.set_xlabel('Time (s)')
 
         # Remove the x-axis labels of the first plot
@@ -1000,7 +1137,7 @@ def source_tf(tf, clusters_mask_plot=None, hist_data=None, display_figs=False, s
 
     else:
         fig, ax = plt.subplots(figsize=(10, 7))
-        fig = source_tf.plot(axes=ax, mask=clusters_mask_plot, mask_style='contour', show=display_figs, combine='mean', title=title)[0]
+        fig = tf.plot(axes=ax, cmap=cmap, vmin=vlim[0], vmax=vlim[1], mask=clusters_mask_plot, mask_style='contour', show=display_figs, combine='mean', title=title)[0]
         ax.vlines(x=0, ymin=ax.get_ylim()[0], ymax=ax.get_ylim()[1], linestyles='--', colors='gray')
 
     fig.suptitle(fname)
@@ -1013,6 +1150,49 @@ def source_tf(tf, clusters_mask_plot=None, hist_data=None, display_figs=False, s
             else:
                 save.fig(fig=fig, path=fig_path, fname=fname)
     return fig
+
+
+def average_tf_and_significance_heatmap(generic_tfr, sig_tfr, sig_mask, sig_regions, sig_chs_percent, hist_data, active_times, l_freq, h_freq, display_figs, save_fig, fig_path):
+
+    # Quadrant average
+    avg_tfr = generic_tfr.copy()
+    avg_tfr.data = np.array([tfr.data for tfr in sig_tfr]).mean(axis=0)
+
+    # Quadrant clusters
+    min_sig_chs = sig_chs_percent * len(sig_regions)
+    mask = np.array(sig_mask).sum(axis=0) > min_sig_chs
+
+    # Define figure name
+    fname = f'Avg_{sig_chs_percent}'
+    title = fname
+    if active_times:
+        fname += f"_{active_times[0]}_{active_times[1]}"
+
+    # Plot
+    fig = source_tf(tf=avg_tfr, clusters_mask_plot=mask, hist_data=hist_data, display_figs=display_figs,
+                                 save_fig=save_fig, fig_path=fig_path, fname=fname, title=title)
+
+    # Make number of signifficant regions heatmap
+    sig_mask_array = np.expand_dims(np.array(sig_mask).sum(axis=0), axis=0)
+
+    # Significance heatmap
+    sig_heatmap = generic_tfr.copy()
+    sig_heatmap.data = sig_mask_array
+
+    # Define figure name
+    fname = f'Sig_regions_{sig_chs_percent}_{l_freq}_{h_freq}'
+    title = fname
+    if active_times:
+        fname += f"_{active_times[0]}_{active_times[1]}"
+
+    # Plot
+    fig = source_tf(tf=sig_heatmap, vlim=(0, max(sig_mask_array.ravel())), cmap='gray',
+                                 clusters_mask_plot=mask, hist_data=hist_data, display_figs=display_figs,
+                                 save_fig=save_fig, fig_path=fig_path, fname=fname, title=title)
+
+    # Close figure
+    if not display_figs:
+        plt.close('all')
 
 
 def add_task_lines(y_text, fontsize=10, color='white', ax=None):
