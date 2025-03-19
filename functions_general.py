@@ -447,8 +447,8 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
                        vsend={'tmin': -2, 'tmax': cross1_dur + 1, 'plot_xlim': [-2 + plot_edge, cross1_dur + 1 - plot_edge]},
                        sac={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': [-0.3 + plot_edge, 0.6 - plot_edge]},
                        fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': [-0.3 + plot_edge, 0.6 - plot_edge]},
-                       blue={'tmin': -1, 'tmax': 1.9, 'plot_xlim': [-1 + plot_edge, 1.9 - plot_edge]},
-                       red={'tmin': -1, 'tmax': 1.9, 'plot_xlim': [-1 + plot_edge, 1.9 - plot_edge]})
+                       blue={'tmin': -0.3, 'tmax': 1, 'plot_xlim': [-0.3 + plot_edge, 1 - plot_edge]},
+                       red={'tmin': -0.3, 'tmax': 1, 'plot_xlim': [-0.3 + plot_edge, 1 - plot_edge]})
 
             if 'fix' in epoch_id:
                 tmin = map['fix']['tmin']
