@@ -571,7 +571,7 @@ meg_params = {'regions_id': 'parietal_occipital',
               }
 
 # TRF parameters
-trf_params = {'input_features': ['tgt_fix_vs', 'it_fix_vs_subsampled', 'blue', 'red'],   # Select features (events)
+trf_params = {'input_features': ['tgt_fix_vs', 'it_fix_vs_sub', 'blue', 'red'],   # Select features (events)
               'standarize': False,
               'fit_power': False,
               'alpha': None,
