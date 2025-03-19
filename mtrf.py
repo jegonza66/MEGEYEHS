@@ -20,24 +20,24 @@ else:
     plt.ioff()
 
 #-----  Parameters -----#
-trial_params = {'corrans': None,
-                'tgtpres': None,
+trial_params = {'corrans': True,
+                'tgtpres': True,
                 'mss': None,
                 'evtdur': None,
                 }
 
-meg_params = {'chs_id': 'parietal_occipital',
-              'band_id': 'Theta',
+meg_params = {'chs_id': 'mag',
+              'band_id': 'Alpha',
               'data_type': 'ICA'
               }
 
 # TRF parameters
-trf_params = {'input_features': ['sac_vs', 'fix_vs'],   # Select features (events)
+trf_params = {'input_features': ['it_fix_vs+tgt_fix_vs', 'tgt_fix_vs'],   # Select features (events)
               'standarize': True,
-              'fit_power': True,
+              'fit_power': False,
               'alpha': None,
-              'tmin': -0.3,
-              'tmax': 0.6,
+              'tmin': -0.2,
+              'tmax': 0.5,
               }
 trf_params['baseline'] = (trf_params['tmin'], -0.05)
 
