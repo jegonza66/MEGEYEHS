@@ -19,14 +19,15 @@ save_data = True
 save_fig = True
 
 #----- Parameters -----#
+keep_longest_saccades = True
 
 # Trial selection
-trial_params = {'epoch_id': 'tgt_fix_ms',  # use'+' to mix conditions (red+blue)
+trial_params = {'epoch_id': 'it_fix_vs',  # use'+' to mix conditions (red+blue)
                 'corrans': True,
                 'tgtpres': True,
                 'mss': None,
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
-                'evtdur': None,
+                'evtdur': -0.8,
                 'trialdur': None,
                 'rel_sac': None,
                 'tmin': -0.3,
@@ -34,12 +35,12 @@ trial_params = {'epoch_id': 'tgt_fix_ms',  # use'+' to mix conditions (red+blue)
                 'baseline': (-0.3, -0.05)}
 
 # Base condition
-trial_params_base = {'epoch_id': 'tgt_fix_ms',  # use'+' to mix conditions (red+blue)
-                     'corrans': False,
+trial_params_base = {'epoch_id': 'tgt_fix_vs',  # use'+' to mix conditions (red+blue)
+                     'corrans': True,
                      'tgtpres': True,
                      'mss': None,
                      'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
-                     'evtdur': None,
+                     'evtdur': -0.8,
                      'trialdur': None,
                      'rel_sac': None,
                      'tmin': -0.3,
@@ -77,9 +78,8 @@ for subject_code in exp_info.subjects_ids:
         subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
 
     # Save data paths
-    epochs_new_path = epochs_path.replace(trial_params["epoch_id"], f'{trial_params["epoch_id"]}_subsampled')
-    evoked_new_path = epochs_path.replace('Epochs', 'Evoked').replace(trial_params["epoch_id"], f'{trial_params["epoch_id"]}_subsampled')
-    epochs_new_base_path = epochs_base_path.replace(trial_params["epoch_id"], f'{trial_params["epoch_id"]}_subsampled')
+    epochs_new_path = epochs_path.replace(trial_params["epoch_id"], f'{trial_params["epoch_id"]}_sub')
+    epochs_new_base_path = epochs_base_path.replace(trial_params_base["epoch_id"], f'{trial_params_base["epoch_id"]}_sub')
 
     # Save figures paths
     epochs_fig_path = epochs_new_path.replace(save_path, plot_path)
@@ -123,8 +123,10 @@ for subject_code in exp_info.subjects_ids:
     # Extract metadata and subsample
     base_metadata = epochs_base.metadata
     epochs_metadata = epochs.metadata
-    epochs_metadata_subsampled = epochs_metadata.sample(n=len(base_metadata))
-    # it_metadata_subsampled = it_metadata.sort_values(by='duration', ascending=False).iloc[:len(tgt_metadata)]
+    if keep_longest_saccades:
+        epochs_metadata_subsampled = epochs_metadata.nlargest(n=len(base_metadata), columns='duration')
+    else:
+        epochs_metadata_subsampled = epochs_metadata.sample(n=len(base_metadata))
 
     # Plot duration histogram
     hist_bins = 15
