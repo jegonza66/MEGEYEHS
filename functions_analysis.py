@@ -68,15 +68,26 @@ def define_events(subject, meg_data, epoch_id, trial_num=None, evt_dur=None, epo
             if 'fix' in epoch_sub_id:
                 metadata = subject.fixations
                 if evt_dur:
-                    metadata = metadata.loc[(metadata['duration'] >= evt_dur)]
-                    metadata_ids = list(metadata['id'])
-                    epoch_keys = [key for key in epoch_keys if key in metadata_ids]
+                    if evt_dur >= 0:
+                        metadata = metadata.loc[(metadata['duration'] >= evt_dur)]
+                        metadata_ids = list(metadata['id'])
+                        epoch_keys = [key for key in epoch_keys if key in metadata_ids]
+                    elif evt_dur < 0:
+                        metadata = metadata.loc[(metadata['duration'] <= abs(evt_dur))]
+                        metadata_ids = list(metadata['id'])
+                        epoch_keys = [key for key in epoch_keys if key in metadata_ids]
+
             elif 'sac' in epoch_sub_id:
                 metadata = subject.saccades
                 if evt_dur:
-                    metadata = metadata.loc[(metadata['duration'] >= evt_dur)]
-                    metadata_ids = list(metadata['id'])
-                    epoch_keys = [key for key in epoch_keys if key in metadata_ids]
+                    if evt_dur >= 0:
+                        metadata = metadata.loc[(metadata['duration'] >= evt_dur)]
+                        metadata_ids = list(metadata['id'])
+                        epoch_keys = [key for key in epoch_keys if key in metadata_ids]
+                    elif evt_dur < 0:
+                        metadata = metadata.loc[(metadata['duration'] <= abs(evt_dur))]
+                        metadata_ids = list(metadata['id'])
+                        epoch_keys = [key for key in epoch_keys if key in metadata_ids]
 
             # Change fixations for previous saccades
             if rel_sac:
@@ -529,7 +540,7 @@ def compute_trf(subject, meg_data, trial_params, trf_params, meg_params, all_chs
         except:
             print(f'Computing input array for {feature}...')
             # Exception for subsampled distractor fixations
-            if 'subsampled' in feature:
+            if 'sub' in feature:
                 # Subsampled epochs path
                 epochs_save_id = (f"{feature}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_tgtpres{trial_params['tgtpres']}_"
                                   f"trialdur{trial_params['trialdur']}_evtdur{trial_params['evtdur']}")
@@ -1096,7 +1107,13 @@ def cluster_regions(n_clusters, sig_data, sig_regions, sig_tfr, clusters_masks, 
             brain.save_image(filename=fig_path_diff + f'sig/{cluster}/' + 'brain_regions.png')
             brain.save_image(filename=fig_path_diff + f'sig/{cluster}/svg/' + 'brain_regions.pdf')
 
-def quadrant_regions(quadrants_regions, sig_regions, sig_tfr, clusters_masks, sig_chs_percent, l_freq, h_freq, active_times, hist_data, subjects_dir, display_figs, save_fig, fig_path_diff):
+        average_tf_and_significance_heatmap(generic_tfr=sig_cluster_regions[0], sig_tfr=sig_cluster_tfr, sig_mask=sig_tf_clusters, sig_regions=sig_cluster_regions,
+                                            sig_chs_percent=sig_chs_percent, hist_data=None, active_times=active_times, l_freq=l_freq, h_freq=h_freq,
+                                            display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_diff + f'sig/{cluster}/')
+
+
+def quadrant_regions(quadrants_regions, sig_regions, sig_tfr, clusters_masks, sig_chs_percent, l_freq, h_freq, active_times, hist_data, subjects_dir, display_figs,
+                     save_fig, fig_path_diff):
 
     for quadrant in quadrants_regions.keys():
 
@@ -1114,15 +1131,15 @@ def quadrant_regions(quadrants_regions, sig_regions, sig_tfr, clusters_masks, si
 
             # Define brain for plotting
             Brain = mne.viz.get_brain_class()
-            brain = Brain("fsaverage", hemi="split", surf="pial", views=['lat', 'med'], subjects_dir=subjects_dir, size=(1080, 720))
+            brain = Brain("fsaverage", hemi="split", surf="pial", views=['lat', 'med', 'dorsal'], subjects_dir=subjects_dir, size=(1080, 720))
 
             # Get cluster's regions data
             sig_quadrant_regions = [sig_regions[idx] for idx in quadrant_regions_idx]
             sig_quadrant_tfr = [sig_tfr[idx] for idx in quadrant_regions_idx]
-            sig_tf_quadrant = [clusters_masks[idx] for idx in quadrant_regions_idx]
+            sig_mask_quadrant = [clusters_masks[idx] for idx in quadrant_regions_idx]
 
             # Iterate over quadrant's regions
-            for region, tfr, plot_mask in zip(sig_quadrant_regions, sig_quadrant_tfr, sig_tf_quadrant):
+            for region, tfr, plot_mask in zip(sig_quadrant_regions, sig_quadrant_tfr, sig_mask_quadrant):
 
                 # Define figure name
                 fname = f'GA_{region.name}_{l_freq}_{h_freq}'
@@ -1136,36 +1153,18 @@ def quadrant_regions(quadrants_regions, sig_regions, sig_tfr, clusters_masks, si
 
                 # Close figure
                 if not display_figs:
-                        plt.close(fig)
+                   plt.close(fig)
 
                 # plot brain regions
                 brain.add_label(region, borders=False)
 
-            # Quadrant average
-            avg_quadrant_tfr = tfr.copy()
-            avg_quadrant_tfr.data = np.array([quadrant_tfr.data for quadrant_tfr in sig_quadrant_tfr]).mean(axis=0)
-
-            # Quadrant clusters
-            min_sig_chs = sig_chs_percent * len(sig_quadrant_regions)
-            quadrant_mask = np.array(sig_tf_quadrant).sum(axis=0) > min_sig_chs
-
-            # Define figure name
-            fname = f'Avg_{quadrant}'
-            title = fname
-            if active_times:
-                fname += f"_{active_times[0]}_{active_times[1]}"
-
-            # Plot
-            fig = plot_general.source_tf(tf=avg_quadrant_tfr, clusters_mask_plot=quadrant_mask, hist_data=hist_data, display_figs=display_figs,
-                                         save_fig=save_fig, fig_path=fig_path_diff + f'sig/{quadrant}/', fname=fname, title=title)
-
             if save_fig:
-                save.fig(fig=fig, path=fig_path_diff + f'sig/{quadrant}/', fname=fname)
-
                 # Save brain plot
                 brain.save_image(filename=fig_path_diff + f'sig/{quadrant}/' + 'brain_regions.png')
                 brain.save_image(filename=fig_path_diff + f'sig/{quadrant}/svg/' + 'brain_regions.pdf')
 
-            # Close figure
-            if not display_figs:
-                plt.close(fig)
+            # Take quadrant average and plot
+            plot_general.average_tf_and_significance_heatmap(generic_tfr=sig_quadrant_tfr[0], sig_tfr=sig_quadrant_tfr, sig_mask=sig_mask_quadrant, sig_regions=sig_quadrant_regions,
+                                                             sig_chs_percent=sig_chs_percent, l_freq=l_freq, h_freq=h_freq, hist_data=hist_data, active_times=active_times,
+                                                             display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_diff + f'sig/{quadrant}/')
+
