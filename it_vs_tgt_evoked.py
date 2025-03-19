@@ -29,7 +29,7 @@ use_ica_data = True
 run_tfce = True
 band_id = None
 # Id
-epoch_ids = ['it_fix_vs_subsampled', 'tgt_fix_vs']
+epoch_ids = ['it_fix_vs_sub', 'tgt_fix_vs_sub']
 # Pick MEG chs (Select channels or set picks = 'mag')
 chs_id = 'temporal'
 chs_ids = [f'{chs_id}_L', f'{chs_id}_R']
@@ -267,7 +267,7 @@ if save_fig:
 # Plot topographies
 topo_times = [0.1, 0.3]
 topo_times_span = [0.005, 0.1]
-grand_average = mne.grand_average(ga_dict['tgt_fix_vs'], interpolate_bads=True)
+grand_average = mne.grand_average(ga_dict[epoch_ids[1]], interpolate_bads=True)
 
 # Mascara en temporales
 picks = functions_general.pick_chs(chs_id='temporal', info=grand_average.info)
@@ -322,7 +322,7 @@ run_tfce = True
 standarize = True
 band_id = None
 # Id
-epoch_ids = ['it_fix_vs_subsampled', 'tgt_fix_vs', 'blue', 'red']
+epoch_ids = ['it_fix_vs_sub', 'tgt_fix_vs', 'blue', 'red']
 # Pick MEG chs (Select channels or set picks = 'mag')
 chs_id = 'temporal'
 chs_ids = [f'{chs_id}_L', f'{chs_id}_R']
@@ -646,7 +646,7 @@ meg_params = {'chs_id': 'mag',
               }
 
 # TRF parameters
-trf_params = {'input_features': ['tgt_fix_vs', 'it_fix_vs_subsampled', 'blue', 'red'],   # Select features (events)
+trf_params = {'input_features': ['tgt_fix_vs', 'it_fix_vs_sub', 'blue', 'red'],   # Select features (events)
               'standarize': False,
               'fit_power': False,
               'alpha': None,
@@ -1316,7 +1316,7 @@ else:
 use_ica_data = True
 band_id = None
 # Id
-epoch_ids = ['it_fix_subsampled', 'tgt_fix']
+epoch_ids = ['it_fix_sub', 'tgt_fix']
 # Pick MEG chs (Select channels or set picks = 'mag')
 chs_id = 'mag'
 # Trials
@@ -1350,7 +1350,7 @@ for i, epoch_id in enumerate(epoch_ids):
 
     # Get time windows from epoch_id name
     map = dict(tgt_fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.1, 0.5)},
-               it_fix_subsampled={'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.1, 0.5)})
+               it_fix_sub={'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.1, 0.5)})
     tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=0, map=map)
     # tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
 
@@ -1494,7 +1494,7 @@ use_ica_data = True
 standarize = False
 band_id = None
 # Id
-epoch_ids = ['it_fix_subsampled', 'tgt_fix', 'blue', 'red']
+epoch_ids = ['it_fix_sub', 'tgt_fix', 'blue', 'red']
 # Pick MEG chs (Select channels or set picks = 'mag')
 chs_id = 'mag'
 # Trials
