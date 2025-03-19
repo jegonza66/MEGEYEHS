@@ -29,22 +29,22 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': 'cross2',  # use'+' to mix conditions (red+blue)
-                'corrans': [True, False],
-                'tgtpres': None,
-                'mss': 4,
+trial_params = {'epoch_id': ['tgt_fix_vs_sub', 'it_fix_vs_sub'],  # use'+' to mix conditions (red+blue)
+                'corrans': True,
+                'tgtpres': True,
+                'mss': None,
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
                 'evtdur': None}
 
 meg_params = {'chs_id': 'mag',
-              'band_id': 'Alpha',
+              'band_id': None,
               'filter_sensors': True,
               'filter_method': 'iir',
               'data_type': 'ICA'
               }
 
 # TRF parameters
-trf_params = {'input_features': ['tgt_fix_vs', 'it_fix_vs_subsampled', 'blue', 'red'],   # Select features (events)
+trf_params = {'input_features': ['tgt_fix_vs', 'it_fix_vs_sub', 'blue', 'red'],   # Select features (events)
               'standarize': False,
               'fit_power': False,
               'alpha': None,
@@ -66,9 +66,9 @@ ico = 5
 spacing = 5.  # Only for volume source estimation
 pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
 source_power = False
-source_estimation = 'cov'  # 'epo' / 'evk' / 'cov' / 'trf'
+source_estimation = 'evk'  # 'epo' / 'evk' / 'cov' / 'trf'
 visualize_alignment = False
-active_times = [-1, 0]
+active_times = None
 
 # Baseline
 if source_power or source_estimation == 'cov':
@@ -86,8 +86,8 @@ plot_individuals = False
 plot_ga = True
 
 # Permutations test
-run_permutations_GA = True
-run_permutations_diff = True
+run_permutations_GA = False
+run_permutations_diff = False
 desired_tval = 0.01
 p_threshold = 0.05
 mask_negatives = False
