@@ -305,7 +305,8 @@ def ch_name_map(orig_ch_name):
 def pick_chs(chs_id, info):
     '''
     :param chs_id: 'mag'/'LR'/'parietal/occipital/'frontal'/sac_chs/parietal+'
-        String identifying the channels to pick.
+        String identifying the channels to pick. can be any region or combination of regions selecting also hemisphere.
+        Regions and hemispheres should be indicated separated by "_" (parietal_occipital_L).
     :param info: class attribute
         info attribute from the evoked data.
     :return: picks: list
