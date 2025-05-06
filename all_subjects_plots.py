@@ -9,8 +9,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 save_fig = False
-save_path = paths().save_path()
-plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
 cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
@@ -147,8 +145,6 @@ if display_figs:
 else:
     plt.ioff()
 
-save_path = paths().save_path()
-plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
 
