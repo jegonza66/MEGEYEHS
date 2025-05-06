@@ -177,7 +177,7 @@ for ch in picks:
 mask = mask.astype(bool)
 mask_params = dict(markersize=10, markerfacecolor="grey", alpha=0.65)
 
-fig_topo = grand_avg.plot_topomap(times=topo_times, average=topo_times_span, cmap='bwr', show=display_figs, mask=mask, mask_params=mask_params, vlim=(-60, 60))
+fig_topo = grand_avg.plot_topomap(times=topo_times, average=topo_times_span, cmap='coolwarm', show=display_figs, mask=mask, mask_params=mask_params, vlim=(-60, 60))
 if save_fig:
     fig_path = ga_save_path.replace(paths().save_path(), paths().plots_path())
     fname = f'{chs_id}_topomaps'
