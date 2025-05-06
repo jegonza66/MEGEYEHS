@@ -1060,7 +1060,7 @@ def cluster_regions(n_clusters, sig_data, sig_regions, sig_tfr, clusters_masks, 
     cluster_fig.tight_layout()
 
     if save_fig:
-        save.fig(fig=cluster_fig, path=fig_path_diff + f'sig/', fname=fname)
+        save.fig(fig=cluster_fig, path=fig_path_diff, fname=fname)
 
     for cluster in np.unique(kmeans.labels_):
 
@@ -1097,22 +1097,22 @@ def cluster_regions(n_clusters, sig_data, sig_regions, sig_tfr, clusters_masks, 
             fig.suptitle(fname)
 
             if save_fig:
-                save.fig(fig=fig, path=fig_path_diff + f'sig/{cluster}/', fname=fname)
+                save.fig(fig=fig, path=fig_path_diff + f'{cluster}/', fname=fname)
 
             # plot brain regions
             brain.add_label(region, borders=False)
 
         # Save brain plot
         if save_fig:
-            brain.save_image(filename=fig_path_diff + f'sig/{cluster}/' + 'brain_regions.png')
-            brain.save_image(filename=fig_path_diff + f'sig/{cluster}/svg/' + 'brain_regions.pdf')
+            brain.save_image(filename=fig_path_diff + f'{cluster}/' + 'brain_regions.png')
+            brain.save_image(filename=fig_path_diff + f'{cluster}/svg/' + 'brain_regions.pdf')
 
         average_tf_and_significance_heatmap(generic_tfr=sig_cluster_regions[0], sig_tfr=sig_cluster_tfr, sig_mask=sig_tf_clusters, sig_regions=sig_cluster_regions,
                                             sig_chs_percent=sig_chs_percent, hist_data=None, active_times=active_times, l_freq=l_freq, h_freq=h_freq,
-                                            display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_diff + f'sig/{cluster}/')
+                                            display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_diff + f'{cluster}/')
 
 
-def quadrant_regions(quadrants_regions, sig_regions, sig_tfr, clusters_masks, sig_chs_percent, l_freq, h_freq, active_times, hist_data, subjects_dir, display_figs,
+def quadrant_regions(quadrants_regions, sig_regions, sig_tfr, clusters_masks, sig_chs_percent, p_threshold, l_freq, h_freq, active_times, hist_data, subjects_dir, display_figs,
                      save_fig, fig_path_diff):
 
     for quadrant in quadrants_regions.keys():
@@ -1148,8 +1148,8 @@ def quadrant_regions(quadrants_regions, sig_regions, sig_tfr, clusters_masks, si
                     fname += f"_{active_times[0]}_{active_times[1]}"
 
                 # Plot
-                fig = plot_general.source_tf(tf=tfr, clusters_mask_plot=plot_mask, hist_data=hist_data, display_figs=display_figs,
-                                             save_fig=save_fig, fig_path=fig_path_diff + f'sig/{quadrant}/', fname=fname, title=title)
+                fig = plot_general.source_tf(tf=tfr, clusters_mask_plot=plot_mask, p_threshold=p_threshold, hist_data=hist_data, display_figs=display_figs,
+                                             save_fig=save_fig, fig_path=fig_path_diff + f'{quadrant}/', fname=fname, title=title)
 
                 # Close figure
                 if not display_figs:
@@ -1160,11 +1160,11 @@ def quadrant_regions(quadrants_regions, sig_regions, sig_tfr, clusters_masks, si
 
             if save_fig:
                 # Save brain plot
-                brain.save_image(filename=fig_path_diff + f'sig/{quadrant}/' + 'brain_regions.png')
-                brain.save_image(filename=fig_path_diff + f'sig/{quadrant}/svg/' + 'brain_regions.pdf')
+                brain.save_image(filename=fig_path_diff + f'{quadrant}/' + 'brain_regions.png')
+                brain.save_image(filename=fig_path_diff + f'{quadrant}/svg/' + 'brain_regions.pdf')
 
             # Take quadrant average and plot
             plot_general.average_tf_and_significance_heatmap(generic_tfr=sig_quadrant_tfr[0], sig_tfr=sig_quadrant_tfr, sig_mask=sig_mask_quadrant, sig_regions=sig_quadrant_regions,
-                                                             sig_chs_percent=sig_chs_percent, l_freq=l_freq, h_freq=h_freq, hist_data=hist_data, active_times=active_times,
-                                                             display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_diff + f'sig/{quadrant}/')
+                                                             sig_chs_percent=sig_chs_percent, p_threshold=p_threshold, l_freq=l_freq, h_freq=h_freq, hist_data=hist_data, active_times=active_times,
+                                                             display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_diff + f'{quadrant}/')
 
