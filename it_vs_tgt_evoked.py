@@ -279,7 +279,7 @@ for ch in picks:
         pass
 mask = mask.astype(bool)
 mask_params = dict(markersize=10, markerfacecolor="gray", alpha=0.65)
-fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='bwr', show=display_figs, vlim=(-60, 60),
+fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='coolwarm', show=display_figs, vlim=(-60, 60),
                                       mask=mask, mask_params=mask_params)
 
 if save_fig:
@@ -581,11 +581,11 @@ grand_average = mne.grand_average(ga_dict['tgt_fix'], interpolate_bads=True)
 #         pass
 # mask = mask.astype(bool)
 # mask_params = dict(markersize=10, markerfacecolor="g", alpha=0.65)
-# fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='bwr', show=display_figs,
+# fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='coolwarm', show=display_figs,
 #                                       mask=mask, mask_params=mask_params, units='a.u.', scalings=1)
 
 
-fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='bwr', show=display_figs,
+fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='coolwarm', show=display_figs,
                                       units='a.u.', scalings=1)
 
 if save_fig:
@@ -1454,7 +1454,7 @@ if type(t_thresh) == dict:
 else:
      title = f'{chs_id}_t{round(t_thresh, 2)}_p{pval_threshold}'
 
-fig = grand_avg.plot_image(cmap='bwr', mask=clusters_mask, mask_style='mask', mask_alpha=0.5,
+fig = grand_avg.plot_image(cmap='coolwarm', mask=clusters_mask, mask_style='mask', mask_alpha=0.5,
                            titles=title, axes=ax, show=display_figs)
 
 if save_fig:
@@ -1648,7 +1648,7 @@ if type(t_thresh) == dict:
 else:
     title = f'{chs_id}_tthresh{round(t_thresh, 2)}_pthresh{pval_threshold}'
 
-fig = grand_avg.plot_image(cmap='bwr', mask=clusters_mask, mask_style='mask', mask_alpha=0.5,
+fig = grand_avg.plot_image(cmap='coolwarm', mask=clusters_mask, mask_style='mask', mask_alpha=0.5,
                            titles=title, axes=ax, show=display_figs)
 
 if save_fig:
