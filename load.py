@@ -235,7 +235,7 @@ def meg(subject, meg_params, save_data=False):
 def time_frequency_range(file_path, l_freq, h_freq):
 
     # MS difference
-    matching_files_ms = glob.glob(file_path)
+    matching_files_ms = glob.glob(file_path.replace(f'{l_freq}_{h_freq}', '*'))
     if len(matching_files_ms):
         for file in matching_files_ms:
             l_freq_file = int(file.split('_')[-3])
