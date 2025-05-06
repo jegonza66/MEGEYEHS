@@ -31,10 +31,10 @@ else:
     plt.ioff()
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
-trial_params = {'epoch_id': ['tgt_fix_vs_sub', 'it_fix_vs_sub'],
+trial_params = {'epoch_id': 'tgt_fix_vs_sub',
                 'corrans': True,
                 'tgtpres': True,
-                'mss': None,
+                'mss': [1, 4],
                 'reject': None,
                 'evtdur': None,
                 }
@@ -430,8 +430,10 @@ for param in param_values.keys():
                                         save_fig=save_fig, fig_path=fig_path_subj, fname=None)
 
                 # Plot connectivity matrix
-                plot_general.plot_con_matrix(subject=subject, labels=labels, adjacency_matrix=con_subj_data, subject_code=subject_code,
-                                             save_fig=save_fig, fig_path=fig_path_subj, fname=None)
+                plot_con_subj_data = con_subj_data.copy()
+                np.fill_diagonal(plot_con_subj_data, 0)
+                plot_general.plot_con_matrix(subject=subject, labels=labels, adjacency_matrix=plot_con_subj_data, subject_code=subject_code,
+                                             save_fig=save_fig, fig_path=fig_path_subj, fname=None, n_ticks=5)
 
                 # Plot connectivity strength (connections from each region to other regions)
                 plot_general.connectivity_strength(subject=subject, subject_code=subject_code, con=con_subj, src=src, labels=labels, surf_vol=surf_vol,
@@ -538,7 +540,7 @@ for param in param_values.keys():
                                                  fname='GA_circle_t')
 
                 # Plot p-values connectome
-                plot_general.connectome(subject='GA', labels=fsaverage_labels, adjacency_matrix=t_values, subject_code='fsaverage', node_color='black',
+                plot_general.connectome(subject='GA', labels=fsaverage_labels, adjacency_matrix=t_values, subject_code='fsaverage',
                                         save_fig=save_fig, fig_path=fig_path_diff, fname=f'GA_t_con', connections_num=(log_p_values > 0).sum())
 
                 # Plot matrix
@@ -574,7 +576,7 @@ for param in param_values.keys():
 
             # Plot connectome
             plot_general.connectome(subject='GA', labels=fsaverage_labels, adjacency_matrix=con_diff_ga, subject_code='fsaverage', edge_thresholddirection='absabove',
-                                    node_color='black', save_fig=save_fig, fig_path=fig_path_diff, fname='GA_connectome_dif')
+                                    save_fig=save_fig, fig_path=fig_path_diff, fname='GA_connectome_dif')
 
             # Plot matrix
             plot_general.plot_con_matrix(subject='GA', labels=fsaverage_labels, adjacency_matrix=con_diff_ga, subject_code='fsaverage',
