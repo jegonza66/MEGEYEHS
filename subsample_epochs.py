@@ -1,6 +1,8 @@
 import os
 import matplotlib.pyplot as plt
 import mne
+import pandas as pd
+
 import functions_analysis
 import load
 import numpy as np
@@ -15,11 +17,13 @@ plot_path = paths().plots_path()
 exp_info = setup.exp_info()
 
 #----- Save data and display figures -----#
-save_data = True
-save_fig = True
+save_data = False
+save_fig = False
+plot_individuals = False
+plot_ga = True
 
 #----- Parameters -----#
-keep_longest_saccades = True
+keep_longest_fixations = True
 
 # Trial selection
 trial_params = {'epoch_id': 'it_fix_vs',  # use'+' to mix conditions (red+blue)
@@ -27,7 +31,7 @@ trial_params = {'epoch_id': 'it_fix_vs',  # use'+' to mix conditions (red+blue)
                 'tgtpres': True,
                 'mss': None,
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
-                'evtdur': -0.8,
+                'evtdur': None,
                 'trialdur': None,
                 'rel_sac': None,
                 'tmin': -0.3,
@@ -40,7 +44,7 @@ trial_params_base = {'epoch_id': 'tgt_fix_vs',  # use'+' to mix conditions (red+
                      'tgtpres': True,
                      'mss': None,
                      'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
-                     'evtdur': -0.8,
+                     'evtdur': None,
                      'trialdur': None,
                      'rel_sac': None,
                      'tmin': -0.3,
@@ -66,6 +70,8 @@ epochs_base_path = save_path + f'Epochs_{meg_params["data_type"]}/' + run_path_b
 epochs_path = save_path + f'Epochs_{meg_params["data_type"]}/' + run_path
 
 #----- Run -----#
+base_metadata_all = []
+epochs_metadata_all = []
 epochs_list_sub = []
 for subject_code in exp_info.subjects_ids:
 
@@ -123,20 +129,21 @@ for subject_code in exp_info.subjects_ids:
     # Extract metadata and subsample
     base_metadata = epochs_base.metadata
     epochs_metadata = epochs.metadata
-    if keep_longest_saccades:
+    if keep_longest_fixations:
         epochs_metadata_subsampled = epochs_metadata.nlargest(n=len(base_metadata), columns='duration')
     else:
         epochs_metadata_subsampled = epochs_metadata.sample(n=len(base_metadata))
 
     # Plot duration histogram
-    hist_bins = 15
-    fig, ax = plt.subplots()
-    plt.title('Fixation duration distribution')
-    base_metadata['duration'].plot.hist(bins=np.linspace(0, max(base_metadata['duration']), hist_bins), ax=ax, alpha=0.5, label='Target')
-    epochs_metadata_subsampled['duration'].plot.hist(bins=np.linspace(0, max(base_metadata['duration']), hist_bins), ax=ax, alpha=0.5, label='Distractor')
-    plt.legend()
-    if save_fig:
-        save.fig(fig=fig, path=epochs_fig_path, fname=f'{subject_code}_fixation_duration_distribution')
+    if plot_individuals:
+        hist_bins = 15
+        fig, ax = plt.subplots()
+        plt.title('Fixation duration distribution')
+        base_metadata['duration'].plot.hist(bins=np.linspace(0, max(base_metadata['duration']), hist_bins), ax=ax, alpha=0.5, label='Target')
+        epochs_metadata_subsampled['duration'].plot.hist(bins=np.linspace(0, max(base_metadata['duration']), hist_bins), ax=ax, alpha=0.5, label='Distractor')
+        plt.legend()
+        if save_fig:
+            save.fig(fig=fig, path=epochs_fig_path, fname=f'{subject_code}_fixation_duration_distribution')
 
     # Get epoch ids of epochs to keep
     epochs_subsampled_ids = epochs_metadata_subsampled['id']
@@ -154,6 +161,14 @@ for subject_code in exp_info.subjects_ids:
     # Average epochs and append to evokeds list
     evoked_subsampled = epochs_subsampled.average()
 
+    if plot_ga:
+        if swap:
+            base_metadata_all.append(epochs_metadata_subsampled)
+            epochs_metadata_all.append(base_metadata)
+        else:
+            epochs_metadata_all.append(epochs_metadata_subsampled)
+            base_metadata_all.append(base_metadata)
+
     if save_data:
         # Save epoched data
         if not swap:
@@ -170,3 +185,15 @@ for subject_code in exp_info.subjects_ids:
             print(f"Saving epochs to: {epochs_new_path}")
             os.makedirs(epochs_new_base_path, exist_ok=True)
             epochs_subsampled.save(epochs_new_base_path + epochs_data_fname, overwrite=True)
+
+if plot_ga:
+    base_metadata_all_plot = pd.concat(base_metadata_all)
+    epochs_metadata_all_plot = pd.concat(epochs_metadata_all)
+    hist_bins = 50
+    fig, ax = plt.subplots()
+    plt.title('Fixation duration distribution')
+    base_metadata_all_plot['duration'].plot.hist(bins=np.linspace(0, 1, hist_bins), ax=ax, alpha=0.5, label='Target')
+    epochs_metadata_all_plot['duration'].plot.hist(bins=np.linspace(0, 1, hist_bins), ax=ax, alpha=0.5, label='Distractor')
+    plt.legend()
+    if save_fig:
+        save.fig(fig=fig, path=epochs_fig_path, fname=f'GA_fixation_duration_distribution')
