@@ -29,10 +29,10 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': ['tgt_fix_vs_sub', 'it_fix_vs_sub'],  # use'+' to mix conditions (red+blue)
+trial_params = {'epoch_id': 'tgt_fix_vs_sub',  # use'+' to mix conditions (red+blue)
                 'corrans': True,
                 'tgtpres': True,
-                'mss': None,
+                'mss': [1, 4],
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
                 'evtdur': None}
 
