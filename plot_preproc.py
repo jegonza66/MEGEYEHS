@@ -476,7 +476,8 @@ def all_subj_performance(axs, all_acc, all_response_times, save_fig=False):
 
     axs[0, 0].set_title(f'Performance')
     axs[0, 0].plot([1, 2, 4], [np.mean(all_acc[1]), np.mean(all_acc[2]), np.mean(all_acc[4])], 'o')
-    axs[0, 0].errorbar(x=[1, 2, 4], y=[np.mean(all_acc[1]), np.mean(all_acc[2]), np.mean(all_acc[4])], yerr=[np.std(all_acc[1]), np.std(all_acc[2]), np.std(all_acc[4])],
+    axs[0, 0].errorbar(x=[1, 2, 4], y=[np.mean(all_acc[1]), np.mean(all_acc[2]), np.mean(all_acc[4])],
+                       yerr=[np.std(all_acc[1])/np.sqrt(len(all_acc[1])), np.std(all_acc[2])/np.sqrt(len(all_acc[2])), np.std(all_acc[4])/np.sqrt(len(all_acc[4]))],
                        color='black', linewidth=0.5)
     # axs[0, 0].set_ylim([0, 1])
     axs[0, 0].set_ylabel('Accuracy')
@@ -485,7 +486,8 @@ def all_subj_performance(axs, all_acc, all_response_times, save_fig=False):
 
     axs[1, 0].plot([1, 2, 4], [np.mean(all_response_times[1]), np.mean(all_response_times[2]), np.mean(all_response_times[4])], 'o')
     axs[1, 0].errorbar(x=[1, 2, 4], y=[np.mean(all_response_times[1]), np.mean(all_response_times[2]), np.mean(all_response_times[4])],
-                       yerr=[np.std(all_response_times[1]), np.std(all_response_times[2]), np.std(all_response_times[4])],
+                       yerr=[np.std(all_response_times[1])/np.sqrt(len(all_response_times[1])), np.std(all_response_times[2])/np.sqrt(len(all_response_times[2])),
+                             np.std(all_response_times[4])/np.sqrt(len(all_response_times[4]))],
                        color='black', linewidth=0.5)
     # axs[1, 0].set_ylim([0, 10])
     axs[1, 0].set_ylabel('Rt')
