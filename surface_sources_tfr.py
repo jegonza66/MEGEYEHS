@@ -38,7 +38,7 @@ trial_params = {'epoch_id': ['tgt_fix_vs_sub', 'it_fix_vs_sub'],  # use'+' to mi
                 'tgtpres': True,
                 'mss': None,
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
-                'evtdur': -0.8,
+                'evtdur': None,
                 'rel_sac': None}
 
 meg_params = {'regions_id': 'all',
@@ -93,7 +93,7 @@ run_permutations_diff = True
 n_permutations = 1024
 desired_tval = 0.01
 degrees_of_freedom = len(exp_info.subjects_ids) - 1
-p_threshold = 0.05
+p_threshold = 0.01
 t_thresh = scipy.stats.t.ppf(1 - desired_tval / 2, df=degrees_of_freedom)
 # t_thresh = dict(start=0, step=0.2)
 
@@ -419,7 +419,7 @@ for param in param_values.keys():
                     fname = fname.replace('Power', tf_output)
 
                 hist_data = epochs.metadata['total_duration']
-                fig = plot_general.source_tf(tf=source_tf, hist_data=hist_data, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path, fname=fname)
+                fig = plot_general.source_tf(tf=source_tf, hist_data=hist_data, p_threshold=p_threshold, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path, fname=fname)
 
                 # Free up memory
                 plt.close(fig)
@@ -483,7 +483,7 @@ for param in param_values.keys():
             if 'fix' in run_params['epoch_id'] or 'sac' in run_params['epoch_id']:
                 hist_data = pd.concat(fixations_duration[param][param_value])
 
-            fig = plot_general.source_tf(tf=ga_tf_region, clusters_mask_plot=clusters_mask_plot, hist_data=hist_data, display_figs=display_figs,
+            fig = plot_general.source_tf(tf=ga_tf_region, clusters_mask_plot=clusters_mask_plot, p_threshold=p_threshold, hist_data=hist_data, display_figs=display_figs,
                                          save_fig=save_fig, fig_path=fig_path, fname=fname, title=title)
 
             # Free up memory
@@ -507,8 +507,8 @@ for param in param_values.keys():
 
             # Save
             if save_fig:
-                brain.save_image(filename=fig_path + 'sig/' + 'brain_regions.png')
-                brain.save_image(filename=fig_path + 'sig/svg/' + 'brain_regions.pdf')
+                brain.save_image(filename=fig_path + f'sig{p_threshold}/' + 'brain_regions.png')
+                brain.save_image(filename=fig_path + f'sig{p_threshold}/svg/' + 'brain_regions.pdf')
 
 
 #----- Difference between conditions -----#
@@ -546,6 +546,16 @@ for param in param_values.keys():
 
             GA_stc_diff_data = all_subj_diff_data.mean(0)
 
+            # Get hist data for each condition
+            # First condition
+            hist_data_comp0 = pd.concat(fixations_duration[param][comparison[0]])
+            hist_data_comp0.rename(f'{param}{comparison[0]}', inplace=True)
+            # Second condition
+            hist_data_comp1 = pd.concat(fixations_duration[param][comparison[1]])
+            hist_data_comp1.rename(f'{param}{comparison[1]}', inplace=True)
+            # Concatenate
+            hist_data = (hist_data_comp0, hist_data_comp1)
+
             # Copy Source Time Course from default subject morph to define GA STC
             GA_stc_diff = GA_stc.copy()
 
@@ -554,8 +564,8 @@ for param in param_values.keys():
             GA_stc_diff.subject = 'fsaverage'
 
             # Delete previous significance plots
-            if os.path.exists(fig_path_diff + f'sig/'):
-                shutil.rmtree(fig_path_diff + f'sig/')
+            if os.path.exists(fig_path_diff + f'sig{p_threshold}/'):
+                shutil.rmtree(fig_path_diff + f'sig{p_threshold}/')
 
             # Define TF quadrants
             quadrants_regions = {'early_low': [], 'late_low': [], 'early_high': [], 'late_high': []}
@@ -608,10 +618,9 @@ for param in param_values.keys():
                 # --------- Plot --------- #
                 ga_tf_diff_region = GA_stc_diff.pick(GA_stc_diff.ch_names[0])
                 ga_tf_diff_region.data = np.expand_dims(GA_stc_diff_data[i], axis=0)
-                hist_data = pd.concat(fixations_duration[param][comparison[0]] + fixations_duration[param][comparison[1]])
 
-                fig = plot_general.source_tf(tf=ga_tf_diff_region, clusters_mask_plot=clusters_mask_plot, hist_data=hist_data, display_figs=display_figs,
-                                             save_fig=save_fig, fig_path=fig_path_diff, fname=fname, title=title)
+                fig = plot_general.source_tf(tf=ga_tf_diff_region, clusters_mask_plot=clusters_mask_plot, p_threshold=p_threshold, hist_data=hist_data, display_figs=display_figs,
+                                             save_fig=save_fig, fig_path=fig_path_diff + f'sig{p_threshold}/', fname=fname, title=title)
 
                 # Close figure
                 if not display_figs:
@@ -643,25 +652,27 @@ for param in param_values.keys():
 
             if save_fig:
                 # Save brain plot
-                brain.save_image(filename=fig_path_diff + f'sig/' + 'brain_regions.png')
-                brain.save_image(filename=fig_path_diff + f'sig/svg/' + 'brain_regions.pdf')
+                os.makedirs(fig_path_diff + f'sig{p_threshold}/', exist_ok=True)
+                brain.save_image(filename=fig_path_diff + f'sig{p_threshold}/' + 'brain_regions.png')
+                os.makedirs(fig_path_diff + f'sig{p_threshold}/svg/', exist_ok=True)
+                brain.save_image(filename=fig_path_diff + f'sig{p_threshold}/svg/' + 'brain_regions.pdf')
 
             # Plot brain with marked regions
             if len(sig_regions):
 
                 # Plot general average
                 plot_general.average_tf_and_significance_heatmap(generic_tfr=ga_tf_diff_region, sig_tfr=sig_tfr, sig_mask=clusters_masks, sig_regions=sig_regions,
-                                                                 sig_chs_percent=sig_chs_percent, hist_data=hist_data, active_times=active_times, l_freq=l_freq, h_freq=h_freq,
-                                                                 display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_diff + f'sig/')
+                                                                 sig_chs_percent=sig_chs_percent, p_threshold=p_threshold, hist_data=hist_data, active_times=active_times, l_freq=l_freq, h_freq=h_freq,
+                                                                 display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_diff + f'sig{p_threshold}/')
                 if run_clustering:
                     functions_analysis.cluster_regions(n_clusters=n_clusters, sig_data=sig_data, sig_regions=sig_regions, sig_tfr=sig_tfr, clusters_masks=clusters_masks,
                                                        l_freq=l_freq, h_freq=h_freq, active_times=active_times, subjects_dir=subjects_dir,
-                                                       display_figs=display_figs, save_fig=save_fig, fig_path_diff=fig_path_diff)
+                                                       display_figs=display_figs, save_fig=save_fig, fig_path_diff=fig_path_diff + f'sig{p_threshold}/')
                 if run_quadrants:
                     functions_analysis.quadrant_regions(quadrants_regions=quadrants_regions, sig_regions=sig_regions, sig_tfr=sig_tfr, clusters_masks=clusters_masks,
                                                         sig_chs_percent=sig_chs_percent, l_freq=l_freq, h_freq=h_freq, active_times=active_times,
-                                                        hist_data=hist_data, subjects_dir=subjects_dir,
-                                                        display_figs=display_figs, save_fig=save_fig, fig_path_diff=fig_path_diff)
+                                                        hist_data=hist_data, subjects_dir=subjects_dir, p_threshold=p_threshold,
+                                                        display_figs=display_figs, save_fig=save_fig, fig_path_diff=fig_path_diff + f'sig{p_threshold}/')
 
 
 
