@@ -13,13 +13,14 @@ from itertools import compress
 import pandas as pd
 import matplotlib.gridspec as gridspec
 import netplotbrain
+import matplotlib.colors as colors
 
 
 save_path = paths().save_path()
 plot_path = paths().plots_path()
 
 
-def epochs(subject, epochs, picks, order=None, overlay=None, combine='mean', sigma=5, group_by=None, cmap='bwr',
+def epochs(subject, epochs, picks, order=None, overlay=None, combine='mean', sigma=5, group_by=None, cmap='coolwarm',
            vmin=None, vmax=None, display_figs=True, save_fig=None, fig_path=None, fname=None):
 
     if save_fig and (not fname or not fig_path):
@@ -237,7 +238,7 @@ def fig_tf_bands(fontsize=None, ticksize=None):
 
 
 def tfr_bands(tfr, chs_id, plot_xlim=(None, None), baseline=None, bline_mode=None, dB=False, vmin=None, vmax=None, subject=None, title=None, vlines_times=[0],
-              topo_times=None, display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None, cmap='bwr'):
+              topo_times=None, display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None, cmap='coolwarm'):
 
     # Sanity check
     if save_fig and (not fname or not fig_path):
@@ -338,7 +339,7 @@ def fig_tf_times(time_len, figsize=(18, 5), ax_len_div=12, timefreqs_tfr=None, f
 
 
 def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=None, bline_mode=None, dB=False, vmin=None, vmax=None,
-              topo_vmin=None, topo_vmax=None, title=None, vlines_times=None, cmap='bwr', display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None):
+              topo_vmin=None, topo_vmax=None, title=None, vlines_times=None, cmap='coolwarm', display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None):
 
     # Sanity check
     if save_fig and (not fname or not fig_path):
@@ -472,7 +473,7 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
     return fig, ax_tf
 
 
-def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, plot_max=True, plot_min=True, vlines_times=None, cmap='bwr',
+def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, plot_max=True, plot_min=True, vlines_times=None, cmap='coolwarm',
                   vmin=None, vmax=None, display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fname or not trf_fig_path):
@@ -522,7 +523,7 @@ def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, Non
 
 
 def tfr_plotjoint_picks(tfr, plot_baseline=(None, 0), bline_mode=None, plot_xlim=(None, None), timefreqs=None, image_args=None, clusters_mask=None,
-                        plot_max=True, plot_min=True, vmin=None, vmax=None, chs_id='mag', vlines_times=None, cmap='bwr',
+                        plot_max=True, plot_min=True, vmin=None, vmax=None, chs_id='mag', vlines_times=None, cmap='coolwarm',
                         display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fname or not trf_fig_path):
@@ -576,11 +577,12 @@ def tfr_plotjoint_picks(tfr, plot_baseline=(None, 0), bline_mode=None, plot_xlim
     tf_ax = fig.axes[0]
     if not vlines_times and (tfr_plotjoint.times[0] != 0 and tfr_plotjoint.times[-1] != 0):
         vlines_times = [0]
-    for t in vlines_times:
-        try:
-            tf_ax.vlines(x=t, ymin=tf_ax.get_ylim()[0], ymax=tf_ax.get_ylim()[1], linestyles='--', colors='gray')
-        except:
-            pass
+    if vlines_times:
+        for t in vlines_times:
+            try:
+                tf_ax.vlines(x=t, ymin=tf_ax.get_ylim()[0], ymax=tf_ax.get_ylim()[1], linestyles='--', colors='gray')
+            except:
+                pass
 
     # Define Topo mask
     if clusters_mask is not None:
@@ -719,9 +721,9 @@ def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, n_
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_connectome', connections_num=150,
-               template='MNI152NLin2009cAsym', template_style='glass', template_alpha=1, node_alpha=0.5, node_scale=30, node_color='red',
-               edge_alpha=1, edge_thresholddirection='above', edge_cmap=None, edge_widthscale=4, view='preset-3'):
+def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='connectome', connections_num=150,
+               template='MNI152NLin2009cAsym', template_style='glass', template_alpha=10, node_alpha=0.5, node_scale=30, node_color='black',
+               edge_alpha=0.7, edge_colorvminvmax='absmax', edge_thresholddirection='above', edge_cmap='coolwarm', edge_widthscale=2, view='preset-3'):
 
     # Sanity check
     if save_fig and (not fig_path):
@@ -768,17 +770,20 @@ def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, 
 
         # Determine vmin and vmax from retained edges
         # Option 1: Signed values (for diverging colormap)
-        vmin = np.min(retained_edges)
-        vmax = np.max(retained_edges)
+        if edge_colorvminvmax == 'absmax':
+            vmax = np.max(abs(retained_edges))
+            vmin = - vmax
+        elif edge_colorvminvmax == 'minmax':
+            vmin = np.min(retained_edges)
+            vmax = np.max(retained_edges)
+        else:
+            raise NameError(f"edge_colorvminvmax should be either 'absmax' or 'minmax'")
 
         if edge_cmap is None:
             if vmin < 0:
                 edge_cmap = 'coolwarm'
-                edge_colorvminvmax = 'minmax'
             else:
-                edge_cmap = 'Greys'
-                vmin = 0
-                edge_colorvminvmax = [0, vmax]
+                edge_cmap = 'YlOrRd'
 
         # Corresponding node labels
         nodes = [i for i in range(len(adjacency_matrix))]
@@ -811,7 +816,7 @@ def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, 
             edge_threshold=edge_threshold,
             edge_color=weights_col_name,
             edge_cmap=edge_cmap,
-            edge_colorvminvmax=edge_colorvminvmax,
+            edge_colorvminvmax=[vmin, vmax],
             edge_widthscale=edge_widthscale,
             view=view
         )
@@ -833,70 +838,7 @@ def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, 
             save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def connectome_orig(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_connectome', connections_num=150,
-               node_size=10, node_color='k', linewidth=2, cmap=None, edge_vmin=None, edge_vmax=None):
-
-    # Sanity check
-    if save_fig and (not fig_path):
-        raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
-
-    # Get parcelation labels positions
-    label_names = [label.name for label in labels]
-    # Get the y-location of the label
-    label_xpos = list()
-    label_ypos = list()
-    label_zpos = list()
-    for name in label_names:
-        idx = label_names.index(name)
-        label_xpos.append(np.mean(labels[idx].pos[:, 0]))
-        label_ypos.append(np.mean(labels[idx].pos[:, 1]))
-        label_zpos.append(np.mean(labels[idx].pos[:, 2]))
-
-    # Make node position array and reescale
-    nodes_pos = np.array([label_xpos, label_ypos, label_zpos]).transpose() * 1100
-
-    # Plot only if at least 1 connection
-    if abs(adjacency_matrix).sum() > 0:
-        # Define edges to plot
-        if connections_num >= 1:
-            edge_threshold = sorted(np.sort(adjacency_matrix, axis=None))[-int(connections_num * 2)]
-            if not edge_vmin:
-                edge_vmin = edge_threshold
-            if not edge_vmax:
-                edge_vmax = np.sort(adjacency_matrix, axis=None)[-1]
-            if edge_vmin < 0:
-                cmap = 'bwr'
-            else:
-                cmap = 'YlOrRd'
-
-        elif connections_num < 1:
-            edge_threshold = f'{connections_num*100}%'
-            if not edge_vmax:
-                edge_vmax = adjacency_matrix.max()
-
-            if adjacency_matrix.min() < 0:
-                if not edge_vmin:
-                    edge_vmin = adjacency_matrix.min()
-                cmap = 'bwr'
-            else:
-                if not edge_vmin:
-                    edge_vmin = sorted(np.sort(adjacency_matrix, axis=None))[-int((1 - connections_num) * len(np.sort(adjacency_matrix, axis=None))**2)]  # set colorbar minimum as twice smaller than plot minimum
-                cmap = 'YlOrRd'
-
-        # Plot connectome
-        fig = plotting.plot_connectome(adjacency_matrix=adjacency_matrix, node_coords=nodes_pos, edge_threshold=edge_threshold, node_size=node_size, node_color=node_color,
-                                       edge_vmin=edge_vmin, edge_vmax=edge_vmax, edge_cmap=cmap, edge_kwargs=dict(linewidth=linewidth), colorbar=True)
-
-        # Save
-        if save_fig:
-            if not fname:
-                fname = f'{subject.subject_id}_connectome'
-            if subject_code == 'fsaverage' and 'fsaverage' not in fname:
-                fname += '_fsaverage'
-            save.fig(fig=fig, path=fig_path, fname=fname)
-
-
-def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='GA_matrix'):
+def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, n_ticks=5, save_fig=False, fig_path=None, fname='GA_matrix'):
 
     matplotlib.use('TkAgg')
 
@@ -905,29 +847,44 @@ def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, save_fig=Fa
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
     label_names = [label.name for label in labels]
+
     # Get the y-location of the label
-    label_ypos = list()
-    for name in label_names:
-        idx = label_names.index(name)
-        label_ypos.append(np.mean(labels[idx].pos[:, 1]))
+    label_ypos = np.array([np.mean(labels[label_names.index(name)].pos[:, 1]) for name in label_names])
 
-    # Make adjacency matrix sorted from frontal to posterior
-    sort = np.argsort(label_ypos)  # Get sorted indexes based on regions anterior-posterior order
-    # adjacency_matrix = np.maximum(adjacency_matrix, adjacency_matrix.transpose())  # Make symetric
-    sorted_matrix = adjacency_matrix[sort[::-1]]  # Sort on one axis
-    sorted_matrix = sorted_matrix[:, sort[::-1]]  # Apply same sort on second axis
+    # Separate left and right hemisphere labels
+    left_indices = [i for i, name in enumerate(label_names) if '-lh' in name]
+    right_indices = [i for i, name in enumerate(label_names) if '-rh' in name]
 
-    sorted_labels = [label_names[i] for i in sort][::-1]  # Get labels in sorted order
+    # Sort within each hemisphere (anterior-to-posterior)
+    left_sorted = sorted(left_indices, key=lambda i: label_ypos[i], reverse=True)  # Anterior to posterior
+    right_sorted = sorted(right_indices, key=lambda i: label_ypos[i], reverse=True)  # Anterior to posterior
 
+    # Combine order: left first, then right
+    sorted_indices = left_sorted + right_sorted
+
+    # Reorder the connectivity matrix and labels
+    sorted_matrix = adjacency_matrix[sorted_indices, :][:, sorted_indices]
+    sorted_labels = np.array([label_names[i] for i in sorted_indices])  # Get labels in sorted order
+
+    # Get min and max from data
     vmin = np.sort(sorted_matrix.ravel())[len(label_ypos)]
     vmax = np.sort(sorted_matrix.ravel())[-1]
 
+    # Plot
     fig = plt.figure(figsize=(8, 5))
-    im = plt.imshow(sorted_matrix, vmin=vmin, vmax=vmax)
+    norm = colors.CenteredNorm(vcenter=0)
+    im = plt.imshow(sorted_matrix, cmap='coolwarm', norm=norm)
+    # im = plt.imshow(sorted_matrix, vmin=vmin, vmax=vmax)
     fig.colorbar(im)
 
     ax = plt.gca()
-    ax.set_yticklabels(sorted_labels)
+    left_ticks = np.linspace(0, (n_ticks -1) * len(sorted_labels)/2/n_ticks, n_ticks, dtype=int)
+    right_ticks = left_ticks + int(len(sorted_labels)/2)
+    tick_positions = np.concatenate([left_ticks, right_ticks])
+    tick_labels = sorted_labels[tick_positions]  # Subset of labels
+
+    ax.set_yticks(tick_positions)  # Set only 7 tick positions
+    ax.set_yticklabels(tick_labels)
     ax.set_xticklabels([])
 
     plt.suptitle('')
@@ -1100,13 +1057,13 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
     return brain
 
 
-def source_tf(tf, clusters_mask_plot=None, vlim=(None, None), cmap='RdBu_r', hist_data=None, display_figs=False, save_fig=True, fig_path=None, fname=None, title=None):
+def source_tf(tf, clusters_mask_plot=None, p_threshold=0.05, vlim=(None, None), cmap='coolwarm', hist_data=None, display_figs=False, save_fig=True, fig_path=None, fname=None, title=None):
 
     # Sanity check
     if save_fig and (not fig_path):
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
-    if isinstance(hist_data, pd.Series):
+    if isinstance(hist_data, pd.Series) or isinstance(hist_data, tuple):
         # Create the figure and gridspec for custom subplot sizes
         fig = plt.figure(figsize=(10, 4))
 
@@ -1128,7 +1085,12 @@ def source_tf(tf, clusters_mask_plot=None, vlim=(None, None), cmap='RdBu_r', his
 
         # Add the lower subplot using the captured size
         ax2 = fig.add_axes([pos1.x0, ax2_bottom, pos1.width, ax2_height], sharex=ax1)
-        ax2.hist(hist_data, range=(tf.tmin, tf.tmax), bins=50, edgecolor='black', linewidth=0.3, stacked=True)
+        if isinstance(hist_data, tuple):
+            for hist_data_sub in hist_data:
+                ax2.hist(hist_data_sub, range=(tf.tmin, tf.tmax), bins=50, edgecolor='black', linewidth=0.3, stacked=True, alpha=0.5, label=hist_data_sub.name)
+                plt.legend(loc='lower left', bbox_to_anchor=(1, -1))
+        else:
+            ax2.hist(hist_data, range=(tf.tmin, tf.tmax), bins=50, edgecolor='black', linewidth=0.3, stacked=True)
         ax2.set_xlabel('Time (s)')
 
         # Remove the x-axis labels of the first plot
@@ -1145,14 +1107,15 @@ def source_tf(tf, clusters_mask_plot=None, vlim=(None, None), cmap='RdBu_r', his
     if save_fig:
         save.fig(fig=fig, path=fig_path, fname=fname)
         if isinstance(clusters_mask_plot, np.ndarray):
-            if 'sig/' not in fig_path:
-                save.fig(fig=fig, path=fig_path + 'sig/', fname=fname)
+            if f'sig{p_threshold}' not in fig_path:
+                save.fig(fig=fig, path=fig_path + f'sig{p_threshold}/', fname=fname)
             else:
                 save.fig(fig=fig, path=fig_path, fname=fname)
     return fig
 
 
-def average_tf_and_significance_heatmap(generic_tfr, sig_tfr, sig_mask, sig_regions, sig_chs_percent, hist_data, active_times, l_freq, h_freq, display_figs, save_fig, fig_path):
+def average_tf_and_significance_heatmap(generic_tfr, sig_tfr, sig_mask, sig_regions, sig_chs_percent, p_threshold,
+                                        hist_data, active_times, l_freq, h_freq, display_figs, save_fig, fig_path):
 
     # Quadrant average
     avg_tfr = generic_tfr.copy()
@@ -1169,10 +1132,10 @@ def average_tf_and_significance_heatmap(generic_tfr, sig_tfr, sig_mask, sig_regi
         fname += f"_{active_times[0]}_{active_times[1]}"
 
     # Plot
-    fig = source_tf(tf=avg_tfr, clusters_mask_plot=mask, hist_data=hist_data, display_figs=display_figs,
-                                 save_fig=save_fig, fig_path=fig_path, fname=fname, title=title)
+    fig = source_tf(tf=avg_tfr, clusters_mask_plot=mask, p_threshold=p_threshold, hist_data=hist_data, display_figs=display_figs,
+                    save_fig=save_fig, fig_path=fig_path, fname=fname, title=title)
 
-    # Make number of signifficant regions heatmap
+    # Make number of significant regions heatmap
     sig_mask_array = np.expand_dims(np.array(sig_mask).sum(axis=0), axis=0)
 
     # Significance heatmap
@@ -1186,7 +1149,7 @@ def average_tf_and_significance_heatmap(generic_tfr, sig_tfr, sig_mask, sig_regi
         fname += f"_{active_times[0]}_{active_times[1]}"
 
     # Plot
-    fig = source_tf(tf=sig_heatmap, vlim=(0, max(sig_mask_array.ravel())), cmap='gray',
+    fig = source_tf(tf=sig_heatmap, vlim=(0, max(sig_mask_array.ravel())), cmap='Greys', p_threshold=p_threshold,
                                  clusters_mask_plot=mask, hist_data=hist_data, display_figs=display_figs,
                                  save_fig=save_fig, fig_path=fig_path, fname=fname, title=title)
 
