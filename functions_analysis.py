@@ -229,27 +229,41 @@ def time_frequency(epochs, l_freq, h_freq, freqs_type='lin', n_cycles_div=2., av
     elif freqs_type == 'lin':
         freqs = np.linspace(l_freq, h_freq, num=h_freq - l_freq + 1)  # 1 Hz bands
     n_cycles = freqs / n_cycles_div  # different number of cycle per frequency
-    if return_itc:
-        power, itc = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
-                                                   average=average, output=output,
-                                                   return_itc=return_itc, decim=3, n_jobs=n_jobs, verbose=True)
-        if save_data:
-            # Save trf data
-            os.makedirs(trf_save_path, exist_ok=True)
-            power.save(trf_save_path + power_data_fname, overwrite=True)
-            itc.save(trf_save_path + itc_data_fname, overwrite=True)
 
-        return power, itc
+    # Phase output
+    if output == 'phase':
+        output = 'complex'
+        average = False
 
-    else:
         power = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True, average=average,
                                               output=output, return_itc=return_itc, decim=3, n_jobs=n_jobs, verbose=True)
-        if save_data:
-            # Save trf data
-            os.makedirs(trf_save_path, exist_ok=True)
-            power.save(trf_save_path + power_data_fname, overwrite=True)
-
+        power.data = np.imag(power.data)
+        power = power.average()
         return power
+
+    else:
+        if return_itc:
+            power, itc = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True,
+                                                       average=average, output=output,
+                                                       return_itc=return_itc, decim=3, n_jobs=n_jobs, verbose=True)
+            if save_data:
+                # Save trf data
+                os.makedirs(trf_save_path, exist_ok=True)
+                power.save(trf_save_path + power_data_fname, overwrite=True)
+                itc.save(trf_save_path + itc_data_fname, overwrite=True)
+
+            return power, itc
+
+        else:
+            power = mne.time_frequency.tfr_morlet(epochs, freqs=freqs, n_cycles=n_cycles, use_fft=True, average=average,
+                                                  output=output, return_itc=return_itc, decim=3, n_jobs=n_jobs, verbose=True)
+
+            if save_data:
+                # Save trf data
+                os.makedirs(trf_save_path, exist_ok=True)
+                power.save(trf_save_path + power_data_fname, overwrite=True)
+
+            return power
 
 
 def time_frequency_multitaper(epochs, l_freq, h_freq, freqs_type='lin', n_cycles_div=2., average=True, return_itc=True,
@@ -1014,28 +1028,29 @@ def run_time_frequency_test(data, pval_threshold, t_thresh, min_sig_chs=0, n_per
     return clusters_mask, clusters_mask_plot, significant_pvalues
 
 
-def get_labels(parcelation, subjects_dir, surf_vol='surface'):
+def get_labels(subject_code, parcelation, subjects_dir, surf_vol='surface'):
+
     # Get parcelation labels
     if surf_vol == 'surface':  # or surf_vol == 'mixed':
         # Get labels for FreeSurfer 'aparc' cortical parcellation with 34 labels/hemi
-        fsaverage_labels = mne.read_labels_from_annot(subject='fsaverage', parc=parcelation, subjects_dir=subjects_dir)
+        labels = mne.read_labels_from_annot(subject=subject_code, parc=parcelation, subjects_dir=subjects_dir)
         # Remove 'unknown' label for fsaverage aparc labels
-        if parcelation == 'aparc':
+        if 'aparc' in parcelation:
             print("Dropping extra 'unkown' label from lh.")
-            drop_idxs = [i for i, label in enumerate(fsaverage_labels) if 'unknown' in label.name]
-            for drop_idx in drop_idxs:
-                fsaverage_labels.pop(drop_idx)
+            drop_idxs = [i for i, label in enumerate(labels) if 'unknown' in label.name.lower()]
+            for drop_idx in drop_idxs[::-1]:
+                labels.pop(drop_idx)
 
     if surf_vol == 'volume':
-        labels_fname = subjects_dir + f'/fsaverage/mri/aparc+aseg.mgz'
-        fsaverage_labels = mne.get_volume_labels_from_aseg(labels_fname, return_colors=True)
+        labels_fname = subjects_dir + f'/{subject_code}/mri/aparc+aseg.mgz'
+        labels = mne.get_volume_labels_from_aseg(labels_fname, return_colors=True)
         # Drop extra labels in fsaverage
-        drop_idxs = [i for i, label in enumerate(fsaverage_labels[0]) if (label == 'ctx-lh-corpuscallosum' or label == 'ctx-rh-corpuscallosum')]
-        for drop_idx in drop_idxs:
-            fsaverage_labels[0].pop(drop_idx)
-            fsaverage_labels[1].pop(drop_idx)
+        drop_idxs = [i for i, label in enumerate(labels[0]) if (label == 'ctx-lh-corpuscallosum' or label == 'ctx-rh-corpuscallosum')]
+        for drop_idx in drop_idxs[::-1]:
+            labels[0].pop(drop_idx)
+            labels[1].pop(drop_idx)
 
-    return fsaverage_labels
+    return labels
 
 
 def cluster_regions(n_clusters, sig_data, sig_regions, sig_tfr, clusters_masks, l_freq, h_freq, active_times, subjects_dir, display_figs, save_fig, fig_path_diff):
