@@ -533,7 +533,7 @@ def get_baseline_duration(epoch_id, mss, tmin, tmax, mss_duration=2, cross1_dur=
     return baseline, plot_baseline
 
 
-def get_plots_timefreqs(epoch_id, mss, cross2_dur, mss_duration, topo_bands, plot_xlim, timefreqs_joint=None, plot_min=True, plot_max=True):
+def get_plots_timefreqs(epoch_id, mss, cross2_dur, mss_duration, plot_xlim, topo_bands=['Alpha', 'Alpha', 'Theta', 'Alpha'], timefreqs_joint=None, plot_min=True, plot_max=True):
     '''
     :param epoch_id:
     :param timefreqs_joint: list of tuples. Each tuple represents the time and frequency of the topoplot.
