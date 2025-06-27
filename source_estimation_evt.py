@@ -29,10 +29,10 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': 'tgt_fix_vs_sub',  # use'+' to mix conditions (red+blue)
+trial_params = {'epoch_id': ['tgt_fix_vs_sub', 'it_fix_vs_sub'],  # use'+' to mix conditions (red+blue)
                 'corrans': True,
                 'tgtpres': True,
-                'mss': [1, 4],
+                'mss': None,
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
                 'evtdur': None}
 
@@ -64,11 +64,11 @@ model_name = 'lcmv'
 surf_vol = 'volume'
 ico = 5
 spacing = 5.  # Only for volume source estimation
-pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
+pick_ori = 'vector'  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
 source_power = False
 source_estimation = 'evk'  # 'epo' / 'evk' / 'cov' / 'trf'
 visualize_alignment = False
-active_times = None
+active_times = [-1, 0]
 
 # Baseline
 if source_power or source_estimation == 'cov':
@@ -87,7 +87,7 @@ plot_ga = True
 
 # Permutations test
 run_permutations_GA = False
-run_permutations_diff = False
+run_permutations_diff = True
 desired_tval = 0.01
 p_threshold = 0.05
 mask_negatives = False
@@ -192,9 +192,6 @@ for param in param_values.keys():
                 # Define active times
                 active_times = [0, run_params['tmax']]
                 fig_path = fig_path.replace(f"{run_params['tmin']}_{run_params['tmax']}", f"{active_times[0]}_{active_times[1]}")
-
-        # Get parcelation labels
-        fsaverage_labels = functions_analysis.get_labels(parcelation='aparc', subjects_dir=subjects_dir, surf_vol=surf_vol)
 
         # Save source estimates time courses on default's subject source space
         stcs_default_dict[param][param_value] = []
@@ -494,11 +491,20 @@ for param in param_values.keys():
             print(f"Applying baseline correction: {bline_mode_ga} from {run_params['baseline'][0]} to {run_params['baseline'][1]}")
             # GA_stc.apply_baseline(baseline=baseline)
             if bline_mode_ga == 'db':
-                GA_stc.data = 10 * np.log10(GA_stc.data / GA_stc.copy().crop(tmin=run_params['baseline'][0], tmax=run_params['baseline'][1]).data.mean(axis=1)[:, None])
+                if pick_ori == 'vector':
+                    GA_stc.data = 10 * np.log10(GA_stc.data / GA_stc.copy().crop(tmin=run_params['baseline'][0], tmax=run_params['baseline'][1]).data.mean(axis=1)[:, :, None])
+                else:
+                    GA_stc.data = 10 * np.log10(GA_stc.data / GA_stc.copy().crop(tmin=run_params['baseline'][0], tmax=run_params['baseline'][1]).data.mean(axis=1)[:, None])
             elif bline_mode_ga == 'ratio':
-                GA_stc.data = GA_stc.data / GA_stc.copy().crop(tmin=run_params['baseline'][0], tmax=run_params['baseline'][1]).data.mean(axis=1)[:, None]
+                if pick_ori == 'vector':
+                    GA_stc.data = GA_stc.data / GA_stc.copy().crop(tmin=run_params['baseline'][0], tmax=run_params['baseline'][1]).data.mean(axis=-1)[:, :, None]
+                else:
+                    GA_stc.data = GA_stc.data / GA_stc.copy().crop(tmin=run_params['baseline'][0], tmax=run_params['baseline'][1]).data.mean(axis=-1)[:, None]
             elif bline_mode_ga == 'mean':
-                GA_stc.data = GA_stc.data - GA_stc.copy().crop(tmin=run_params['baseline'][0], tmax=run_params['baseline'][1]).data.mean(axis=1)[:, None]
+                if pick_ori == 'vector':
+                    GA_stc.data = GA_stc.data - GA_stc.copy().crop(tmin=run_params['baseline'][0], tmax=run_params['baseline'][1]).data.mean(axis=-1)[:, :, None]
+                else:
+                    GA_stc.data = GA_stc.data - GA_stc.copy().crop(tmin=run_params['baseline'][0], tmax=run_params['baseline'][1]).data.mean(axis=-1)[:, None]
 
         # Save GA from epoch id
         GA_stcs[param][param_value] = GA_stc
@@ -507,7 +513,7 @@ for param in param_values.keys():
         if plot_ga:
             fname = f'GA'
             brain = plot_general.sources(stc=GA_stc, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=initial_time, surf_vol=surf_vol,
-                                         force_fsaverage=force_fsaverage, source_estimation=source_estimation, mask_negatives=mask_negatives,
+                                         force_fsaverage=force_fsaverage, source_estimation=source_estimation, mask_negatives=mask_negatives, pick_ori=pick_ori,
                                          positive_cbar=positive_cbar, views=['lat', 'med'], save_fig=save_fig, save_vid=False, fig_path=fig_path, fname=fname)
 
         # --------- Test significance compared to baseline --------- #
@@ -580,7 +586,7 @@ for param in param_values.keys():
             if plot_ga:
                 fname = f'GA'
                 brain = plot_general.sources(stc=GA_stc_diff, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=difference_initial_time, surf_vol=surf_vol,
-                                             force_fsaverage=force_fsaverage, source_estimation=source_estimation, mask_negatives=mask_negatives,
+                                             force_fsaverage=force_fsaverage, source_estimation=source_estimation, mask_negatives=mask_negatives, pick_ori=pick_ori,
                                              views=['lat', 'med'], save_vid=False, save_fig=save_fig, fig_path=fig_path_diff, fname=fname, positive_cbar=positive_cbar)
 
             #--------- Cluster permutations test ---------#
@@ -599,12 +605,12 @@ for param in param_values.keys():
                     fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
                     brain = plot_general.sources(stc=GA_stc_diff_sig, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0,
                                                  surf_vol=surf_vol, time_label=time_label, force_fsaverage=force_fsaverage, source_estimation=source_estimation,
-                                                 views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=positive_cbar,
+                                                 views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=positive_cbar, pick_ori=pick_ori,
                                                  save_vid=False, save_fig=save_fig, fig_path=fig_path_diff, fname=fname)
 
                 elif significance_mask is not None:
                     fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
                     brain = plot_general.sources(stc=stc_all_cluster_vis, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0,
                                                  surf_vol=surf_vol, time_label=time_label, force_fsaverage=force_fsaverage, source_estimation=source_estimation,
-                                                 views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=positive_cbar,
+                                                 views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=positive_cbar, pick_ori=pick_ori,
                                                  save_vid=False, save_fig=save_fig, fig_path=fig_path_diff, fname=fname)
