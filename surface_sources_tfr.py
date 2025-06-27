@@ -33,13 +33,13 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': ['tgt_fix_vs_sub', 'it_fix_vs_sub'],  # use'+' to mix conditions (red+blue)
+trial_params = {'epoch_id': 'it_fix_vs_sub',  # use'+' to mix conditions (red+blue)
                 'corrans': True,
-                'tgtpres': True,
-                'mss': None,
+                'tgtpres': None,
+                'mss': [1, 4],
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
                 'evtdur': None,
-                'rel_sac': None}
+                'rel_sac': 'prev'}
 
 meg_params = {'regions_id': 'all',
               'band_id': None,
@@ -71,7 +71,7 @@ pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the di
 source_estimation = 'epo'
 estimate_source_tf = True
 visualize_alignment = False
-parcelation='aparc'
+parcelation='aparc.a2009s'
 
 # Time freqcuency computation
 tf_output = 'avg_power'  # 'phase' / 'avg_power'
@@ -135,8 +135,9 @@ aparc_region_labels['all'] = [value for key in aparc_region_labels.keys() for va
 region_labels = [element for region in meg_params['regions_id'].split('_') for element in aparc_region_labels[region]]
 
 # Get parcelation labels
-fsaverage_labels = functions_analysis.get_labels(parcelation=parcelation, subjects_dir=subjects_dir, surf_vol=surf_vol)
-fsaverage_labels = [label for label in fsaverage_labels for label_id in region_labels if label.name.startswith(label_id + '-')]
+fsaverage_labels = functions_analysis.get_labels(subject_code='fsaverage', parcelation=parcelation, subjects_dir=subjects_dir, surf_vol=surf_vol)
+if parcelation == 'aparc':
+    fsaverage_labels = [label for label in fsaverage_labels for label_id in region_labels if label.name.startswith(label_id + '-')]
 
 # Get param to compute difference from params dictionary
 param_values = {key: value for key, value in trial_params.items() if type(value) == list}
@@ -200,7 +201,7 @@ for param in param_values.keys():
         # Source paths
         source_model_path = f"{model_name}_{surf_vol}_ico{ico}_{pick_ori}"
         labels_model_path = source_model_path + f"_{parcelation}_{labels_mode}/"
-        source_tf_path = source_model_path + f"_{bline_mode_subj}_{source_estimation}_{labels_mode}/"
+        source_tf_path = source_model_path + f"_{bline_mode_subj}_{source_estimation}_{parcelation}_{labels_mode}/"
 
         # Data paths
         epochs_save_path = paths().save_path() + f"Epochs_{meg_params['data_type']}/Band_{meg_params['band_id']}/" + run_path
@@ -243,7 +244,7 @@ for param in param_values.keys():
                 source_tf = mne.time_frequency.read_tfrs(source_tf_save_path + subj_source_data_fname, condition=0)
 
                 # Get next fixation start time and save
-                if 'fix' in run_params['epoch_id']:
+                if 'fix' in run_params['epoch_id'] or 'sac' in run_params['epoch_id']:
                     epochs = mne.read_epochs(epochs_save_path + epochs_data_fname)
 
                 # Append data for GA
@@ -348,20 +349,19 @@ for param in param_values.keys():
                     # Extract region labels data
                     region_labels = [element for region in meg_params['regions_id'].split('_') for element in aparc_region_labels[region]]
 
+                    # Get labels for FreeSurfer cortical parcellation or segmentation
+                    used_labels = functions_analysis.get_labels(subject_code=subject_code, parcelation=parcelation, subjects_dir=subjects_dir, surf_vol=surf_vol)
+
                     if surf_vol == 'volume':
                         labels_path = subjects_dir + f'/{subject_code}/mri/{parcelation}+aseg.mgz'
-                        labels = mne.get_volume_labels_from_aseg(labels_path, return_colors=False)
-                        used_labels = [label for label in labels for label_id in region_labels if label_id in label]
+                        if parcelation == 'aparc':
+                            used_labels = [label for label in used_labels for label_id in region_labels if label_id in label]
                         used_labels = [labels_path, used_labels]
 
-                    elif subject_code != 'fsaverage':
-                        # Get labels for FreeSurfer cortical parcellation
-                        labels = mne.read_labels_from_annot(subject=subject_code, parc=parcelation, subjects_dir=subjects_dir)
-                        used_labels = [label for label in labels for label_id in region_labels if label.name.startswith(label_id + '-')]
-
                     else:
-                        labels = fsaverage_labels
-                        used_labels = [label for label in labels for label_id in region_labels if label.name.startswith(label_id + '-')]
+                        if parcelation == 'aparc':
+                            # Filter labels by region
+                            used_labels = [label for label in used_labels for label_id in region_labels if label.name.startswith(label_id + '-')]
 
                     # Average the source estimates within each label using sign-flips to reduce signal cancellations
                     label_ts = mne.extract_label_time_course(stcs=stc_epochs, labels=used_labels, src=src, mode=labels_mode, return_generator=False)
@@ -408,6 +408,7 @@ for param in param_values.keys():
                 epochs.metadata['total_duration'] = epochs.metadata['duration'] + epochs.metadata['next_sac_dur']
                 fixations_duration[param][param_value].append(epochs.metadata['total_duration'])
             elif 'sac' in run_params['epoch_id']:
+                epochs.metadata['prev_fix_dur'] = subject.fixations['next_sac'].apply(lambda x: subject.saccades.loc[int(x), 'duration'] if pd.notna(x) else 0)
                 epochs.metadata['total_duration'] = epochs.metadata['duration']
                 fixations_duration[param][param_value].append(epochs.metadata['total_duration'])
 
