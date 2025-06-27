@@ -31,16 +31,16 @@ else:
     plt.ioff()
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
-trial_params = {'epoch_id': 'tgt_fix_vs_sub',
+trial_params = {'epoch_id': ['tgt_fix_vs_sub', 'it_fix_vs_sub'],  # 'tgt_fix_vs_sub' / 'tgt_fix_vs_sac' / 'sub_vs_sac' / 'tgt_fix_vs_sub_sac'
                 'corrans': True,
                 'tgtpres': True,
-                'mss': [1, 4],
+                'mss': None,
                 'reject': None,
                 'evtdur': None,
                 }
 run_comparison = True
 
-meg_params = {'band_id': 'Beta',  # Frequency band (filter sensor space)
+meg_params = {'band_id': 'Alpha',  # Frequency band (filter sensor space)
               'filter_sensors': True,  # connectivity computation method includes filtering in desired frequency range (Not envelope correlation method)
               'filter_method': 'iir',  # Only for envelope connectivity
               'data_type': 'ICA'
@@ -59,7 +59,7 @@ pick_ori = None  # 'vector' For dipoles, 'max_power' for
 if surf_vol == 'volume':
     parcelation_segmentation = 'aseg'  # aseg / aparc+aseg / aparc.a2009s+aseg
 elif surf_vol == 'surface':
-    parcelation_segmentation = 'aparc'  # aparc / aparc.a2009s
+    parcelation_segmentation = 'aparc.a2009s'  # aparc / aparc.a2009s
 
 multiple_comparisons = True
 
@@ -70,12 +70,14 @@ if surf_vol == 'volume':
     labels_mode = 'mean'
 elif surf_vol == 'surface':
     labels_mode = 'pca_flip'
+
+# Envelope or PLI
 envelope_connectivity = True
-downsample_ts = False
+downsample_ts = True
 if envelope_connectivity:
     connectivity_method = 'corr'
     orthogonalization = 'pair'  # 'pair' for pairwise leakage correction / 'sym' for symmetric leakage correction
-    desired_sfreq = 10
+    desired_sfreq = 120
 else:
     connectivity_method = 'pli'
 standarize_con = True
@@ -115,6 +117,7 @@ else:
 subj_matrices = {}
 subj_matrices_no_std = {}
 ga_matrices = {}
+mean_global_con = {}
 
 # Get param to compute difference from params dictionary
 param_values = {key: value for key, value in trial_params.items() if type(value) == list}
@@ -124,6 +127,7 @@ if param_values == {}:
 
 # --------- Run ---------#
 for param in param_values.keys():
+    mean_global_con[param] = {}
     subj_matrices[param] = {}
     subj_matrices_no_std[param] = {}
     ga_matrices[param] = {}
@@ -209,6 +213,7 @@ for param in param_values.keys():
         subj_matrices[param][param_value] = []
         subj_matrices_no_std[param][param_value] = []
         ga_matrices[param][param_value] = []
+        mean_global_con[param][param_value] = {'lh': [], 'rh': [], 'global': []}
 
         # Get parcelation labels and set up connectivity matrix
         if surf_vol == 'surface':  # or surf_vol == 'mixed':
@@ -216,10 +221,10 @@ for param in param_values.keys():
             # Get labels for FreeSurfer 'aparc' cortical parcellation with 34 labels/hemi
             fsaverage_labels = mne.read_labels_from_annot(subject='fsaverage', parc=parcelation_segmentation, subjects_dir=subjects_dir)
             # Remove 'unknown' label for fsaverage aparc labels
-            if parcelation_segmentation == 'aparc':
+            if 'aparc' in parcelation_segmentation:
                 print("Dropping extra 'unkown' label from lh.")
-                drop_idxs = [i for i, label in enumerate(fsaverage_labels) if 'unknown' in label.name]
-                for drop_idx in drop_idxs:
+                drop_idxs = [i for i, label in enumerate(fsaverage_labels) if 'unknown' in label.name.lower()]
+                for drop_idx in drop_idxs[::-1]:
                     fsaverage_labels.pop(drop_idx)
             # con_matrix = np.zeros((len(exp_info.subjects_ids), len(fsaverage_labels), len(fsaverage_labels)))
 
@@ -308,7 +313,14 @@ for param in param_values.keys():
             elif subject_code != 'fsaverage':
                 # Get labels for FreeSurfer cortical parcellation
                 labels = mne.read_labels_from_annot(subject=subject_code, parc=parcelation_segmentation, subjects_dir=subjects_dir)
+
+                print("Dropping extra 'unkown' label from lh.")
+                drop_idxs = [i for i, label in enumerate(labels) if 'unknown' in label.name.lower()]
+                for drop_idx in drop_idxs[::-1]:
+                    labels.pop(drop_idx)
+
                 label_names_segmentation = None
+
             else:
                 labels = fsaverage_labels
                 label_names_segmentation = None
@@ -326,6 +338,7 @@ for param in param_values.keys():
                         sfreq = meg_data.info['sfreq']
                     except:
                         meg_data = load.meg(subject=subject, meg_params=meg_params)
+                        sfreq = meg_data.info['sfreq']
                 else:
                     # Load epochs data
                     if os.path.isfile(epochs_save_path + epochs_data_fname):
@@ -348,11 +361,14 @@ for param in param_values.keys():
                         epochs, events = functions_analysis.epoch_data(subject=subject, mss=run_params['mss'], corr_ans=run_params['corrans'], tgt_pres=run_params['tgtpres'],
                                                                        epoch_id=run_params['epoch_id'], meg_data=meg_data, trial_dur=trialdur,
                                                                        tmin=tmin, tmax=tmax, baseline=baseline, reject=run_params['reject'],
-                                                                       save_data=False, epochs_save_path=epochs_save_path,
+                                                                       save_data=save_data, epochs_save_path=epochs_save_path,
                                                                        epochs_data_fname=epochs_data_fname)
 
                     # Pick meg channels for source modeling
                     epochs.pick('meg')
+
+                    # Extract sfreq
+                    sfreq = epochs.info['sfreq']
 
                     # --------- Source estimation ---------#
                     # Load filter
@@ -378,7 +394,6 @@ for param in param_values.keys():
                 if envelope_connectivity:
                     if downsample_ts:
                         for i, ts in enumerate(label_ts):
-                            sfreq = meg_data.info['sfreq']
                             samples_interval = int(sfreq/desired_sfreq)
                             # Taking jumping windows average of samples
                             label_ts[i] = np.array([np.mean(ts[:, j*samples_interval:(j+1)*samples_interval], axis=-1) for j in range(int(len(ts[0])/samples_interval) + 1)]).T
@@ -399,7 +414,7 @@ for param in param_values.keys():
                     con_subj = con_subj.combine()
 
                 else:
-                    con_subj = mne_connectivity.spectral_connectivity_epochs(label_ts, method=connectivity_method, mode='multitaper', sfreq=meg_data.info['sfreq'],
+                    con_subj = mne_connectivity.spectral_connectivity_epochs(label_ts, method=connectivity_method, mode='multitaper', sfreq=sfreq,
                                                                         fmin=fmin, fmax=fmax, tmin=con_tmin, tmax=con_tmax, faverage=True, mt_adaptive=True)
                 # Save
                 if save_data:
@@ -412,6 +427,19 @@ for param in param_values.keys():
 
             # Save for comparisons
             con_matrix_no_std.append(con_subj_data)
+
+            # Identify left and right hemisphere indices
+            lh_indices = [i for i, label in enumerate(fsaverage_labels) if label.hemi == 'lh']
+            rh_indices = [i for i, label in enumerate(fsaverage_labels) if label.hemi == 'rh']
+
+            # Compute mean connectivity within each hemisphere (excluding diagonal)
+            lh_matrix = con_subj_data[np.ix_(lh_indices, lh_indices)]
+            rh_matrix = con_subj_data[np.ix_(rh_indices, rh_indices)]
+
+            # Append subjects global connectivity
+            mean_global_con[param][param_value]['global'].append(con_subj_data.mean())
+            mean_global_con[param][param_value]['lh'].append(lh_matrix.mean())
+            mean_global_con[param][param_value]['rh'].append(rh_matrix.mean())
 
             # Standarize
             if standarize_con:
@@ -463,11 +491,16 @@ for param in param_values.keys():
                                            labels_fname=labels_fname, label_names_segmentation=label_names_segmentation,
                                            subjects_dir=subjects_dir, save_fig=save_fig, fig_path=fig_path, fname='GA_strength')
 
+        # Plot global connectivity
+        data_dict = {
+            param_value: {'lh': mean_global_con[param][param_value]['lh'], 'rh': mean_global_con[param][param_value]['rh'],
+                            'global': mean_global_con[param][param_value]['global']}}
+        plot_general.global_connectivity(data_dict=data_dict, categories=[param_value], save_fig=save_fig, fig_path=fig_path)
+
         # Get connectivity matrices for comparisson
         subj_matrices[param][param_value] = np.array(con_matrix)
         subj_matrices_no_std[param][param_value] = np.array(con_matrix_no_std)
         ga_matrices[param][param_value] = ga_sorted_matrix
-
 
 # ----- Difference between conditions ----- #
 # Take difference of conditions if applies
@@ -554,8 +587,18 @@ for param in param_values.keys():
 
             #----- Difference -----#
             con_diff = []
+            mean_global_con_diff = {'lh': [], 'rh': [], 'global': []}  # Global mean connectivity difference
             # Compute difference
             for i in range(len(subj_matrices_no_std[param][comparison[0]])):
+                # Global mean connectivity difference
+                mean_global_con_diff['global'].append((mean_global_con[param][comparison[0]]['global'][i] - mean_global_con[param][comparison[1]]['global'][i]) /
+                                            (mean_global_con[param][comparison[0]]['global'][i] + mean_global_con[param][comparison[1]]['global'][i]))
+                mean_global_con_diff['lh'].append((mean_global_con[param][comparison[0]]['lh'][i] - mean_global_con[param][comparison[1]]['lh'][i]) /
+                                                      (mean_global_con[param][comparison[0]]['lh'][i] + mean_global_con[param][comparison[1]]['lh'][i]))
+                mean_global_con_diff['rh'].append((mean_global_con[param][comparison[0]]['rh'][i] - mean_global_con[param][comparison[1]]['rh'][i]) /
+                                                      (mean_global_con[param][comparison[0]]['rh'][i] + mean_global_con[param][comparison[1]]['rh'][i]))
+
+                # Matrix differences
                 subj_dif = subj_matrices_no_std[param][comparison[0]][i] - subj_matrices_no_std[param][comparison[1]][i]
                 if standarize_con:
                     subj_dif = (subj_dif - np.mean(subj_dif)) / np.std(subj_dif)
@@ -586,3 +629,12 @@ for param in param_values.keys():
             plot_general.connectivity_strength(subject='GA', subject_code='fsaverage', con=con_diff_ga, src=src, labels=fsaverage_labels, surf_vol=surf_vol,
                                                labels_fname=labels_fname, label_names_segmentation=label_names_segmentation,
                                                subjects_dir=subjects_dir, save_fig=save_fig, fig_path=fig_path_diff, fname='GA_strength_dif')
+
+            # Boxplot of mean global connectivity and their difference
+            data_dict = {
+                comparison[0]: {'lh': mean_global_con[param][comparison[0]]['lh'], 'rh': mean_global_con[param][comparison[0]]['rh'], 'global': mean_global_con[param][comparison[0]]['global']},
+                comparison[1]: {'lh': mean_global_con[param][comparison[1]]['lh'], 'rh': mean_global_con[param][comparison[1]]['rh'], 'global': mean_global_con[param][comparison[1]]['global']},
+                'diff': {'lh': mean_global_con_diff['lh'], 'rh': mean_global_con_diff['rh'], 'global': mean_global_con_diff['global']}
+            }
+            categories = [key for key in data_dict.keys()]
+            plot_general.global_connectivity(data_dict=data_dict, categories=categories, save_fig=save_fig, fig_path=fig_path_diff)
