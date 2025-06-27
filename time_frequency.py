@@ -33,29 +33,29 @@ else:
 use_ica_data = True
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
-trial_params = {'epoch_id': 'cross2',
+trial_params = {'epoch_id': 'tgt_fix_ms',  # 'it_sac_ms+tgt_sac_ms', 'it_sac_vs+tgt_sac_vs', 'it_sac_vs', 'tgt_fix_vs', 'sac_emap', 'hl_start'
                 'corrans': [True, False],
                 'tgtpres': None,
-                'mss': 4,
+                'mss': None,
                 'reject': None,
                 'evtdur': None,
                 'rel_sac': None
                 }
-run_comparison = False
+run_comparison = True
 
 # Select channels
-chs_ids = ['parietal', 'occipital']  # region_hemisphere
+chs_ids = ['parietal', 'occipital', 'parietal_occipital']  # region_hemisphere
 
 # Power time frequency params
 l_freq = 1
 h_freq = 40
-run_itc = False
+run_itc = True
 plot_edge = 0.15
 
 # Plots parameters
 # Colorbar
-vmax_power = 0.2
-vmin_power = -0.2
+vmax_power = None
+vmin_power = None
 vmin_itc, vmax_itc = None, None
 # plot_joint max and min topoplots
 plot_max, plot_min = True, True
@@ -67,9 +67,6 @@ overlay_broadband_power = False
 # mean: subtracting the mean of baseline values
 bline_mode = 'logratio'
 ga_plot_bline_mode = 'mean'
-
-# Topoplot bands
-topo_bands = ['Alpha', 'Alpha', 'Theta', 'Alpha']
 
 # Time Frequency config
 tf_method = 'morlet'  # 'morlet' or 'multitaper'
@@ -151,7 +148,7 @@ for param in param_values.keys():
 
         # Define time-frequency bands to plot in plot_joint
         timefreqs_joint, timefreqs_tfr, vlines_times = functions_general.get_plots_timefreqs(epoch_id=run_params['epoch_id'], mss=run_params['mss'], cross2_dur=cross2_dur,
-                                                                                             mss_duration=mss_duration, topo_bands=topo_bands, plot_xlim=plot_xlim,
+                                                                                             mss_duration=mss_duration, plot_xlim=plot_xlim,
                                                                                              plot_min=plot_min, plot_max=plot_max)
 
         # Get baseline duration for epoch_id
@@ -184,6 +181,8 @@ for param in param_values.keys():
 
         # Grand average data variable
         grand_avg_power_fname = f'Grand_Average_power_{l_freq}_{h_freq}_tfr.h5'
+        if output == 'phase':
+            grand_avg_power_fname = grand_avg_power_fname.replace('power', 'phase')
         grand_avg_itc_fname = f'Grand_Average_itc_{l_freq}_{h_freq}_tfr.h5'
 
         #------------ Run -------------#
@@ -253,6 +252,8 @@ for param in param_values.keys():
 
                 # Data filenames
                 power_data_fname = f'Power_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
+                if output == 'phase':
+                    power_data_fname = power_data_fname.replace('Power', 'Phase')
                 itc_data_fname = f'ITC_{subject.subject_id}_{l_freq}_{h_freq}_tfr.h5'
                 epochs_data_fname = f'Subject_{subject.subject_id}_epo.fif'
                 # Subject plots path
@@ -388,14 +389,14 @@ for param in param_values.keys():
         for chs_id in chs_ids:
             if run_itc:
                 ga_permutations_list = [grand_avg_power, grand_avg_itc]
-                titles_list = ['Power', 'ITC']
+                titles_list = [output, 'ITC']
                 if run_permutations_ga:
                     subj_permutations_list = [power_data[param][param_value], itc_data[param][param_value]]
                 else:
                     subj_permutations_list = [None] * len(titles_list)
             else:
                 ga_permutations_list = [grand_avg_power]
-                titles_list = ['Power']
+                titles_list = [output]
                 if run_permutations_ga:
                     subj_permutations_list = [power_data[param][param_value]]
                 else:
@@ -511,14 +512,14 @@ for param in param_values.keys():
             for chs_id in chs_ids:
                 if run_itc:
                     ga_permutations_list = [grand_avg_power_dif, grand_avg_itc_dif]
-                    titles_list = ['Power', 'ITC']
+                    titles_list = [output, 'ITC']
                     if run_permutations_dif:
                         subj_permutations_list = [power_data_dif, itc_data_dif]
                     else:
                         subj_permutations_list = [None, None]
                 else:
                     ga_permutations_list = [grand_avg_power_dif]
-                    titles_list = ['Power']
+                    titles_list = [output]
                     if run_permutations_dif:
                         subj_permutations_list = [power_data_dif]
                     else:
