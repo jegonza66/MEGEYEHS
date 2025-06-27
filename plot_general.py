@@ -238,7 +238,7 @@ def fig_tf_bands(fontsize=None, ticksize=None):
 
 
 def tfr_bands(tfr, chs_id, plot_xlim=(None, None), baseline=None, bline_mode=None, dB=False, vmin=None, vmax=None, subject=None, title=None, vlines_times=[0],
-              topo_times=None, display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None, cmap='coolwarm'):
+              topo_times=None, display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None, cmap='bwr'):
 
     # Sanity check
     if save_fig and (not fname or not fig_path):
@@ -339,7 +339,7 @@ def fig_tf_times(time_len, figsize=(18, 5), ax_len_div=12, timefreqs_tfr=None, f
 
 
 def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=None, bline_mode=None, dB=False, vmin=None, vmax=None,
-              topo_vmin=None, topo_vmax=None, title=None, vlines_times=None, cmap='coolwarm', display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None):
+              topo_vmin=None, topo_vmax=None, title=None, vlines_times=None, cmap='bwr', display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None):
 
     # Sanity check
     if save_fig and (not fname or not fig_path):
@@ -473,7 +473,7 @@ def tfr_times(tfr, chs_id, timefreqs_tfr=None, plot_xlim=(None, None), baseline=
     return fig, ax_tf
 
 
-def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, plot_max=True, plot_min=True, vlines_times=None, cmap='coolwarm',
+def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, None), timefreqs=None, plot_max=True, plot_min=True, vlines_times=None, cmap='bwr',
                   vmin=None, vmax=None, display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fname or not trf_fig_path):
@@ -523,7 +523,7 @@ def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, Non
 
 
 def tfr_plotjoint_picks(tfr, plot_baseline=(None, 0), bline_mode=None, plot_xlim=(None, None), timefreqs=None, image_args=None, clusters_mask=None,
-                        plot_max=True, plot_min=True, vmin=None, vmax=None, chs_id='mag', vlines_times=None, cmap='coolwarm',
+                        plot_max=True, plot_min=True, vmin=None, vmax=None, chs_id='mag', vlines_times=None, cmap='bwr',
                         display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fname or not trf_fig_path):
@@ -721,7 +721,7 @@ def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, n_
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='connectome', connections_num=150,
+def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='connectome', connections_num=100,
                template='MNI152NLin2009cAsym', template_style='glass', template_alpha=10, node_alpha=0.5, node_scale=30, node_color='black',
                edge_alpha=0.7, edge_colorvminvmax='absmax', edge_thresholddirection='above', edge_cmap='coolwarm', edge_widthscale=2, view='preset-3'):
 
@@ -942,8 +942,45 @@ def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, lab
         brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
 
 
-def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsaverage, source_estimation, save_fig, fig_path, fname, surface='pial', hemi='split', views='lateral',
-            alpha=0.75, mask_negatives=False, time_label='auto', save_vid=True, positive_cbar=None, clim=None):
+def global_connectivity(data_dict, categories, save_fig, fig_path, hemispheres=['lh', 'rh', 'global']):
+    import seaborn as sns
+    from statannotations.Annotator import Annotator
+    from scipy.stats import wilcoxon
+
+    # Prepare data for seaborn
+    records = []
+    data_means = []
+    for cat in categories:
+        for hemi in hemispheres:
+            mean_val = np.mean(data_dict[cat][hemi])
+            data_means.append(f"{hemi}: {mean_val:.2f}")
+            for val in data_dict[cat][hemi]:
+                records.append({'Category': cat, 'Hemisphere': hemi, 'Connectivity': val})
+    df = pd.DataFrame(records)
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.boxplot(x='Category', y='Connectivity', hue='Hemisphere', data=df, ax=ax)
+    ax.set_title(f"Mean Global Connectivity - {' | '.join(data_means)}")
+
+    # Automated statistical annotation for paired Wilcoxon between hemispheres for each category
+    pairs = []
+    for cat in categories:
+        if len(hemispheres) >= 2:
+            pairs.append(((cat, hemispheres[0]), (cat, hemispheres[1])))
+    if pairs:
+        annotator = Annotator(ax, pairs, data=df, x='Category', y='Connectivity', hue='Hemisphere',
+                              order=categories, hue_order=hemispheres)
+        annotator.configure(test='Wilcoxon', text_format='star', loc='inside', verbose=0, comparisons_correction=None)
+        annotator.apply_and_annotate()
+
+    plt.tight_layout()
+
+    if save_fig:
+        save.fig(fig=fig, path=fig_path, fname='GA_mean_global_con_boxplot')
+
+
+def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsaverage, source_estimation, save_fig, fig_path, fname, pick_ori=None,
+            surface='pial', hemi='split', views='lateral', alpha=0.75, mask_negatives=False, time_label='auto', save_vid=True, positive_cbar=None, clim=None):
 
     # Close all plot figures
     try:
@@ -982,15 +1019,21 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
 
     # Define clim
     if not clim:
-
-        clim = {'kind': 'values', 'lims': ((abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) / 1.5,
-                                           (abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) / 1.25,
-                                           (abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) * 1.1)}
-        print(clim)
-        # Replace positive cbar for positive / negative
-        if positive_cbar == False or (stc.data[:, initial_time_idx].mean() - stc.data[:, initial_time_idx].std() <= 0 and positive_cbar != True):
-            clim['pos_lims'] = clim.pop('lims')
-
+        if pick_ori == 'vector':
+            clim = {'kind': 'values', 'lims': ((abs(stc.data[:, :, initial_time_idx]).max() - abs(stc.data[:, :, initial_time_idx]).min()) / 1.5,
+                                               (abs(stc.data[:, :, initial_time_idx]).max() - abs(stc.data[:, :, initial_time_idx]).min()) / 1.25,
+                                               (abs(stc.data[:, :, initial_time_idx]).max() - abs(stc.data[:, :, initial_time_idx]).min()) * 1.1)}
+            # # Replace positive cbar for positive / negative
+            # if positive_cbar == False or (stc.data[:, :, initial_time_idx].mean() - stc.data[:, :, initial_time_idx].std() <= 0 and positive_cbar != True):
+            #     clim['pos_lims'] = clim.pop('lims')
+        else:
+            print(pick_ori)
+            clim = {'kind': 'values', 'lims': ((abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) / 1.5,
+                                               (abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) / 1.25,
+                                               (abs(stc.data[:, initial_time_idx]).max() - abs(stc.data[:, initial_time_idx]).min()) * 1.1)}
+            # Replace positive cbar for positive / negative
+            if positive_cbar == False or (stc.data[:, initial_time_idx].mean() - stc.data[:, initial_time_idx].std() <= 0 and positive_cbar != True):
+                clim['pos_lims'] = clim.pop('lims')
 
     if surf_vol == 'volume':
 
@@ -1057,7 +1100,7 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
     return brain
 
 
-def source_tf(tf, clusters_mask_plot=None, p_threshold=0.05, vlim=(None, None), cmap='coolwarm', hist_data=None, display_figs=False, save_fig=True, fig_path=None, fname=None, title=None):
+def source_tf(tf, clusters_mask_plot=None, p_threshold=0.05, vlim=(None, None), cmap='bwr', hist_data=None, display_figs=False, save_fig=True, fig_path=None, fname=None, title=None):
 
     # Sanity check
     if save_fig and (not fig_path):
