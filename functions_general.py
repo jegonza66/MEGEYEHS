@@ -448,8 +448,8 @@ def get_time_lims(epoch_id, mss=None, plot_edge=0.1, map=None):
                        vsend={'tmin': -2, 'tmax': cross1_dur + 1, 'plot_xlim': [-2 + plot_edge, cross1_dur + 1 - plot_edge]},
                        sac={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': [-0.3 + plot_edge, 0.6 - plot_edge]},
                        fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': [-0.3 + plot_edge, 0.6 - plot_edge]},
-                       blue={'tmin': -0.3, 'tmax': 1, 'plot_xlim': [-0.3 + plot_edge, 1 - plot_edge]},
-                       red={'tmin': -0.3, 'tmax': 1, 'plot_xlim': [-0.3 + plot_edge, 1 - plot_edge]})
+                       blue={'tmin': -0.1, 'tmax': 1.5, 'plot_xlim': [-0.1 + plot_edge, 1.5 - plot_edge]},
+                       red={'tmin': -0.1, 'tmax': 1.5, 'plot_xlim': [-0.1 + plot_edge, 1.5 - plot_edge]})
 
             if 'fix' in epoch_id:
                 tmin = map['fix']['tmin']
@@ -777,3 +777,31 @@ def butter_highpass_filter(data, l_freq, sfreq=1200, order=3):
     b, a = butter(N=order, Wn=l_freq, fs=sfreq, btype='high')
     y = lfilter(b, a, data)
     return y
+
+
+def read_region_labels_csv(csv_path, parcellation='aparc.a2009s'):
+    """
+    Read region labels CSV and return dictionary with macro regions as keys
+    and lists of brain regions as values.
+
+    :param csv_path: Path to CSV file with columns 'Long name' and 'Region'
+    :param parcellation: Parcellation name to use as key in returned dict
+    :return: Dictionary with format {parcellation: {macro_region: [regions]}}
+    """
+
+    region_labels = {}
+    df = pd.read_csv(csv_path)
+
+    # Group regions by macro region
+    for _, row in df.iterrows():
+        macro_region = row['Region'].lower()
+        brain_region = row['Short name'].lower()
+
+        # Initialize list if macro region doesn't exist
+        if macro_region not in region_labels:
+            region_labels[macro_region] = []
+
+        # Add brain region to the appropriate macro region list
+        region_labels[macro_region].append(brain_region)
+
+    return region_labels
