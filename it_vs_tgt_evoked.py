@@ -265,8 +265,8 @@ if save_fig:
     save.fig(fig=fig_both, path=fig_path, fname=fname + '_both')
 
 # Plot topographies
-topo_times = [0.1, 0.3]
-topo_times_span = [0.005, 0.1]
+topo_times = [0.3]
+topo_times_span = [0.1]
 grand_average = mne.grand_average(ga_dict[epoch_ids[1]], interpolate_bads=True)
 
 # Mascara en temporales
@@ -278,9 +278,8 @@ for ch in picks:
     except:
         pass
 mask = mask.astype(bool)
-mask_params = dict(markersize=10, markerfacecolor="gray", alpha=0.65)
-fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='coolwarm', show=display_figs, vlim=(-60, 60),
-                                      mask=mask, mask_params=mask_params)
+# mask_params = dict(markersize=10, markerfacecolor="gray", alpha=0.65)
+fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='bwr', show=display_figs, vlim=(-60, 60))
 
 if save_fig:
     fig_path = paths().plots_path() + f'Evoked_{data_type}/it_vs_tgt/'
