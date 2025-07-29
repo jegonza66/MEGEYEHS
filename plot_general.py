@@ -644,8 +644,8 @@ def mri_meg_alignment(subject, subject_code, dig, subjects_dir=os.path.join(path
                                      coord_frame='meg', mri_fiducials=fids_path)
 
 
-def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, n_lines=100, connectivity_method='pli', subject_code=None, display_figs=False, save_fig=False,
-                        fig_path=None, fname=None, fontsize=None, ticksize=None):
+def connectivity_circle(subject, labels, con, surf_vol, region_labels=None, parcellation='aparc.a2009s', vmin=None, vmax=None, n_lines=150, connectivity_method='pli',
+                        colormap=None, subject_code=None, display_figs=False, save_fig=False, fig_path=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fig_path):
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
@@ -661,21 +661,49 @@ def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, n_
     # Get parcelation labels positions
     label_names = [label.name for label in labels]
 
-    # Get colors for each label
-    label_colors = [label.color for label in labels]
+    # Define brain regions and their colors
+    region_colors = {
+        'frontal': '#FFFF00',  # Yellow
+        'sensory/motor': '#9B59B6',  # Purple
+        'temporal': '#45B7D1',  # Blue
+        'parietal': '#00FF00',  # Green
+        'occipital': '#FF6B6B',  # Red
+        'unknown': '#808080'  # Grey
+    }
+
+    # Function to classify labels into brain regions
+    def classify_region(label_name):
+        if region_labels and parcellation in region_labels:
+            label_lower = label_name.lower()
+            for region, region_terms in region_labels[parcellation].items():
+                if any(term in label_lower for term in region_terms):
+                    return region
+        return 'unknown'
+
+    # Assign colors based on brain regions
+    label_colors = []
+    for label_name in label_names:
+        region = classify_region(label_name)
+        label_colors.append(region_colors[region])
 
     # Reorder the labels based on their location in the left hemi
     lh_labels = [name for name in label_names if ('lh' in name or 'Left' in name)]
 
-    # Get the y-location of the label
-    label_ypos = list()
-    for name in lh_labels:
-        idx = label_names.index(name)
-        ypos = np.mean(labels[idx].pos[:, 1])
-        label_ypos.append(ypos)
+    # Define the desired order of macro regions
+    region_order = list(region_colors.keys())
 
-    # Reorder the labels based on their location
-    lh_labels = [label for (yp, label) in sorted(zip(label_ypos, lh_labels))]
+    # Get the macro region for each label and assign order values
+    label_region_order = []
+    for name in lh_labels:
+        region = classify_region(name)
+        try:
+            order_value = region_order.index(region)
+        except ValueError:
+            order_value = len(region_order)  # Put unknown regions at the end
+        label_region_order.append(order_value)
+
+    # Reorder the labels based on their macro region
+    lh_labels = [label for (order, label) in sorted(zip(label_region_order, lh_labels))]
 
     # For the right hemi
     rh_labels = [label.replace('-lh', '-rh') for label in lh_labels]
@@ -685,31 +713,46 @@ def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, n_
     # include first volume nodes that are in neither hemisphere
     if surf_vol == 'volume':
         node_order.extend([label for label in label_names if label not in lh_labels and label not in rh_labels])
-    node_order.extend(lh_labels[::-1])  # reverse the order
-    node_order.extend(rh_labels)
+    node_order.extend(lh_labels)
+    node_order.extend(rh_labels[::-1])  # reverse the order for right hemisphere
 
     node_angles = mne.viz.circular_layout(label_names, node_order, start_pos=90, group_boundaries=[0, len(label_names) / 2])
 
-    # Plot the graph using node colors from the FreeSurfer parcellation
-    fig, ax = plt.subplots(figsize=(8, 8), facecolor='black', subplot_kw=dict(polar=True))
+    # Plot the graph using node colors from brain regions
+    fig, ax = plt.subplots(figsize=(10, 8), facecolor='black', subplot_kw=dict(polar=True))
 
-    # Plot
+    # Find vmin and vmax values
+    edge_threshold = sorted(np.sort(np.abs(con), axis=None))[-int(n_lines * 2) - 1]
+    retained_edges = con[np.abs(con) > edge_threshold]
+
+    # Plot without labels
     if not vmin:
-        sorted_con = con.flatten()
-        sorted_con.sort()
-        if isinstance(n_lines, int):
-            vmin = sorted_con[-n_lines]
-        elif isinstance(n_lines, float):
-            vmin = sorted_con[-int(n_lines * len(label_names))]
+        vmin = np.min(retained_edges)
 
     if not vmax:
-        sorted_con = con.flatten()
-        sorted_con.sort()
-        vmax = sorted_con[-1]
-    mne_connectivity.viz.plot_connectivity_circle(con, label_names, n_lines=n_lines, vmin=vmin, vmax=vmax,
+        vmax = np.max(retained_edges)
+
+    if not colormap:
+        if vmin < 0:
+            colormap = 'coolwarm'
+        else:
+            colormap = 'Reds'
+
+    mne_connectivity.viz.plot_connectivity_circle(con, label_names, n_lines=n_lines,
                                                   node_angles=node_angles, node_colors=label_colors,
                                                   title=f'All-to-All Connectivity ({connectivity_method})', ax=ax,
-                                                  show=display_figs)
+                                                  colorbar_size=0.4, colormap=colormap, fontsize_colorbar=30,
+                                                  show=display_figs, fontsize_names=0)  # Set fontsize_names=0 to hide labels
+
+    # Add legend for brain regions - only show regions that are present
+    present_regions = set(classify_region(name) for name in label_names)
+    from matplotlib.patches import Patch
+    sorted_present_regions = [region for region in region_colors.keys() if region in present_regions]
+
+    legend_elements = [Patch(facecolor=region_colors[region], label=region.capitalize())
+                       for region in sorted_present_regions]
+    ax.legend(handles=legend_elements, loc='upper left', bbox_to_anchor=(1.1, 1), fontsize=14)
+
     fig.tight_layout()
 
     # Save
@@ -721,9 +764,9 @@ def connectivity_circle(subject, labels, con, surf_vol, vmin=None, vmax=None, n_
         save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='connectome', connections_num=100,
-               template='MNI152NLin2009cAsym', template_style='glass', template_alpha=10, node_alpha=0.5, node_scale=30, node_color='black',
-               edge_alpha=0.7, edge_colorvminvmax='absmax', edge_thresholddirection='above', edge_cmap='coolwarm', edge_widthscale=2, view='preset-3'):
+def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, fig_path=None, fname='connectome', connections_num=150,
+               template='MNI152NLin2009cAsym', template_style='glass', template_alpha=10, node_alpha=0.4, node_scale=20, node_color='black', vmin=None, vmax=None,
+               edge_alpha=0.7, edge_colorvminvmax='minmax', edge_thresholddirection='absabove', edge_cmap=None, edge_widthscale=2, view='preset-3'):
 
     # Sanity check
     if save_fig and (not fig_path):
@@ -769,21 +812,21 @@ def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, 
                 retained_edges = adjacency_matrix[adjacency_matrix < edge_threshold]
 
         # Determine vmin and vmax from retained edges
-        # Option 1: Signed values (for diverging colormap)
-        if edge_colorvminvmax == 'absmax':
-            vmax = np.max(abs(retained_edges))
-            vmin = - vmax
-        elif edge_colorvminvmax == 'minmax':
-            vmin = np.min(retained_edges)
-            vmax = np.max(retained_edges)
-        else:
-            raise NameError(f"edge_colorvminvmax should be either 'absmax' or 'minmax'")
+        if not vmax or not vmin:
+            if edge_colorvminvmax == 'absmax':
+                vmax = np.max(abs(retained_edges))
+                vmin = - vmax
+            elif edge_colorvminvmax == 'minmax':
+                vmin = np.min(retained_edges)
+                vmax = np.max(retained_edges)
+            else:
+                raise NameError(f"edge_colorvminvmax should be either 'absmax' or 'minmax'")
 
         if edge_cmap is None:
             if vmin < 0:
                 edge_cmap = 'coolwarm'
             else:
-                edge_cmap = 'YlOrRd'
+                edge_cmap = 'Reds'
 
         # Corresponding node labels
         nodes = [i for i in range(len(adjacency_matrix))]
@@ -816,7 +859,7 @@ def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, 
             edge_threshold=edge_threshold,
             edge_color=weights_col_name,
             edge_cmap=edge_cmap,
-            edge_colorvminvmax=[vmin, vmax],
+            # edge_colorvminvmax=[vmin, vmax],
             edge_widthscale=edge_widthscale,
             view=view
         )
@@ -877,17 +920,18 @@ def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, n_ticks=5, 
     # im = plt.imshow(sorted_matrix, vmin=vmin, vmax=vmax)
     fig.colorbar(im)
 
-    ax = plt.gca()
-    left_ticks = np.linspace(0, (n_ticks -1) * len(sorted_labels)/2/n_ticks, n_ticks, dtype=int)
-    right_ticks = left_ticks + int(len(sorted_labels)/2)
-    tick_positions = np.concatenate([left_ticks, right_ticks])
-    tick_labels = sorted_labels[tick_positions]  # Subset of labels
+    if n_ticks:
+        ax = plt.gca()
+        left_ticks = np.linspace(0, (n_ticks -1) * len(sorted_labels)/2/n_ticks, n_ticks, dtype=int)
+        right_ticks = left_ticks + int(len(sorted_labels)/2)
+        tick_positions = np.concatenate([left_ticks, right_ticks])
+        tick_labels = sorted_labels[tick_positions]  # Subset of labels
 
-    ax.set_yticks(tick_positions)  # Set only 7 tick positions
-    ax.set_yticklabels(tick_labels)
-    ax.set_xticklabels([])
+        ax.set_yticks(tick_positions)  # Set only 7 tick positions
+        ax.set_yticklabels(tick_labels)
+        ax.set_xticklabels([])
 
-    plt.suptitle('')
+        plt.suptitle('')
 
     # Save
     if save_fig:
@@ -898,6 +942,117 @@ def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, n_ticks=5, 
         save.fig(fig=fig, path=fig_path, fname=fname)
 
     return sorted_matrix
+
+
+def plot_con_matrix(subject, labels, adjacency_matrix, region_labels=None, parcellation='aparc.a2009s',
+                    save_fig=False, fig_path=None, fname=None, n_ticks=0):
+    # Define brain regions and their colors (same as circle plot)
+    region_colors = {
+        'frontal': '#FFFF00',  # Yellow
+        'sensory/motor': '#9B59B6',  # Purple
+        'temporal': '#45B7D1',  # Blue
+        'parietal': '#00FF00',  # Green
+        'occipital': '#FF6B6B',  # Red
+        'unknown': '#808080'  # Grey
+    }
+
+    # Function to classify labels into brain regions
+    def classify_region(label_name):
+        if region_labels and parcellation in region_labels:
+            label_lower = label_name.lower()
+            for region, region_terms in region_labels[parcellation].items():
+                if any(term in label_lower for term in region_terms):
+                    return region
+        return 'unknown'
+
+    # Get label names and classify regions
+    label_names = [label.name for label in labels]
+    label_regions = [classify_region(name) for name in label_names]
+
+    # Create region order matching circle plot colors dictionary order
+    region_order = list(region_colors.keys())
+
+    # Sort indices by region order, then by hemisphere (lh first, then rh)
+    def sort_key(idx):
+        label_name = label_names[idx]
+        region = label_regions[idx]
+        region_idx = region_order.index(region) if region in region_order else len(region_order)
+        hemi_idx = 0 if 'lh' in label_name.lower() else 1
+        return (region_idx, hemi_idx, label_name)
+
+    # Get sorted indices
+    sorted_indices = sorted(range(len(labels)), key=sort_key)
+
+    # Reorder matrix and labels
+    reordered_matrix = adjacency_matrix[np.ix_(sorted_indices, sorted_indices)]
+    reordered_labels = [label_names[i] for i in sorted_indices]
+    reordered_regions = [label_regions[i] for i in sorted_indices]
+
+    # Create the plot with adjusted layout for square matrix
+    fig = plt.figure(figsize=(14, 10))
+    ax = plt.subplot2grid((1, 20), (0, 0), colspan=16)  # Matrix takes 4/5 of width
+
+    # Plot the connectivity matrix
+    norm = colors.CenteredNorm(vcenter=0)
+    im = ax.imshow(reordered_matrix, cmap='coolwarm', aspect='equal', norm=norm)  # Use 'equal' for square
+    ax.set_xlim(-0.5, len(reordered_matrix) - 0.5)
+    ax.set_ylim(len(reordered_matrix) - 0.5, -0.5)  # Invert y-axis for proper orientation
+
+    # Find region boundaries and add colored rectangles around each region
+    current_region = None
+    region_start = 0
+
+    for i, region in enumerate(reordered_regions + [None]):  # Add None to handle the last region
+        if region != current_region:
+            if current_region is not None:
+                # Draw rectangle around the previous region
+                region_end = i - 1
+                rect = plt.Rectangle((region_start - 0.5, region_start - 0.5),
+                                     region_end - region_start + 1,
+                                     region_end - region_start + 1,
+                                     fill=False, edgecolor=region_colors[current_region],
+                                     linewidth=10)
+                ax.add_patch(rect)
+
+            current_region = region
+            region_start = i
+
+    # Set ticks and labels
+    if n_ticks:
+        tick_spacing = len(reordered_labels) // n_ticks
+        tick_indices = range(0, len(reordered_labels), tick_spacing)
+        ax.set_xticks(tick_indices)
+        ax.set_yticks(tick_indices)
+        ax.set_xticklabels([reordered_labels[i] for i in tick_indices], rotation=45, ha='right')
+        ax.set_yticklabels([reordered_labels[i] for i in tick_indices])
+
+    # Add colorbar in the remaining space
+    cbar_ax = plt.subplot2grid((1, 20), (0, 17), colspan=1)
+    cbar = plt.colorbar(im, cax=cbar_ax)
+    cbar.ax.tick_params(labelsize=40)
+
+    # Set title
+    if subject == 'GA':
+        title = f'Grand Average Connectivity Matrix'
+    else:
+        title = f'Subject {subject.subject_id} Connectivity Matrix'
+    ax.set_title(title)
+
+    # # Add region legend
+    # legend_elements = [plt.Rectangle((0, 0), 1, 1, facecolor=color, edgecolor='black', label=region.title())
+    #                    for region, color in region_colors.items() if region in reordered_regions]
+    # ax.legend(handles=legend_elements, loc='center left', bbox_to_anchor=(1.15, 0.5))
+
+    plt.tight_layout()
+
+    # Save figure
+    if save_fig:
+        os.makedirs(fig_path, exist_ok=True)
+        if not fname:
+            fname = 'connectivity_matrix_reordered'
+        save.fig(fig=fig, path=fig_path, fname=fname)
+
+    return reordered_matrix
 
 
 def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, labels_fname, label_names_segmentation, subjects_dir, save_fig, fig_path, fname, threshold=1):
@@ -942,7 +1097,7 @@ def connectivity_strength(subject, subject_code, con, src, labels, surf_vol, lab
         brain.save_image(filename=fig_path + '/svg/' + fname + '.pdf')
 
 
-def global_connectivity(data_dict, categories, save_fig, fig_path, hemispheres=['lh', 'rh', 'global']):
+def global_connectivity(data_dict, categories, save_fig, fig_path, n_lines, hemispheres=['lh', 'rh', 'global'], fname=None):
     import seaborn as sns
     from statannotations.Annotator import Annotator
     from scipy.stats import wilcoxon
@@ -950,17 +1105,56 @@ def global_connectivity(data_dict, categories, save_fig, fig_path, hemispheres=[
     # Prepare data for seaborn
     records = []
     data_means = []
+    wilcoxon_results = []
+    wilcoxon_vs_zero = []
+
     for cat in categories:
         for hemi in hemispheres:
             mean_val = np.mean(data_dict[cat][hemi])
             data_means.append(f"{hemi}: {mean_val:.2f}")
+            # Test against zero for lh and rh hemispheres
+            if hemi in ['lh', 'rh']:
+                try:
+                    stat_zero, p_val_zero = wilcoxon(data_dict[cat][hemi])
+                    p_format = f"{p_val_zero:.2e}" if p_val_zero < 0.001 else f"{p_val_zero:.3f}"
+                    w_format = f"{stat_zero:.2e}" if stat_zero < 0.001 else f"{stat_zero:.1f}"
+                    wilcoxon_vs_zero.append(f"{cat}-{hemi} vs 0: W={w_format}, p={p_format}")
+                except:
+                    wilcoxon_vs_zero.append(f"{cat}-{hemi} vs 0: W=N/A, p=N/A")
+
             for val in data_dict[cat][hemi]:
                 records.append({'Category': cat, 'Hemisphere': hemi, 'Connectivity': val})
+
+    # Compute Wilcoxon statistics for each category between hemispheres
+    for cat in categories:
+        if len(hemispheres) >= 2:
+            try:
+                stat, p_val = wilcoxon(data_dict[cat][hemispheres[0]], data_dict[cat][hemispheres[1]])
+                p_format = f"{p_val:.2e}" if p_val < 0.001 else f"{p_val:.3f}"
+                w_format = f"{stat:.2e}" if stat < 0.001 else f"{stat:.1f}"
+                wilcoxon_results.append(f"{cat}: W={w_format}, p={p_format}")
+            except:
+                wilcoxon_results.append(f"{cat}: W=N/A, p=N/A")
+
     df = pd.DataFrame(records)
 
     fig, ax = plt.subplots(figsize=(8, 6))
     sns.boxplot(x='Category', y='Connectivity', hue='Hemisphere', data=df, ax=ax)
-    ax.set_title(f"Mean Global Connectivity - {' | '.join(data_means)}")
+    sns.swarmplot(x='Category', y='Connectivity', hue='Hemisphere', data=df, ax=ax, color='black',
+                  size=4, alpha=0.7, dodge=True)
+
+    # Create title with means and Wilcoxon statistics
+    title_lines = [f"Mean Global Connectivity - {' | '.join(data_means)}"]
+    if wilcoxon_results:
+        title_lines.append(' | '.join(wilcoxon_results))
+    if wilcoxon_vs_zero:
+        title_lines.append('vs Zero: ' + ' | '.join(wilcoxon_vs_zero))
+
+    ax.set_title('\n'.join(title_lines), fontsize=10)
+
+    # Remove duplicate legend (swarmplot creates its own)
+    handles, labels = ax.get_legend_handles_labels()
+    ax.legend(handles[:len(hemispheres)], labels[:len(hemispheres)])
 
     # Automated statistical annotation for paired Wilcoxon between hemispheres for each category
     pairs = []
@@ -976,7 +1170,9 @@ def global_connectivity(data_dict, categories, save_fig, fig_path, hemispheres=[
     plt.tight_layout()
 
     if save_fig:
-        save.fig(fig=fig, path=fig_path, fname='GA_mean_global_con_boxplot')
+        if not fname:
+            fname = f'GA_mean_global_con_{n_lines}'
+        save.fig(fig=fig, path=fig_path, fname=fname)
 
 
 def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsaverage, source_estimation, save_fig, fig_path, fname, pick_ori=None,
