@@ -1183,3 +1183,85 @@ def quadrant_regions(quadrants_regions, sig_regions, sig_tfr, clusters_masks, si
                                                              sig_chs_percent=sig_chs_percent, p_threshold=p_threshold, l_freq=l_freq, h_freq=h_freq, hist_data=hist_data, active_times=active_times,
                                                              display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_diff + f'{quadrant}/')
 
+
+def compute_regional_connectivity_averages(con, labels, region_labels, parcellation='aparc.a2009s',
+                                           n_connections=None, threshold_absolute=True):
+    """
+    Compute average connectivity for each brain region by averaging rows of the connectivity matrix.
+
+    Parameters:
+    -----------
+    con : numpy.ndarray
+        Connectivity matrix (n_labels x n_labels)
+    labels : list
+        List of label objects or label names
+    region_labels : dict
+        Dictionary mapping parcellation schemes to region definitions
+    parcellation : str
+        Parcellation scheme to use (default: 'aparc.a2009s')
+    n_connections : int or None
+        Number of strongest connections to keep for averaging. If None, use all connections.
+    threshold_absolute : bool
+        If True, threshold based on absolute values. If False, threshold based on positive values only.
+
+    Returns:
+    --------
+    regional_averages : dict
+        Dictionary with region names as keys and average connectivity arrays as values
+    """
+
+    # Get label names
+    if hasattr(labels[0], 'name'):
+        label_names = [label.name for label in labels]
+    else:
+        label_names = labels
+
+    # Function to classify labels into brain regions
+    def classify_region(label_name):
+        if parcellation in region_labels:
+            label_lower = label_name.lower()
+            for region, region_terms in region_labels[parcellation].items():
+                if any(term in label_lower for term in region_terms):
+                    return region
+        return 'unknown'
+
+    # Group labels by region
+    region_indices = {}
+    for i, label_name in enumerate(label_names):
+        region = classify_region(label_name)
+        if region not in region_indices:
+            region_indices[region] = []
+        region_indices[region].append(i)
+
+    # Apply threshold to connectivity matrix if specified
+    if n_connections is not None:
+        con_thresholded = con.copy()
+
+        # Get threshold value based on strongest connections
+        if threshold_absolute:
+            # Use absolute values for thresholding
+            threshold_value = np.sort(np.abs(con.flatten()))[-n_connections]
+            mask = np.abs(con) < threshold_value
+        else:
+            # Use only positive values for thresholding
+            positive_values = con[con > 0]
+            if len(positive_values) >= n_connections:
+                threshold_value = np.sort(positive_values)[-n_connections]
+                mask = con < threshold_value
+            else:
+                # If fewer positive connections than requested, keep all positive
+                mask = con <= 0
+
+        # Zero out connections below threshold
+        con_thresholded[mask] = 0
+    else:
+        con_thresholded = con
+
+    # Compute regional averages
+    regional_averages = {}
+    for region, indices in region_indices.items():
+        if len(indices) > 0:
+            # Average the rows corresponding to this region
+            regional_averages[region] = np.mean(con_thresholded[indices, :])
+
+    return regional_averages
