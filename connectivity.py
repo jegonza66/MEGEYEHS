@@ -16,9 +16,10 @@ import mne_rsa
 from scipy.stats import ttest_ind, wilcoxon
 from statsmodels.stats.multitest import fdrcorrection
 import copy
+import pandas as pd
 
 
-# --------- Define Parameters ---------#
+# --------- Define Parameters --------- #
 save_fig = True
 display_figs = False
 plot_individuals = False
@@ -70,9 +71,10 @@ if surf_vol == 'volume':
     labels_mode = 'mean'
 elif surf_vol == 'surface':
     labels_mode = 'pca_flip'
+n_top_connections = 150
 
 # Envelope or PLI
-envelope_connectivity = True
+envelope_connectivity = False
 downsample_ts = True
 if envelope_connectivity:
     connectivity_method = 'corr'
@@ -85,6 +87,17 @@ standarize_con = True
 if envelope_connectivity:
     meg_params['filter_sensors'] = True  # Just in case
 
+# Surface labels id by region
+region_labels_csv = os.path.join(paths().save_path(), 'aparc.a2009s_regions.csv')  # Path to the CSV file containing region mappings
+region_labels = {'aparc': {'occipital': ['cuneus', 'lateraloccipital', 'lingual', 'pericalcarine'],
+                       'parietal': ['postcentral', 'superiorparietal', 'supramarginal', 'inferiorparietal', 'precuneus'],
+                       'temporal': ['inferiortemporal', 'middletemporal', 'superiortemporal', 'bankssts', 'transversetemporal', 'fusiform', 'entorhinal', 'parahippocampal', 'temporalpole'],
+                       'frontal': ['precentral', 'caudalmiddlefrontal', 'superiorfrontal', 'rostralmiddlefrontal', 'lateralorbitofrontal', 'parstriangularis', 'parsorbitalis', 'parsopercularis', 'medialorbitofrontal', 'paracentral', 'frontalpole'],
+                       'insula': ['insula'],
+                       'cingulate': ['isthmuscingulate', 'posteriorcingulate', 'caudalanteriorcingulate', 'rostralanteriorcingulate']
+                           },
+                 'aparc.a2009s': functions_general.read_region_labels_csv(csv_path=region_labels_csv, parcellation='aparc.a2009s')
+                 }
 
 #----- Setup -----#
 # Define Subjects_dir as Freesurfer output folder
@@ -436,10 +449,31 @@ for param in param_values.keys():
             lh_matrix = con_subj_data[np.ix_(lh_indices, lh_indices)]
             rh_matrix = con_subj_data[np.ix_(rh_indices, rh_indices)]
 
-            # Append subjects global connectivity
-            mean_global_con[param][param_value]['global'].append(con_subj_data.mean())
-            mean_global_con[param][param_value]['lh'].append(lh_matrix.mean())
-            mean_global_con[param][param_value]['rh'].append(rh_matrix.mean())
+            # Remove diagonal elements for hemisphere calculations
+            lh_matrix_no_diag = lh_matrix.copy()
+            np.fill_diagonal(lh_matrix_no_diag, 0)
+            rh_matrix_no_diag = rh_matrix.copy()
+            np.fill_diagonal(rh_matrix_no_diag, 0)
+
+            # Global matrix without diagonal
+            global_matrix_no_diag = con_subj_data.copy()
+            np.fill_diagonal(global_matrix_no_diag, 0)
+
+            # Get top N connections for each hemisphere and global
+            if n_top_connections is not None:
+                lh_top_values = np.sort(lh_matrix_no_diag.flatten())[-int(n_top_connections/2):]
+                rh_top_values = np.sort(rh_matrix_no_diag.flatten())[-int(n_top_connections/2):]
+                global_top_values = np.sort(global_matrix_no_diag.flatten())[-int(n_top_connections/2):]
+            else:
+                # Use all non-zero connections
+                lh_top_values = lh_matrix_no_diag.flatten()
+                rh_top_values = rh_matrix_no_diag.flatten()
+                global_top_values = global_matrix_no_diag.flatten()
+
+            # Append subjects global connectivity using top N connections
+            mean_global_con[param][param_value]['global'].append(global_top_values.mean())
+            mean_global_con[param][param_value]['lh'].append(lh_top_values.mean())
+            mean_global_con[param][param_value]['rh'].append(rh_top_values.mean())
 
             # Standarize
             if standarize_con:
@@ -451,16 +485,17 @@ for param in param_values.keys():
             if plot_individuals:
                 # Plot circle
                 plot_general.connectivity_circle(subject=subject, labels=labels, surf_vol=surf_vol, con=con_subj_data, connectivity_method=connectivity_method,
+                                                 region_labels=region_labels, parcellation=parcelation_segmentation, n_lines=n_top_connections,
                                                  subject_code=subject_code, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_subj, fname=None)
 
                 # Plot connectome
-                plot_general.connectome(subject=subject, labels=labels, adjacency_matrix=con_subj_data, subject_code=subject_code,
+                plot_general.connectome(subject=subject, labels=labels, adjacency_matrix=con_subj_data, subject_code=subject_code, connections_num=n_top_connections,
                                         save_fig=save_fig, fig_path=fig_path_subj, fname=None)
 
                 # Plot connectivity matrix
                 plot_con_subj_data = con_subj_data.copy()
                 np.fill_diagonal(plot_con_subj_data, 0)
-                plot_general.plot_con_matrix(subject=subject, labels=labels, adjacency_matrix=plot_con_subj_data, subject_code=subject_code,
+                plot_general.plot_con_matrix(subject=subject, labels=labels, adjacency_matrix=plot_con_subj_data, region_labels=region_labels, parcellation=parcelation_segmentation,
                                              save_fig=save_fig, fig_path=fig_path_subj, fname=None, n_ticks=5)
 
                 # Plot connectivity strength (connections from each region to other regions)
@@ -476,14 +511,15 @@ for param in param_values.keys():
 
         # Plot circle
         plot_general.connectivity_circle(subject='GA', labels=fsaverage_labels, surf_vol=surf_vol, con=ga_con_matrix, connectivity_method=connectivity_method, subject_code='fsaverage',
+                                         region_labels=region_labels, parcellation=parcelation_segmentation, n_lines=n_top_connections,
                                          display_figs=display_figs, save_fig=save_fig, fig_path=fig_path, fname='GA_circle')
 
         # Plot connectome
-        plot_general.connectome(subject='GA', labels=fsaverage_labels, adjacency_matrix=ga_con_matrix, subject_code='fsaverage', save_fig=save_fig, fig_path=fig_path,
-                                fname='GA_connectome')
+        plot_general.connectome(subject='GA', labels=fsaverage_labels, adjacency_matrix=ga_con_matrix, connections_num=n_top_connections, subject_code='fsaverage',
+                                save_fig=save_fig, fig_path=fig_path, fname='GA_connectome')
 
         # Plot matrix
-        ga_sorted_matrix = plot_general.plot_con_matrix(subject='GA', labels=fsaverage_labels, adjacency_matrix=ga_con_matrix, subject_code='fsaverage',
+        ga_sorted_matrix = plot_general.plot_con_matrix(subject='GA', labels=fsaverage_labels, adjacency_matrix=ga_con_matrix, region_labels=region_labels, parcellation=parcelation_segmentation,
                                                         save_fig=save_fig, fig_path=fig_path, fname='GA_matrix')
 
         # Plot connectivity strength (connections from each region to other regions)
@@ -495,7 +531,7 @@ for param in param_values.keys():
         data_dict = {
             param_value: {'lh': mean_global_con[param][param_value]['lh'], 'rh': mean_global_con[param][param_value]['rh'],
                             'global': mean_global_con[param][param_value]['global']}}
-        plot_general.global_connectivity(data_dict=data_dict, categories=[param_value], save_fig=save_fig, fig_path=fig_path)
+        plot_general.global_connectivity(data_dict=data_dict, categories=[param_value], save_fig=save_fig, fig_path=fig_path, n_lines=n_top_connections)
 
         # Get connectivity matrices for comparisson
         subj_matrices[param][param_value] = np.array(con_matrix)
@@ -569,6 +605,7 @@ for param in param_values.keys():
 
                 # Plot circle
                 plot_general.connectivity_circle(subject='GA', labels=fsaverage_labels, surf_vol=surf_vol, con=t_values, connectivity_method=connectivity_method, vmin=min_value,
+                                                 region_labels=region_labels, parcellation=parcelation_segmentation, colormap='coolwarm', n_lines=n_top_connections,
                                                  vmax=max_value, subject_code='fsaverage', display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_diff,
                                                  fname='GA_circle_t')
 
@@ -577,7 +614,7 @@ for param in param_values.keys():
                                         save_fig=save_fig, fig_path=fig_path_diff, fname=f'GA_t_con', connections_num=(log_p_values > 0).sum())
 
                 # Plot matrix
-                plot_general.plot_con_matrix(subject='GA', labels=fsaverage_labels, adjacency_matrix=t_values, subject_code='fsaverage',
+                plot_general.plot_con_matrix(subject='GA', labels=fsaverage_labels, adjacency_matrix=t_values, region_labels=region_labels, parcellation=parcelation_segmentation,
                                              save_fig=save_fig, fig_path=fig_path_diff, fname='GA_matrix_t')
 
                 # Plot connectivity strength (connections from each region to other regions)
@@ -586,26 +623,19 @@ for param in param_values.keys():
                                                    subjects_dir=subjects_dir, save_fig=save_fig, fig_path=fig_path_diff, fname=f'GA_strength_t')
 
             #----- Difference -----#
-            con_diff = []
+            con_diff_list = []
             mean_global_con_diff = {'lh': [], 'rh': [], 'global': []}  # Global mean connectivity difference
             # Compute difference
             for i in range(len(subj_matrices_no_std[param][comparison[0]])):
-                # Global mean connectivity difference
-                mean_global_con_diff['global'].append((mean_global_con[param][comparison[0]]['global'][i] - mean_global_con[param][comparison[1]]['global'][i]) /
-                                            (mean_global_con[param][comparison[0]]['global'][i] + mean_global_con[param][comparison[1]]['global'][i]))
-                mean_global_con_diff['lh'].append((mean_global_con[param][comparison[0]]['lh'][i] - mean_global_con[param][comparison[1]]['lh'][i]) /
-                                                      (mean_global_con[param][comparison[0]]['lh'][i] + mean_global_con[param][comparison[1]]['lh'][i]))
-                mean_global_con_diff['rh'].append((mean_global_con[param][comparison[0]]['rh'][i] - mean_global_con[param][comparison[1]]['rh'][i]) /
-                                                      (mean_global_con[param][comparison[0]]['rh'][i] + mean_global_con[param][comparison[1]]['rh'][i]))
 
                 # Matrix differences
                 subj_dif = subj_matrices_no_std[param][comparison[0]][i] - subj_matrices_no_std[param][comparison[1]][i]
                 if standarize_con:
                     subj_dif = (subj_dif - np.mean(subj_dif)) / np.std(subj_dif)
-                con_diff.append(subj_dif)
+                con_diff_list.append(subj_dif)
 
             # Make array
-            con_diff = np.array(con_diff)
+            con_diff = np.array(con_diff_list)
 
             # Take Grand Average of connectivity differences
             con_diff_ga = con_diff.mean(0)
@@ -613,16 +643,75 @@ for param in param_values.keys():
             # Fill diagonal with 0
             np.fill_diagonal(con_diff_ga, 0)
 
+            # Get indices of top N absolute values
+            con_diff_ga_abs = np.abs(con_diff_ga)
+            top_indices = np.unravel_index(np.argpartition(con_diff_ga_abs.ravel(), -n_top_connections)[-n_top_connections:], con_diff_ga_abs.shape)
+
+            # Compute difference
+            for i in range(len(subj_matrices_no_std[param][comparison[0]])):
+
+                # Get absolute values for ranking but use original values for averaging
+                subj_dif = con_diff[i]
+                subj_dif_abs = np.abs(subj_dif)
+                np.fill_diagonal(subj_dif_abs, 0)  # Remove diagonal
+
+                # Get top N connections globally based on absolute values
+                if n_top_connections is not None:
+
+                    # Split top connections by hemisphere
+                    lh_top_mask = np.zeros_like(subj_dif, dtype=bool)
+                    rh_top_mask = np.zeros_like(subj_dif, dtype=bool)
+                    global_top_mask = np.zeros_like(subj_dif, dtype=bool)
+
+                    for idx in range(len(top_indices[0])):
+                        i, j = top_indices[0][idx], top_indices[1][idx]
+                        global_top_mask[i, j] = True
+
+                        # Check if both indices are in left hemisphere
+                        if i in lh_indices and j in lh_indices:
+                            lh_top_mask[i, j] = True
+                        # Check if both indices are in right hemisphere
+                        elif i in rh_indices and j in rh_indices:
+                            rh_top_mask[i, j] = True
+
+                    # Get original (non-absolute) values for the top connections
+                    lh_diff_values = subj_dif[lh_top_mask]
+                    rh_diff_values = subj_dif[rh_top_mask]
+                    global_diff_values = subj_dif[global_top_mask]
+
+                    # Compute means (handle empty arrays)
+                    lh_mean = lh_diff_values.mean() if len(lh_diff_values) > 0 else 0
+                    rh_mean = rh_diff_values.mean() if len(rh_diff_values) > 0 else 0
+                    global_mean = global_diff_values.mean()
+
+                else:
+                    # Use all non-diagonal connections
+                    lh_matrix_diff = subj_dif[np.ix_(lh_indices, lh_indices)]
+                    rh_matrix_diff = subj_dif[np.ix_(rh_indices, rh_indices)]
+
+                    np.fill_diagonal(lh_matrix_diff, 0)
+                    np.fill_diagonal(rh_matrix_diff, 0)
+
+                    lh_mean = lh_matrix_diff.mean()
+                    rh_mean = rh_matrix_diff.mean()
+                    global_mean = subj_dif[~np.eye(subj_dif.shape[0], dtype=bool)].mean()
+
+                # Save to dictionary
+                mean_global_con_diff['lh'].append(lh_mean)
+                mean_global_con_diff['rh'].append(rh_mean)
+                mean_global_con_diff['global'].append(global_mean)
+
             # Plot circle
             plot_general.connectivity_circle(subject='GA', labels=fsaverage_labels, surf_vol=surf_vol, con=con_diff_ga, connectivity_method=connectivity_method, subject_code='fsaverage',
+                                             region_labels=region_labels, parcellation=parcelation_segmentation, colormap='coolwarm', n_lines=n_top_connections,
                                              display_figs=display_figs, save_fig=save_fig, fig_path=fig_path_diff, fname='GA_circle_dif')
 
             # Plot connectome
-            plot_general.connectome(subject='GA', labels=fsaverage_labels, adjacency_matrix=con_diff_ga, subject_code='fsaverage', edge_thresholddirection='absabove',
-                                    save_fig=save_fig, fig_path=fig_path_diff, fname='GA_connectome_dif')
+            plot_general.connectome(subject='GA', labels=fsaverage_labels, adjacency_matrix=con_diff_ga, connections_num=n_top_connections, subject_code='fsaverage',
+                                    edge_thresholddirection='absabove', save_fig=save_fig, fig_path=fig_path_diff, fname='GA_connectome_dif')
 
             # Plot matrix
-            plot_general.plot_con_matrix(subject='GA', labels=fsaverage_labels, adjacency_matrix=con_diff_ga, subject_code='fsaverage',
+            plot_general.plot_con_matrix(subject='GA', labels=fsaverage_labels, adjacency_matrix=con_diff_ga, region_labels=region_labels, parcellation=parcelation_segmentation,
                                          save_fig=save_fig, fig_path=fig_path_diff, fname='GA_matrix_dif')
 
             # Plot connectivity strength (connections from each region to other regions)
@@ -632,9 +721,16 @@ for param in param_values.keys():
 
             # Boxplot of mean global connectivity and their difference
             data_dict = {
-                comparison[0]: {'lh': mean_global_con[param][comparison[0]]['lh'], 'rh': mean_global_con[param][comparison[0]]['rh'], 'global': mean_global_con[param][comparison[0]]['global']},
-                comparison[1]: {'lh': mean_global_con[param][comparison[1]]['lh'], 'rh': mean_global_con[param][comparison[1]]['rh'], 'global': mean_global_con[param][comparison[1]]['global']},
                 'diff': {'lh': mean_global_con_diff['lh'], 'rh': mean_global_con_diff['rh'], 'global': mean_global_con_diff['global']}
             }
             categories = [key for key in data_dict.keys()]
-            plot_general.global_connectivity(data_dict=data_dict, categories=categories, save_fig=save_fig, fig_path=fig_path_diff)
+            plot_general.global_connectivity(data_dict=data_dict, categories=categories, save_fig=save_fig, fig_path=fig_path_diff, n_lines=n_top_connections)
+
+            # Compute regional connectivity averages
+            regional_conn_averages = functions_analysis.compute_regional_connectivity_averages(
+                con=con_diff_ga,
+                labels=fsaverage_labels,
+                region_labels=region_labels,
+                parcellation=parcelation_segmentation,
+                n_connections=None
+            )
