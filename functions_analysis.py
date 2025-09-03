@@ -101,8 +101,10 @@ def define_events(subject, meg_data, epoch_id, trial_num=None, evt_dur=None, epo
 
     if 'fix' in epoch_id and not rel_sac:
         metadata_sup = subject.fixations
+        metadata_sup = metadata_sup.loc[metadata_sup['id'].isin(metadata['event_name'].astype(str))]
     elif 'sac' in epoch_id:
         metadata_sup = subject.saccades
+        metadata_sup = metadata_sup.loc[metadata_sup['id'].isin(metadata['event_name'].astype(str))]
 
     return metadata, events, events_id, metadata_sup
 
@@ -469,14 +471,23 @@ def get_bad_annot_array(meg_data, subj_path, fname, save_var=True):
 def make_mtrf_input(input_arrays, var_name, subject, meg_data, evt_dur, cond_trials, epoch_keys, bad_annotations_array,
                     subj_path, fname, save_var=True):
 
+    secondary_variable = False
+    if '/' in var_name:
+        secondary_variable = True
+        var_name_2 = var_name.split('/')[1]
+        var_name = var_name.split('/')[0]
+
     # Define events
-    metadata, events, _, _ = define_events(subject=subject, epoch_id=var_name, evt_dur=evt_dur, trial_num=cond_trials, meg_data=meg_data,  epoch_keys=epoch_keys)
+    metadata, events, _, metadata_sup = define_events(subject=subject, epoch_id=var_name, evt_dur=evt_dur, trial_num=cond_trials, meg_data=meg_data,  epoch_keys=epoch_keys)
     # Make input arrays as 0
     input_array = np.zeros(len(meg_data.times))
     # Get events samples index
     evt_idxs = events[:, 0]
-    # Set those indexes as 1
-    input_array[evt_idxs] = 1
+    # Set those indexes as 1 or as variable
+    if secondary_variable:
+        input_array[evt_idxs] = metadata_sup[var_name_2].to_numpy()
+    else:
+        input_array[evt_idxs] = 1
     # Exclude bad annotations
     input_array = input_array * bad_annotations_array
     # Save to all input arrays dictionary
@@ -541,7 +552,11 @@ def compute_trf(subject, meg_data, trial_params, trf_params, meg_params, all_chs
 
     # Iterate over input features
     input_arrays = {}
-    for feature in trf_params['input_features']:
+    if isinstance(trf_params['input_features'], dict):
+        elements = trf_params['input_features'].keys()
+    elif isinstance(trf_params['input_features'], list):
+        elements = trf_params['input_features']
+    for feature in elements:
 
         subj_path = paths().save_path() + f'TRF/{subject.subject_id}/'
         fname_var = (f"{feature}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_tgtpres{trial_params['tgtpres']}_trialdur{trial_params['trialdur']}_"
@@ -578,6 +593,27 @@ def compute_trf(subject, meg_data, trial_params, trf_params, meg_params, all_chs
                                            bad_annotations_array=bad_annotations_array,
                                            subj_path=subj_path, fname=fname_var)
 
+        if isinstance(trf_params['input_features'], dict):
+            try:
+                for value in trf_params['input_features'][feature]:
+                    fname_var = (f"{feature}-{value}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_tgtpres{trial_params['tgtpres']}_trialdur{trial_params['trialdur']}_"
+                                 f"evtdur{trial_params['evtdur']}_array.pkl")
+
+                    try:
+                        input_arrays[value] = load.var(file_path=subj_path + fname_var)
+                        print(f"Loaded input array for {feature}-{value}")
+
+                    except:
+                        print(f'Computing input array for {feature}-{value}...')
+                        epoch_keys = None
+
+                        input_arrays = make_mtrf_input(input_arrays=input_arrays, var_name=f'{feature}/{value}',
+                                                       subject=subject, meg_data=meg_data, evt_dur=trial_params['evtdur'],
+                                                       cond_trials=cond_trials, epoch_keys=epoch_keys,
+                                                       bad_annotations_array=bad_annotations_array,
+                                                       subj_path=subj_path, fname=fname_var)
+            except:
+                pass
     # Concatenate input arrays as one
     model_input = np.array([input_arrays[key] for key in input_arrays.keys()]).T
 
@@ -603,7 +639,57 @@ def compute_trf(subject, meg_data, trial_params, trf_params, meg_params, all_chs
     return rf
 
 
-def make_trf_evoked(subject, rf, meg_data, trf_params, meg_params, evokeds=None, display_figs=False, plot_individuals=True, save_fig=True, fig_path=None):
+def make_trf_evoked(subject, rf, meg_data, trf_params, meg_params, feature_index, feature, evokeds=None, display_figs=False, plot_individuals=True, save_fig=True, fig_path=None):
+
+    # All or multiple regions
+    if meg_params['chs_id'] == 'mag' or '_' in meg_params['chs_id']:
+
+        # Define evoked from TRF list to concatenate all
+        subj_evoked_list = []
+
+        # iterate over regions
+        for chs_idx, chs_subset in enumerate(rf.keys()):
+            # Get channels subset info
+            picks = functions_general.pick_chs(chs_id=chs_subset, info=meg_data.info)
+            meg_sub = meg_data.copy().pick(picks)
+
+            # Get TRF coeficients from chs subset
+            trf = rf[chs_subset].coef_[:, feature_index, :]
+
+            if chs_idx == 0:
+                # Define evoked object from arrays of TRF
+                subj_evoked = mne.EvokedArray(data=trf, info=meg_sub.info, tmin=trf_params['tmin'], baseline=trf_params['baseline'])
+            else:
+                # Append evoked object from arrays of TRF to list, to concatenate all
+                subj_evoked_list.append(mne.EvokedArray(data=trf, info=meg_sub.info, tmin=trf_params['tmin'], baseline=trf_params['baseline']))
+
+        # Concatenate evoked from al regions
+        subj_evoked = subj_evoked.add_channels(subj_evoked_list)
+
+    else:
+        trf = rf.coef_[:, feature_index, :]
+        # Define evoked objects from arrays of TRF
+        subj_evoked = mne.EvokedArray(data=trf, info=meg_sub.info, tmin=trf_params['tmin'], baseline=trf_params['baseline'])
+
+    # Append for Grand average
+    if evokeds != None:
+        evokeds[feature].append(subj_evoked)
+
+    # Plot
+    if plot_individuals:
+        fig = subj_evoked.plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(trf_params['tmin'], trf_params['tmax']), titles=feature)
+        fig.suptitle(f'{feature}')
+
+    if save_fig:
+        # Save
+        fig_path_subj = fig_path + f'{subject.subject_id}/'
+        fname = f"{feature}_{meg_params['chs_id']}"
+        save.fig(fig=fig, fname=fname, path=fig_path_subj)
+
+    return evokeds
+
+
+def parse_trf_to_evoked(subject, rf, meg_data, trf_params, meg_params, evokeds=None, display_figs=False, plot_individuals=True, save_fig=True, fig_path=None):
     """
     Get model coeficients as separate responses to each feature.
 
@@ -630,72 +716,46 @@ def make_trf_evoked(subject, rf, meg_data, trf_params, meg_params, evokeds=None,
     if save_fig and not fig_path:
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
-    # Variables to store coefficients, and "evoked" data of the subject.
-    trf = {}
-    subj_evoked = {}
-    subj_evoked_list = {}
-    for i, feature in enumerate(trf_params['input_features']):
+    if isinstance(trf_params['input_features'], dict):
+        elements = trf_params['input_features'].keys()
+    elif isinstance(trf_params['input_features'], list):
+        elements = trf_params['input_features']
+    feature_index = 0
+    for feature in elements:
 
-        # All or multiple regions
-        if meg_params['chs_id'] == 'mag' or '_' in meg_params['chs_id']:
+        evokeds = make_trf_evoked(subject=subject, rf=rf, meg_data=meg_data, evokeds=evokeds,
+                                  trf_params=trf_params, feature_index=feature_index, feature=feature, meg_params=meg_params,
+                                  plot_individuals=plot_individuals, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path)
+        feature_index += 1
 
-            # Define evoked from TRF list to concatenate all
-            subj_evoked_list[feature] = []
+        if isinstance(trf_params['input_features'], dict):
+            try:
+                for value in trf_params['input_features'][feature]:
+                    feature_value = f'{feature}-{value}'
+                    evokeds = make_trf_evoked(subject=subject, rf=rf, meg_data=meg_data, evokeds=evokeds,
+                                              trf_params=trf_params, feature_index=feature_index, feature=feature_value, meg_params=meg_params,
+                                              plot_individuals=plot_individuals, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path)
+                    feature_index += 1
+            except:
+                pass
 
-            # iterate over regions
-            for chs_idx, chs_subset in enumerate(rf.keys()):
-                # Get channels subset info
-                picks = functions_general.pick_chs(chs_id=chs_subset, info=meg_data.info)
-                meg_sub = meg_data.copy().pick(picks)
-
-                # Get TRF coeficients from chs subset
-                trf[feature] = rf[chs_subset].coef_[:, i, :]
-
-                if chs_idx == 0:
-                    # Define evoked object from arrays of TRF
-                    subj_evoked[feature] = mne.EvokedArray(data=trf[feature], info=meg_sub.info, tmin=trf_params['tmin'], baseline=trf_params['baseline'])
-                else:
-                    # Append evoked object from arrays of TRF to list, to concatenate all
-                    subj_evoked_list[feature].append(mne.EvokedArray(data=trf[feature], info=meg_sub.info, tmin=trf_params['tmin'], baseline=trf_params['baseline']))
-
-            # Concatenate evoked from al regions
-            subj_evoked[feature] = subj_evoked[feature].add_channels(subj_evoked_list[feature])
-
-        else:
-            trf[feature] = rf.coef_[:, i, :]
-            # Define evoked objects from arrays of TRF
-            subj_evoked[feature] = mne.EvokedArray(data=trf[feature], info=meg_sub.info, tmin=trf_params['tmin'], baseline=trf_params['baseline'])
-
-        # Append for Grand average
-        if evokeds != None:
-            evokeds[feature].append(subj_evoked[feature])
-
-        # Plot
-        if plot_individuals:
-            fig = subj_evoked[feature].plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(trf_params['tmin'], trf_params['tmax']), titles=feature)
-            fig.suptitle(f'{feature}')
-
-        if save_fig:
-            # Save
-            fig_path_subj = fig_path + f'{subject.subject_id}/'
-            fname = f"{feature}_{meg_params['chs_id']}"
-            save.fig(fig=fig, fname=fname, path=fig_path_subj)
-
-    return subj_evoked, evokeds
+    return evokeds
 
 
-def trf_grand_average(feature_evokeds, trf_params, trial_params, meg_params, display_figs=False, save_fig=True, fig_path=None):
+def trf_grand_average(feature_evokeds, trf_params, meg_params, display_figs=False, save_fig=True, fig_path=None):
 
     # Sanity check
     if save_fig and not fig_path:
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
     grand_avg = {}
-    for feature in trf_params['input_features']:
+    if isinstance(trf_params['input_features'], dict):
+        elements = trf_params['input_features'].keys()
+    elif isinstance(trf_params['input_features'], list):
+        elements = trf_params['input_features']
+    for feature in elements:
         # Compute grand average
         grand_avg[feature] = mne.grand_average(feature_evokeds[feature], interpolate_bads=True)
-        plot_times_idx = np.where((grand_avg[feature].times > trf_params['tmin']) & (grand_avg[feature].times < trf_params['tmax']))[0]
-        data = grand_avg[feature].get_data()[:, plot_times_idx]
 
         # Plot
         fig = grand_avg[feature].plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(trf_params['tmin'], trf_params['tmax']), titles=feature)
@@ -704,6 +764,23 @@ def trf_grand_average(feature_evokeds, trf_params, trial_params, meg_params, dis
             # Save
             fname = f"{feature}_GA_{meg_params['chs_id']}"
             save.fig(fig=fig, fname=fname, path=fig_path)
+
+        if isinstance(trf_params['input_features'], dict):
+            try:
+                for value in trf_params['input_features'][feature]:
+                    feature_value = f'{feature}-{value}'
+                    # Compute grand average
+                    grand_avg[feature_value] = mne.grand_average(feature_evokeds[feature_value], interpolate_bads=True)
+
+                    # Plot
+                    fig = grand_avg[feature_value].plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(trf_params['tmin'], trf_params['tmax']), titles=feature_value)
+
+                    if save_fig:
+                        # Save
+                        fname = f"{feature_value}_GA_{meg_params['chs_id']}"
+                        save.fig(fig=fig, fname=fname, path=fig_path)
+            except:
+                pass
 
     return grand_avg
 

@@ -20,19 +20,22 @@ else:
     plt.ioff()
 
 #-----  Parameters -----#
-trial_params = {'corrans': True,
-                'tgtpres': True,
+trial_params = {'corrans': None,
+                'tgtpres': None,
                 'mss': None,
                 'evtdur': None,
                 }
 
 meg_params = {'chs_id': 'mag',
-              'band_id': 'Alpha',
+              'band_id': None,
               'data_type': 'ICA'
               }
 
 # TRF parameters
-trf_params = {'input_features': ['it_fix_vs+tgt_fix_vs', 'tgt_fix_vs'],   # Select features (events)
+trf_params = {'input_features': {'it_fix_vs+tgt_fix_vs': ['fix_target'],
+                                 'sac_vs': None,
+                                 'blue': None,
+                                 'red': None},   # Select features (events)
               'standarize': True,
               'fit_power': False,
               'alpha': None,
@@ -51,7 +54,7 @@ else:
 # Figure path
 fig_path = paths().plots_path() + (f"TRF_{meg_params['data_type']}/Band_{meg_params['band_id']}/{trf_params['input_features']}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_"
                                    f"tgtpres{trial_params['tgtpres']}_trialdur{trial_params['trialdur']}_evtdur{trial_params['evtdur']}_{trf_params['tmin']}_{trf_params['tmax']}_"
-                                   f"bline{trf_params['baseline']}_alpha{trf_params['alpha']}_std{trf_params['standarize']}/{meg_params['chs_id']}/")
+                                   f"bline{trf_params['baseline']}_alpha{trf_params['alpha']}_std{trf_params['standarize']}/{meg_params['chs_id']}/").replace(":", "")
 
 # Change path to include envelope power
 if trf_params['fit_power']:
@@ -62,8 +65,19 @@ save_path = fig_path.replace(paths().plots_path(), paths().save_path())
 
 # Define Grand average variables
 feature_evokeds = {}
-for feature in trf_params['input_features']:
+if isinstance(trf_params['input_features'], dict):
+    elements = trf_params['input_features'].keys()
+elif isinstance(trf_params['input_features'], list):
+    elements = trf_params['input_features']
+for feature in elements:
     feature_evokeds[feature] = []
+    if isinstance(trf_params['input_features'], dict):
+        try:
+            for value in trf_params['input_features'][feature]:
+                feature_value = f'{feature}-{value}'
+                feature_evokeds[feature_value] = []
+        except:
+            pass
 
 # Iterate over subjects
 for subject_code in exp_info.subjects_ids:
@@ -101,10 +115,10 @@ for subject_code in exp_info.subjects_ids:
                                             save_data=save_data, trf_path=trf_path, trf_fname=trf_fname)
 
     # Get model coeficients as separate responses to each feature
-    subj_evoked, feature_evokeds = functions_analysis.make_trf_evoked(subject=subject, rf=rf, meg_data=meg_data, evokeds=feature_evokeds,
-                                                                      trf_params=trf_params, meg_params=meg_params,
-                                                                      plot_individuals=plot_individuals, save_fig=save_fig, fig_path=fig_path)
+    feature_evokeds = functions_analysis.parse_trf_to_evoked(subject=subject, rf=rf, meg_data=meg_data, evokeds=feature_evokeds,
+                                                             trf_params=trf_params, meg_params=meg_params,
+                                                             plot_individuals=plot_individuals, save_fig=save_fig, fig_path=fig_path)
 
 fname = f"{feature}_GA_{meg_params['chs_id']}"
-grand_avg = functions_analysis.trf_grand_average(feature_evokeds=feature_evokeds, trf_params=trf_params, trial_params=trial_params, meg_params=meg_params,
+grand_avg = functions_analysis.trf_grand_average(feature_evokeds=feature_evokeds, trf_params=trf_params, meg_params=meg_params,
                                                  display_figs=display_figs, save_fig=save_fig, fig_path=fig_path)
