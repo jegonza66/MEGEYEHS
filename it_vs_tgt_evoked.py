@@ -315,36 +315,45 @@ else:
 #-----  Parameters -----#
 # Reescale and plot with FRF
 FRF_TRF = False
-# ICA vs raw data
-use_ica_data = True
-run_tfce = True
-standarize = True
-band_id = None
-# Id
-epoch_ids = ['it_fix_vs_sub', 'tgt_fix_vs', 'blue', 'red']
-# Pick MEG chs (Select channels or set picks = 'mag')
+
+#-----  Parameters -----#
+trial_params = {'corrans': True,
+                'tgtpres': True,
+                'mss': None,
+                'evtdur': None,
+                }
+
+meg_params = {'chs_id': 'mag',
+              'band_id': (0.1, 40),
+              'data_type': 'ICA',
+              'downsample': 300
+              }
+
+# TRF parameters
+trf_params = {'input_features': {'it_fix_vs': None,
+                                 'tgt_fix_vs': None, # 'n_fix', 'duration', {'fix_vs': ['item', 'fix_target']} 'pupil'? 'distance'?, 'mss'?,
+                                 'sac_vs': None, # duration , avg_vel
+                                 'blue': None,
+                                 'red': None  # Select features (events)
+                                 },
+              'standarize': True,
+              'fit_power': False,
+              'alpha': 1000,
+              'tmin': -0.2,
+              'tmax': 0.5,
+              }
+trf_params['baseline'] = (trf_params['tmin'], -0.05)
+
+# Window durations
+cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
+if 'vs' in trf_params['input_features']:
+    trial_params['trialdur'] = vs_dur[trial_params['mss']]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
+else:
+    trial_params['trialdur'] = None
+
 chs_id = 'temporal'
 chs_ids = [f'{chs_id}_L', f'{chs_id}_R']
 labels = ['TRF Distractor', 'TRF Target']
-# Trials
-corr_ans = True
-tgt_pres = True
-mss = None
-trial_dur = None
-evt_dur = None
-# Get time windows from epoch_id name
-tmin, tmax, plot_xlim = -0.3, 0.6, (-0.1, 0.5)
-# Baseline
-baseline = (tmin, -0.05)
-# TRF hiper-parameter
-alpha = None
-
-
-# Data type
-if use_ica_data:
-    data_type = 'ICA'
-else:
-    data_type = 'RAW'
 
 # Variable to store data and plot
 ga_dict = {}
@@ -354,9 +363,21 @@ stds = {}
 bads = []
 
 # Save path
-load_path = paths().save_path() + f'TRF_{data_type}/{epoch_ids}_mss{mss}_corrans{corr_ans}_tgtpres{tgt_pres}_trialdur{trial_dur}' \
-                                  f'_evtdur{evt_dur}_{tmin}_{tmax}_bline{baseline}_alpha{alpha}_std{standarize}/mag/'
-fig_path = load_path.replace(paths().save_path(), paths().plots_path())
+# Figure path
+fig_path = paths().plots_path() + (f"TRF_{meg_params['data_type']}/Band_{meg_params['band_id']}/{trf_params['input_features']}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_"
+                                   f"tgtpres{trial_params['tgtpres']}_trialdur{trial_params['trialdur']}_evtdur{trial_params['evtdur']}_{trf_params['tmin']}_{trf_params['tmax']}_"
+                                   f"bline{trf_params['baseline']}_alpha{trf_params['alpha']}_std{trf_params['standarize']}/{meg_params['chs_id']}/").replace(":", "")
+
+# Change path to include downsampled data
+if meg_params['downsample'] is not None:
+    fig_path = fig_path.replace(f"Band_{meg_params['band_id']}", f"Band_{meg_params['band_id']}_downsample_{meg_params['downsample']}")
+
+# Change path to include envelope power
+if trf_params['fit_power']:
+    fig_path = fig_path.replace(f"TRF_{meg_params['data_type']}", f"TRF_{meg_params['data_type']}_ENV")
+
+# Save path
+save_path = fig_path.replace(paths().plots_path(), paths().save_path())
 
 # Figure
 matplotlib.rc({'font.size': 20})
@@ -375,7 +396,7 @@ if FRF_TRF:
 else:
     fig, axs = plt.subplots(ncols=2, figsize=(17, 5))
 
-for i, epoch_id in enumerate(epoch_ids[:2]):
+for i, epoch_id in enumerate(list(trf_params['input_features'].keys())[:2]):
     evokeds[epoch_id] = {}
     means[epoch_id] = {}
     stds[epoch_id] = {}
@@ -386,19 +407,29 @@ for i, epoch_id in enumerate(epoch_ids[:2]):
 
         # Iterate over subjects
         for subject_code in exp_info.subjects_ids:
+            trf_path = save_path
+            trf_fname = f'TRF_{subject_code}.pkl'
 
-            if use_ica_data:
+            if meg_params['data_type'] == 'ICA':
                 # Load subject object
                 subject = load.ica_subject(exp_info=exp_info, subject_code=subject_code)
-                meg_data = load.ica_data(subject=subject)
+                # Load MEG
+                if meg_params['band_id']:
+                    meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'])
+                else:
+                    meg_data = load.ica_data(subject=subject)
             else:
                 # Load subject object
                 subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
-                meg_data = subject.load_preproc_meg_data()
+                # Load MEG
+                if meg_params['band_id']:
+                    meg_data = load.filtered_data(subject=subject, band_id=meg_params['band_id'], use_ica_data=False)
+                else:
+                    meg_data = subject.load_preproc_meg_data()
 
-            # Data filenames
-            trf_path = load_path
-            trf_fname = f'TRF_{subject_code}.pkl'
+            if meg_params['downsample']:
+                print(f'Downsampling data to {meg_params["downsample"]} Hz')
+                meg_data.resample(meg_params['downsample'])
 
             # Load rf data
             rf = load.var(trf_path + trf_fname)
@@ -421,10 +452,10 @@ for i, epoch_id in enumerate(epoch_ids[:2]):
 
                     if chs_idx == 0:
                         # Define evoked object from arrays of TRF
-                        evoked = mne.EvokedArray(data=trf, info=meg_sub.info, tmin=tmin, baseline=baseline)
+                        evoked = mne.EvokedArray(data=trf, info=meg_sub.info, tmin=trf_params['tmin'], baseline=trf_params['baseline'])
                     else:
                         # Append evoked object from arrays of TRF to list, to concatenate all
-                        evoked_list.append(mne.EvokedArray(data=trf, info=meg_sub.info, tmin=tmin, baseline=baseline))
+                        evoked_list.append(mne.EvokedArray(data=trf, info=meg_sub.info, tmin=trf_params['tmin'], baseline=trf_params['baseline']))
 
                 # Concatenate evoked from al regions
                 evoked = evoked.add_channels(evoked_list)
@@ -477,6 +508,7 @@ for i, epoch_id in enumerate(epoch_ids[:2]):
                                 y2=means[epoch_id][lat_chs]+stds[epoch_id][lat_chs], alpha=0.5, color=f'C{i}', edgecolor=None)
             axs[j].set_xlim(evoked.times[0], evoked.times[-1])
 
+epoch_ids = list(trf_params['input_features'].keys())[:2]
 # Get subjects trf from both classes split in left and right
 obs_left = [evokeds[epoch_ids[0]][chs_ids[0]], evokeds[epoch_ids[1]][chs_ids[0]]]
 obs_right = [evokeds[epoch_ids[0]][chs_ids[1]], evokeds[epoch_ids[1]][chs_ids[1]]]
@@ -565,9 +597,9 @@ if save_fig:
     save.fig(fig=fig, path=fig_path, fname=fname)
 
 # Plot topographies
-topo_times = [0.1, 0.4]
-topo_times_span = [0.01, 0.2]
-grand_average = mne.grand_average(ga_dict['tgt_fix'], interpolate_bads=True)
+topo_times = [0.1, 0.35]
+topo_times_span = [0.01, 0.01]
+grand_average = mne.grand_average(ga_dict[list(ga_dict.keys())[1]], interpolate_bads=True)
 
 
 # Mascara en temporales
@@ -585,7 +617,7 @@ grand_average = mne.grand_average(ga_dict['tgt_fix'], interpolate_bads=True)
 
 
 fig_topo = grand_average.plot_topomap(times=topo_times, average=topo_times_span, cmap='coolwarm', show=display_figs,
-                                      units='a.u.', scalings=1)
+                                      units='a.u.', vlim=(-2e13, 2e13))
 
 if save_fig:
     fname = f'TRF_{chs_id}_topomaps'
