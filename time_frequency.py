@@ -421,7 +421,7 @@ for param in param_values.keys():
                     min_sig_chs = len(picks) * significant_channels
 
                     # Run clusters permutations test
-                    clusters_mask, clusters_mask_plot, significant_pvalues = functions_analysis.run_time_frequency_test(data=permutations_test_data_array, pval_threshold=pval_threshold,
+                    clusters_mask, clusters_mask_plot, significant_pvalues = functions_analysis.run_permutations_test_tf(data=permutations_test_data_array, pval_threshold=pval_threshold,
                                                                                                    t_thresh=pval_threshold, n_permutations=n_permutations, min_sig_chs=min_sig_chs)
 
                     # Define image args to plot mask
