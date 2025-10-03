@@ -6,6 +6,7 @@ import pickle
 import mne
 import functions_general
 import glob
+import pandas as pd
 
 
 def config(path, fname):
@@ -153,10 +154,45 @@ def ica_subject(exp_info, subject_code):
         ica_subject = pickle.load(f)
         f.close()
     except:
-        print(f'Directory: {os.listdir(pathlib.Path(os.path.join(ica_path, subject_id)))}')
-        raise ValueError(f'ICA data for subject {subject_id} not found in {file_path}')
+        try:
+            # Retry with pandas
+            ica_subject = pd.read_pickle(file_path)
+        except:
+            print(f'Directory: {os.listdir(pathlib.Path(os.path.join(ica_path, subject_id)))}')
+            raise ValueError(f'ICA data for subject {subject_id} not found in {file_path}')
 
     return ica_subject
+
+
+def downsampled_data(subject, sfreq, band_id=None, method='iir', preload=False, save_data=False):
+
+    ds_path = paths().ds_path_ica() + f'Band_{band_id}/{subject.subject_id}/'
+
+    ds_meg_data_fname = f'Subject_{subject.subject_id}_method_{method}_meg.fif'
+
+    # Try to load filtered data
+    try:
+        print(f'Loading downsampled data data in band {band_id} for subject {subject.subject_id}')
+        # Load data
+        ds_data = mne.io.read_raw_fif(ds_path + ds_meg_data_fname, preload=preload)
+
+    except:
+        print(f'No previous downsampled data found for subject {subject.subject_id} in band {band_id}.\n'
+              f'Downsampleing data...')
+
+        ds_data = filtered_data(subject=subject, band_id=band_id, save_data=save_data,
+                                 method=method)
+
+        print(f'Downsampling data to {sfreq} Hz')
+        ds_data.resample(sfreq)
+
+        if save_data:
+            print('Saving filtered data')
+            # Save MEG
+            os.makedirs(ds_path, exist_ok=True)
+            ds_data.save(ds_path + ds_meg_data_fname, overwrite=True)
+
+    return ds_data
 
 
 def filtered_data(subject, band_id, method='iir', use_ica_data=True, preload=False, save_data=False):
@@ -217,13 +253,16 @@ def ica_data(subject, preload=False):
 def meg(subject, meg_params, save_data=False):
 
     if meg_params['data_type'] == 'ICA':
-        if meg_params['band_id'] and meg_params['filter_sensors']:
+        if 'downsample' in meg_params.keys() and meg_params['downsample']:
+            meg_data = downsampled_data(subject=subject, sfreq=meg_params.get('downsample'), band_id=meg_params.get('band_id', None),
+                                       method=meg_params.get('filter_method', 'iir'), save_data=save_data)
+        elif meg_params.get('band_id') and meg_params['filter_sensors']:
             meg_data = filtered_data(subject=subject, band_id=meg_params['band_id'], save_data=save_data,
                                           method=meg_params['filter_method'])
         else:
             meg_data = ica_data(subject=subject)
     elif meg_params['data_type'] == 'RAW':
-        if meg_params['band_id'] and meg_params['filter_sensors']:
+        if meg_params.get('band_id') and meg_params.get('filter_sensors'):
             meg_data = filtered_data(subject=subject, band_id=meg_params['band_id'], use_ica_data=False,
                                           save_data=save_data, method=meg_params['filter_method'])
         else:
@@ -254,3 +293,31 @@ def time_frequency_range(file_path, l_freq, h_freq):
         raise ValueError('No file found with desired frequency range')
 
     return time_frequency
+
+
+def forward_model(sources_path_subject, subject_code, chs_id, source_params):
+
+    if source_params['surf_vol'] == 'volume':
+        fname_fwd = sources_path_subject + f"/{subject_code}_volume_ico{source_params['ico']}_{int(source_params['spacing'])}-fwd.fif"
+    elif source_params['surf_vol'] == 'surface':
+        fname_fwd = sources_path_subject + f"/{subject_code}_surface_ico{source_params['ico']}-fwd.fif"
+    elif source_params['surf_vol'] == 'mixed':
+        fname_fwd = sources_path_subject + f"/{subject_code}_mixed_ico{source_params['ico']}_{int(source_params['spacing'])}-fwd.fif"
+    fwd = mne.read_forward_solution(fname_fwd)
+
+    return fwd
+
+
+def source_model(sources_path_subject, subject_code, source_params):
+
+    # Get Source space for default subject
+    if source_params['surf_vol'] == 'volume':
+        fname_src = sources_path_subject + f"/fsaverage_volume_ico{source_params['ico']}_{int(source_params['spacing'])}-src.fif"
+    elif source_params['surf_vol'] == 'surface':
+        fname_src = sources_path_subject + f"/fsaverage_surface_ico{source_params['ico']}-src.fif"
+    elif source_params['surf_vol'] == 'mixed':
+        fname_src = sources_path_subject + f"/fsaverage_mixed_ico{source_params['ico']}_{int(source_params['spacing'])}-src.fif"
+
+    src = mne.read_source_spaces(fname_src)
+
+    return src
