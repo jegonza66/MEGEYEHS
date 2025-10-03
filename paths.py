@@ -172,6 +172,24 @@ class paths:
 
         return filtered_path
 
+    def ds_path_ica(self):
+        """
+        Paths to the filtered data folder.
+
+        Returns
+        -------
+        filtered_path: str
+            Path in str format to the folder containing the filtered data.
+        """
+
+        ds_path = self.main_path + 'Python/Save/Downsampled_Data_ICA/'
+
+        # Create directory if it doesn't exist
+        os.makedirs(ds_path, exist_ok=True)
+
+        return ds_path
+
+
     def filtered_path_ica(self):
         """
         Paths to the filtered data folder.
