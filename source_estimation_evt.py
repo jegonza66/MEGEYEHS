@@ -29,7 +29,7 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': ['tgt_fix_vs_sub', 'it_fix_vs_sub'],  # use'+' to mix conditions (red+blue)
+trial_params = {'epoch_id': ['tgt_fix_vs', 'it_fix_vs'],  # use'+' to mix conditions (red+blue)
                 'corrans': True,
                 'tgtpres': True,
                 'mss': None,
@@ -37,20 +37,27 @@ trial_params = {'epoch_id': ['tgt_fix_vs_sub', 'it_fix_vs_sub'],  # use'+' to mi
                 'evtdur': None}
 
 meg_params = {'chs_id': 'mag',
-              'band_id': None,
+              'band_id': (0.1, 40),  # None for no filtering / 'Alpha' / 'Beta' / 'Theta' / 'Delta' / 'Gamma' / 'HGamma' or custom (l_freq, h_freq)
               'filter_sensors': True,
               'filter_method': 'iir',
-              'data_type': 'ICA'
+              'data_type': 'ICA',
+              'downsample': 300
               }
 
 # TRF parameters
-trf_params = {'input_features': ['tgt_fix_vs', 'it_fix_vs_sub', 'blue', 'red'],   # Select features (events)
-              'standarize': False,
+trf_params = {'input_features': {'it_fix_vs': None,
+                                 'tgt_fix_vs': None,  # 'n_fix', 'duration', {'fix_vs': ['item', 'fix_target']} 'pupil'? 'distance'?, 'mss'?,
+                                 'sac_vs': None,  # duration , avg_vel
+                                 'blue': None,
+                                 'red': None  # Select features (events)
+                                 },  # Select features (events)
+              'standarize': True,
               'fit_power': False,
-              'alpha': None,
-              'tmin': -0.3,
-              'tmax': 0.6,
-              'baseline': (-0.3, -0.05)
+              'alpha': 1000,
+              'tmin': -0.2,
+              'tmax': 0.5,
+              'baseline': (-0.2, -0.05),
+
               }
 
 l_freq, h_freq = functions_general.get_freq_band(band_id=meg_params['band_id'])
@@ -64,9 +71,9 @@ model_name = 'lcmv'
 surf_vol = 'volume'
 ico = 5
 spacing = 5.  # Only for volume source estimation
-pick_ori = 'vector'  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
+pick_ori = None  # 'vector' For dipoles, 'max-power' for fixed dipoles in the direction tha maximizes output power
 source_power = False
-source_estimation = 'evk'  # 'epo' / 'evk' / 'cov' / 'trf'
+source_estimation = 'trf'  # 'epo' / 'evk' / 'cov' / 'trf'
 visualize_alignment = False
 active_times = [-1, 0]
 
@@ -82,11 +89,11 @@ plot_edge = 0.15
 initial_time = 0.1
 difference_initial_time = 0.3
 positive_cbar = None  # None for free determination, False to include negative values
-plot_individuals = False
+plot_individuals = True
 plot_ga = True
 
 # Permutations test
-run_permutations_GA = False
+run_permutations_GA = True
 run_permutations_diff = True
 desired_tval = 0.01
 p_threshold = 0.05
@@ -390,7 +397,11 @@ for param in param_values.keys():
                 # Get trf paths
                 trf_path = paths().save_path() + (f"TRF_{meg_params['data_type']}/Band_{meg_params['band_id']}/{trf_params['input_features']}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_"
                                    f"tgtpres{trial_params['tgtpres']}_trialdur{trial_params['trialdur']}_evtdur{trial_params['evtdur']}_{trf_params['tmin']}_{trf_params['tmax']}_"
-                                   f"bline{trf_params['baseline']}_alpha{trf_params['alpha']}_std{trf_params['standarize']}/{meg_params['chs_id']}/")
+                                   f"bline{trf_params['baseline']}_alpha{trf_params['alpha']}_std{trf_params['standarize']}/{meg_params['chs_id']}/").replace(":", "")
+
+                if meg_params['downsample'] is not None:
+                    trf_path = trf_path.replace(f"Band_{meg_params['band_id']}", f"Band_{meg_params['band_id']}_downsample_{meg_params['downsample']}")
+
                 trf_fig_path = trf_path.replace(paths().save_path(), paths().plots_path())
                 trf_fname = f'TRF_{subject.subject_id}.pkl'
 
@@ -404,11 +415,26 @@ for param in param_values.keys():
                     rf = functions_analysis.compute_trf(subject=subject, meg_data=meg_data, trial_params=trial_params, trf_params=trf_params, meg_params=meg_params,
                                                         save_data=save_data, trf_path=trf_path, trf_fname=trf_fname)
 
+                feature_evokeds = {}
+                if isinstance(trf_params['input_features'], dict):
+                    elements = trf_params['input_features'].keys()
+                elif isinstance(trf_params['input_features'], list):
+                    elements = trf_params['input_features']
+                for feature in elements:
+                    feature_evokeds[feature] = []
+                    if isinstance(trf_params['input_features'], dict):
+                        try:
+                            for value in trf_params['input_features'][feature]:
+                                feature_value = f'{feature}-{value}'
+                                feature_evokeds[feature_value] = []
+                        except:
+                            pass
+
                 # Get model coeficients as separate responses to each feature
-                subj_evoked, _ = functions_analysis.make_trf_evoked(subject=subject, rf=rf, meg_data=meg_data, trf_params=trf_params, meg_params=meg_params, fig_path=trf_fig_path)
+                feature_evokeds = functions_analysis.parse_trf_to_evoked(subject=subject, rf=rf, meg_data=meg_data, trf_params=trf_params, meg_params=meg_params, evokeds=feature_evokeds)
 
                 # Get evoked from desired feature
-                evoked = subj_evoked[run_params['epoch_id']]
+                evoked = feature_evokeds[run_params['epoch_id']][0]
 
                 # Apply filter and get source estimates
                 stc = beamformer.apply_lcmv(evoked=evoked, filters=filters)
@@ -466,7 +492,7 @@ for param in param_values.keys():
             if plot_individuals:
                 fname = f'{subject.subject_id}'
                 plot_general.sources(stc=stc_default, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=initial_time, surf_vol=surf_vol,
-                                     force_fsaverage=force_fsaverage, source_estimation=source_estimation, mask_negatives=mask_negatives,
+                                     force_fsaverage=force_fsaverage, source_estimation=source_estimation, mask_negatives=mask_negatives, pick_ori=pick_ori,
                                      positive_cbar=positive_cbar, views=['lat', 'med'], save_fig=save_fig, save_vid=False, fig_path=fig_path, fname=fname)
 
         # Grand Average: Average evoked stcs from this epoch_id
