@@ -102,7 +102,7 @@ def define_events(subject, meg_data, epoch_id, trial_num=None, evt_dur=None, epo
     if 'fix' in epoch_id and not rel_sac:
         metadata_sup = subject.fixations
         metadata_sup = metadata_sup.loc[metadata_sup['id'].isin(metadata['event_name'].astype(str))]
-    elif 'sac' in epoch_id:
+    if 'sac' in epoch_id:
         metadata_sup = subject.saccades
         metadata_sup = metadata_sup.loc[metadata_sup['id'].isin(metadata['event_name'].astype(str))]
 
@@ -485,7 +485,11 @@ def make_mtrf_input(input_arrays, var_name, subject, meg_data, evt_dur, cond_tri
     evt_idxs = events[:, 0]
     # Set those indexes as 1 or as variable
     if secondary_variable:
-        input_array[evt_idxs] = metadata_sup[var_name_2].to_numpy()
+        var_name = f'{var_name}/{var_name_2}'  # Overwrite varname to add in corresponding dictionary key
+        if var_name_2 == 'item' or var_name_2 == 'fix_target':
+            input_array[evt_idxs] = np.where((metadata_sup[var_name_2].fillna(0).to_numpy() != 0), 1, 0)
+        else:
+            input_array[evt_idxs] = metadata_sup[var_name_2].to_numpy()
     else:
         input_array[evt_idxs] = 1
     # Exclude bad annotations
@@ -503,15 +507,20 @@ def make_mtrf_input(input_arrays, var_name, subject, meg_data, evt_dur, cond_tri
 def fit_mtrf(meg_data, tmin, tmax, model_input, chs_id, standarize=True, fit_power=False, alpha=0, n_jobs=4):
 
     # Define mTRF model
-    rf = ReceptiveField(tmin, tmax, meg_data.info['sfreq'], estimator=alpha, scoring='corrcoef', verbose=False, n_jobs=n_jobs)
+    rf = ReceptiveField(tmin, tmax, meg_data.info['sfreq'], estimator=alpha, scoring='corrcoef', n_jobs=n_jobs)
 
-    # Get subset channels data as array
-    picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
-    meg_sub = meg_data.copy().pick(picks)
-
-    # Apply hilbert and extract envelope
-    if fit_power:
-        meg_sub = meg_sub.apply_hilbert(envelope=True)
+    if chs_id != 'misc':
+        # Get subset channels data as array
+        picks = functions_general.pick_chs(chs_id=chs_id, info=meg_data.info)
+        meg_sub = meg_data.copy().pick(picks)
+        # Apply hilbert and extract envelope
+        if fit_power:
+            meg_sub = meg_sub.apply_hilbert(envelope=True)
+    else:
+        meg_sub = meg_data.copy()
+        # Apply hilbert and extract envelope
+        if fit_power:
+            meg_sub = meg_sub.apply_hilbert(envelope=True, picks='VE')
 
     meg_data_array = meg_sub.get_data()
 
@@ -530,23 +539,43 @@ def fit_mtrf(meg_data, tmin, tmax, model_input, chs_id, standarize=True, fit_pow
     return rf
 
 
+def load_input_array_feature(feature, trial_params, meg_params, subj_path, use_saved_data=True):
+    fname_var = (f"{feature}_mss{trial_params.get('mss')}_corrans{trial_params.get('corrans')}_"
+                 f"tgtpres{trial_params.get('tgtpres')}_trialdur{trial_params.get('trialdur')}_"
+                 f"evtdur{trial_params.get('evtdur')}_array.pkl")
+
+    if meg_params.get('downsample'):
+        fname_var = fname_var.replace('_array.pkl', f'_{meg_params.get("downsample")}_array.pkl')
+
+    if os.path.exists(subj_path + fname_var) and use_saved_data:
+        feature_array = load.var(file_path=subj_path + fname_var)
+        print(f"Loaded input array for {feature} from \n"
+              f"{fname_var}")
+        return feature_array, fname_var
+
+    else:
+        return False, fname_var
+
 def compute_trf(subject, meg_data, trial_params, trf_params, meg_params, all_chs_regions=['frontal', 'temporal', 'central', 'parietal', 'occipital'],
-                save_data=False, trf_path=None, trf_fname=None):
+                use_saved_data=True, save_data=False, trf_path=None, trf_fname=None):
 
     print(f"Computing TRF for {trf_params['input_features']}")
 
     # Get condition trials
-    cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=trial_params['mss'], trial_dur=trial_params['trialdur'],
-                                                                      corr_ans=trial_params['corrans'], tgt_pres=trial_params['tgtpres'])
+    cond_trials, bh_data_sub = functions_general.get_condition_trials(subject=subject, mss=trial_params.get('mss'), trial_dur=trial_params.get('trialdur'),
+                                                                      corr_ans=trial_params.get('corrans'), tgt_pres=trial_params.get('tgtpres'))
 
     # Bad annotations filepath
     subj_path = paths().save_path() + f'TRF/{subject.subject_id}/'
-    fname_bad_annot = f'bad_annot_array.pkl'
+    if meg_params.get('downsample'):
+        fname_bad_annot = f'bad_annot_array_{meg_params["downsample"]}.pkl'
+    else:
+        fname_bad_annot = f'bad_annot_array.pkl'
 
-    try:
+    if os.path.exists(subj_path + fname_bad_annot):
         bad_annotations_array = load.var(subj_path + fname_bad_annot)
         print(f'Loaded bad annotations array')
-    except:
+    else:
         print(f'Computing bad annotations array...')
         bad_annotations_array = get_bad_annot_array(meg_data=meg_data, subj_path=subj_path, fname=fname_bad_annot)
 
@@ -556,17 +585,13 @@ def compute_trf(subject, meg_data, trial_params, trf_params, meg_params, all_chs
         elements = trf_params['input_features'].keys()
     elif isinstance(trf_params['input_features'], list):
         elements = trf_params['input_features']
+
+    subj_path = paths().save_path() + f'TRF/{subject.subject_id}/'
     for feature in elements:
-
-        subj_path = paths().save_path() + f'TRF/{subject.subject_id}/'
-        fname_var = (f"{feature}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_tgtpres{trial_params['tgtpres']}_trialdur{trial_params['trialdur']}_"
-                     f"evtdur{trial_params['evtdur']}_array.pkl")
-
-        try:
-            input_arrays[feature] = load.var(file_path=subj_path + fname_var)
-            print(f"Loaded input array for {feature}")
-
-        except:
+        feature_data, fname_var = load_input_array_feature(feature=feature, trial_params=trial_params, meg_params=meg_params, subj_path=subj_path, use_saved_data=use_saved_data)
+        if isinstance(feature_data, np.ndarray):
+            input_arrays[feature] = feature_data
+        else:
             print(f'Computing input array for {feature}...')
             # Exception for subsampled distractor fixations
             if 'sub' in feature:
@@ -596,17 +621,12 @@ def compute_trf(subject, meg_data, trial_params, trf_params, meg_params, all_chs
         if isinstance(trf_params['input_features'], dict):
             try:
                 for value in trf_params['input_features'][feature]:
-                    fname_var = (f"{feature}-{value}_mss{trial_params['mss']}_corrans{trial_params['corrans']}_tgtpres{trial_params['tgtpres']}_trialdur{trial_params['trialdur']}_"
-                                 f"evtdur{trial_params['evtdur']}_array.pkl")
-
-                    try:
-                        input_arrays[value] = load.var(file_path=subj_path + fname_var)
-                        print(f"Loaded input array for {feature}-{value}")
-
-                    except:
+                    feature_data, fname_var = load_input_array_feature(feature=f"{feature}-{value}", trial_params=trial_params, meg_params=meg_params, subj_path=subj_path, use_saved_data=use_saved_data)
+                    if isinstance(feature_data, np.ndarray):
+                        input_arrays[f'{feature}-{value}'] = feature_data
+                    else:
                         print(f'Computing input array for {feature}-{value}...')
                         epoch_keys = None
-
                         input_arrays = make_mtrf_input(input_arrays=input_arrays, var_name=f'{feature}/{value}',
                                                        subject=subject, meg_data=meg_data, evt_dur=trial_params['evtdur'],
                                                        cond_trials=cond_trials, epoch_keys=epoch_keys,
@@ -616,7 +636,6 @@ def compute_trf(subject, meg_data, trial_params, trf_params, meg_params, all_chs
                 pass
     # Concatenate input arrays as one
     model_input = np.array([input_arrays[key] for key in input_arrays.keys()]).T
-
     # All regions or selected (multiple) regions
     if meg_params['chs_id'] == 'mag' or '_' in meg_params['chs_id']:
         # rf as a dictionary containing the rf of each region
@@ -639,7 +658,7 @@ def compute_trf(subject, meg_data, trial_params, trf_params, meg_params, all_chs
     return rf
 
 
-def make_trf_evoked(subject, rf, meg_data, trf_params, meg_params, feature_index, feature, evokeds=None, display_figs=False, plot_individuals=True, save_fig=True, fig_path=None):
+def make_trf_evoked(subject, rf, meg_data, trf_params, meg_params, feature_index, feature, feature_evokeds=None, display_figs=False, plot_individuals=True, save_fig=True, fig_path=None):
 
     # All or multiple regions
     if meg_params['chs_id'] == 'mag' or '_' in meg_params['chs_id']:
@@ -666,30 +685,34 @@ def make_trf_evoked(subject, rf, meg_data, trf_params, meg_params, feature_index
         # Concatenate evoked from al regions
         subj_evoked = subj_evoked.add_channels(subj_evoked_list)
 
+    elif meg_params['chs_id'] == 'misc':
+        trf = np.expand_dims(rf.coef_[feature_index, :], axis=0)
+        # Define evoked objects from arrays of TRF
+        subj_evoked = mne.EvokedArray(data=trf, info=meg_data.info, tmin=trf_params['tmin'], baseline=trf_params['baseline'])
     else:
         trf = rf.coef_[:, feature_index, :]
         # Define evoked objects from arrays of TRF
-        subj_evoked = mne.EvokedArray(data=trf, info=meg_sub.info, tmin=trf_params['tmin'], baseline=trf_params['baseline'])
+        subj_evoked = mne.EvokedArray(data=trf, info=meg_data.info, tmin=trf_params['tmin'], baseline=trf_params['baseline'])
 
     # Append for Grand average
-    if evokeds != None:
-        evokeds[feature].append(subj_evoked)
+    if feature_evokeds != None:
+        feature_evokeds[feature].append(subj_evoked)
 
     # Plot
     if plot_individuals:
         fig = subj_evoked.plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(trf_params['tmin'], trf_params['tmax']), titles=feature)
         fig.suptitle(f'{feature}')
 
-    if save_fig:
-        # Save
-        fig_path_subj = fig_path + f'{subject.subject_id}/'
-        fname = f"{feature}_{meg_params['chs_id']}"
-        save.fig(fig=fig, fname=fname, path=fig_path_subj)
+        if save_fig:
+            # Save
+            fig_path_subj = fig_path + f'{subject.subject_id}/'
+            fname = f"{feature}_{meg_params['chs_id']}"
+            save.fig(fig=fig, fname=fname, path=fig_path_subj)
 
-    return evokeds
+    return feature_evokeds
 
 
-def parse_trf_to_evoked(subject, rf, meg_data, trf_params, meg_params, evokeds=None, display_figs=False, plot_individuals=True, save_fig=True, fig_path=None):
+def parse_trf_to_evoked(subject, rf, meg_data, trf_params, meg_params, sub_idx, feature_evokeds=None, display_figs=False, plot_individuals=False, save_fig=False, fig_path=None):
     """
     Get model coeficients as separate responses to each feature.
 
@@ -723,7 +746,7 @@ def parse_trf_to_evoked(subject, rf, meg_data, trf_params, meg_params, evokeds=N
     feature_index = 0
     for feature in elements:
 
-        evokeds = make_trf_evoked(subject=subject, rf=rf, meg_data=meg_data, evokeds=evokeds,
+        feature_evokeds = make_trf_evoked(subject=subject, rf=rf, meg_data=meg_data, feature_evokeds=feature_evokeds,
                                   trf_params=trf_params, feature_index=feature_index, feature=feature, meg_params=meg_params,
                                   plot_individuals=plot_individuals, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path)
         feature_index += 1
@@ -732,14 +755,27 @@ def parse_trf_to_evoked(subject, rf, meg_data, trf_params, meg_params, evokeds=N
             try:
                 for value in trf_params['input_features'][feature]:
                     feature_value = f'{feature}-{value}'
-                    evokeds = make_trf_evoked(subject=subject, rf=rf, meg_data=meg_data, evokeds=evokeds,
+                    feature_evokeds = make_trf_evoked(subject=subject, rf=rf, meg_data=meg_data, feature_evokeds=feature_evokeds,
                                               trf_params=trf_params, feature_index=feature_index, feature=feature_value, meg_params=meg_params,
                                               plot_individuals=plot_individuals, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path)
                     feature_index += 1
             except:
                 pass
 
-    return evokeds
+    if trf_params['add_features']:
+        if sub_idx == 0:
+            feature_evokeds['+'.join(trf_params['add_features'])] = []
+        data = np.zeros_like(feature_evokeds[trf_params['add_features'][0]][sub_idx].data)
+        for i in range(len(trf_params['add_features'])):
+            data += feature_evokeds[trf_params['add_features'][i]][sub_idx].data
+
+        # Define evoked objects from arrays of TRF
+        info = feature_evokeds[trf_params['add_features'][0]][sub_idx].info
+        add_evoked = mne.EvokedArray(data=data, info=info, tmin=trf_params['tmin'], baseline=trf_params['baseline'])
+
+        feature_evokeds['+'.join(trf_params['add_features'])].append(add_evoked)
+
+    return feature_evokeds
 
 
 def trf_grand_average(feature_evokeds, trf_params, meg_params, display_figs=False, save_fig=True, fig_path=None):
@@ -749,11 +785,7 @@ def trf_grand_average(feature_evokeds, trf_params, meg_params, display_figs=Fals
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
 
     grand_avg = {}
-    if isinstance(trf_params['input_features'], dict):
-        elements = trf_params['input_features'].keys()
-    elif isinstance(trf_params['input_features'], list):
-        elements = trf_params['input_features']
-    for feature in elements:
+    for feature in feature_evokeds.keys():
         # Compute grand average
         grand_avg[feature] = mne.grand_average(feature_evokeds[feature], interpolate_bads=True)
 
@@ -764,23 +796,6 @@ def trf_grand_average(feature_evokeds, trf_params, meg_params, display_figs=Fals
             # Save
             fname = f"{feature}_GA_{meg_params['chs_id']}"
             save.fig(fig=fig, fname=fname, path=fig_path)
-
-        if isinstance(trf_params['input_features'], dict):
-            try:
-                for value in trf_params['input_features'][feature]:
-                    feature_value = f'{feature}-{value}'
-                    # Compute grand average
-                    grand_avg[feature_value] = mne.grand_average(feature_evokeds[feature_value], interpolate_bads=True)
-
-                    # Plot
-                    fig = grand_avg[feature_value].plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(trf_params['tmin'], trf_params['tmax']), titles=feature_value)
-
-                    if save_fig:
-                        # Save
-                        fname = f"{feature_value}_GA_{meg_params['chs_id']}"
-                        save.fig(fig=fig, fname=fname, path=fig_path)
-            except:
-                pass
 
     return grand_avg
 
@@ -1060,7 +1075,7 @@ def run_source_permutations_test(src, stc, source_data, subject, exp_info, save_
     return stc_all_cluster_vis, significant_voxels, significance_mask, t_thresh_name, time_label, p_threshold
 
 
-def run_time_frequency_test(data, pval_threshold, t_thresh, min_sig_chs=0, n_permutations=1024):
+def run_permutations_test_tf(data, pval_threshold, t_thresh, min_sig_chs=0, n_permutations=1024):
 
     # Clusters out type
     if type(t_thresh) == dict:
@@ -1103,6 +1118,43 @@ def run_time_frequency_test(data, pval_threshold, t_thresh, min_sig_chs=0, n_per
             clusters_mask_plot = None
 
     return clusters_mask, clusters_mask_plot, significant_pvalues
+
+
+
+def run_permutations_test(data, pval_threshold, t_thresh, adj_matrix=None, n_permutations=1024):
+
+    # Clusters out type
+    if type(t_thresh) == dict:
+        out_type = 'indices'
+    else:
+        out_type = 'mask'
+
+    significant_pvalues = None
+
+    # Permutations cluster test (TFCE if t_thresh as dict)
+    t_tfce, clusters, p_tfce, H0 = permutation_cluster_1samp_test(X=data, threshold=t_thresh, n_permutations=n_permutations, adjacency=adj_matrix,
+                                                                  out_type=out_type, n_jobs=4)
+
+    # Make clusters mask
+    if type(t_thresh) == dict:
+        # If TFCE use p-vaues of voxels directly
+        p_tfce = p_tfce.reshape(data.shape[-2:])  # Reshape to data's shape
+        clusters_mask = p_tfce < pval_threshold
+
+    else:
+        # Get significant clusters
+        good_clusters_idx = np.where(p_tfce < pval_threshold)[0]
+        significant_clusters = [clusters[idx] for idx in good_clusters_idx]
+        significant_pvalues = [p_tfce[idx] for idx in good_clusters_idx]
+
+        # Reshape to data's shape by adding all clusters into one bool array
+        clusters_mask = np.zeros(data[0].shape)
+        if len(significant_clusters):
+            for significant_cluster in significant_clusters:
+                clusters_mask += significant_cluster
+        clusters_mask = clusters_mask.astype(bool)
+
+    return clusters_mask, significant_pvalues
 
 
 def get_labels(subject_code, parcelation, subjects_dir, surf_vol='surface'):
