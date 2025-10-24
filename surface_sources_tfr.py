@@ -456,7 +456,7 @@ for param in param_values.keys():
                 region_subj_data = np.expand_dims(region_subj_data, axis=-1)  # Need shape (n_subjects, n_freqs, n_times, n_channels,)
 
                 # Run clusters permutations test
-                clusters_mask, clusters_mask_plot, significant_pvalues = functions_analysis.run_time_frequency_test(data=region_subj_data, pval_threshold=p_threshold,
+                clusters_mask, clusters_mask_plot, significant_pvalues = functions_analysis.run_permutations_test_tf(data=region_subj_data, pval_threshold=p_threshold,
                                                                                                t_thresh=t_thresh, n_permutations=n_permutations)
 
                 if isinstance(t_thresh, dict):
@@ -592,7 +592,7 @@ for param in param_values.keys():
                     region_subj_diff_data = np.expand_dims(region_subj_diff_data, axis=-1)  # Need shape (n_subjects, n_freqs, n_times, n_channels,)
 
                     # Run clusters permutations test
-                    clusters_mask, clusters_mask_plot, significant_pvalues = functions_analysis.run_time_frequency_test(data=region_subj_diff_data, pval_threshold=p_threshold, t_thresh=t_thresh, n_permutations=n_permutations)
+                    clusters_mask, clusters_mask_plot, significant_pvalues = functions_analysis.run_permutations_test_tf(data=region_subj_diff_data, pval_threshold=p_threshold, t_thresh=t_thresh, n_permutations=n_permutations)
 
                     if isinstance(t_thresh, dict):
                         fname = f'GA_{region.name}_{l_freq}_{h_freq}_tTFCE_pval{p_threshold}'
