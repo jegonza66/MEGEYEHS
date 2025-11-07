@@ -14,7 +14,7 @@ import numpy as np
 exp_info = setup.exp_info()
 
 #----- Save data and display figures -----#
-use_saved_data = False
+use_saved_data = True
 save_data = True
 save_fig = True
 display_figs = True
@@ -25,28 +25,28 @@ else:
     plt.ioff()
 
 #-----  Parameters -----#
-trial_params = {'corrans': True,
-                'tgtpres': None,
+trial_params = {'corrans': None,
+                'tgtpres': True,
                 'mss': None,
                 'evtdur': None,
                 }
 
 meg_params = {'chs_id': 'mag',
-              'band_id': 'Beta',
+              'band_id': (0.1, 40),
               'data_type': 'ICA',
               'downsample': 300
               }
 
 # TRF parameters
-trf_params = {'input_features': {#'it_fix_vs+tgt_fix_vs': ['correct'],
-                                 'it_fix_vs': ['mss'], # 'n_fix', 'duration', {'fix_vs': ['item', 'fix_target']} 'pupil'? 'distance'?, 'mss'?,
+trf_params = {'input_features': {'it_fix_vs+tgt_fix_vs': ['correct'],
+                                 'tgt_fix_vs': ['correct'], # 'n_fix', 'duration', {'fix_vs': ['item', 'fix_target']} 'pupil'? 'distance'?, 'mss'?,
                                  'sac_vs': None, # duration , avg_vel
                                  'blue': None,
                                  'red': None  # Select features (events)
                                  },
               'add_features': None,
               'standarize': True,
-              'fit_power': True,
+              'fit_power': False,
               'alpha': 1000,
               'tmin': -0.2,
               'tmax': 0.5,
@@ -178,11 +178,11 @@ if run_permutations:
 else:
     clusters_mask = None
 
-joint_ylims = [dict(mag=[-6e13, 6e13]), dict(mag=[-2e13, 2e13]), dict(mag=[-2e13, 2e13]), dict(mag=[-2e13, 2e13]), dict(mag=[-1.5e14, 1.5e14]), dict(mag=[-1.5e14, 1.5e14]), dict(mag=[-1.5e14, 1.5e14])]
+joint_ylims = [dict(mag=[-6e13, 6e13]), dict(mag=[-2e13, 2e13]), dict(mag=[-2e13, 2e13]), dict(mag=[-2e13, 2e13]), dict(mag=[-1.5e14, 1.5e14]),  dict(mag=[-5e13, 5e13]),  dict(mag=[-5e13, 5e13])]
 
 # Plot features figure
 if isinstance(t_thresh, dict):
     fname = f'GA_features_TFCE_{pval_threshold}_{n_permutations}'
 else:
     fname = f'GA_features_{round(t_thresh, 2)}_{pval_threshold}_{n_permutations}'
-fig = plot_general.plot_trf_features(grand_avg=grand_avg, clusters_mask=clusters_mask, joint_ylims=joint_ylims, save_fig=save_fig, fig_path=fig_path, fname=fname)
+fig = plot_general.plot_trf_features(grand_avg=grand_avg, clusters_mask=clusters_mask, joint_ylims=joint_ylims, top_topos=False, save_fig=save_fig, fig_path=fig_path, fname=fname)
