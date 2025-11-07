@@ -575,7 +575,7 @@ def tfr_plotjoint_picks(tfr, plot_baseline=(None, 0), bline_mode=None, plot_xlim
                                    title=title, show=display_figs, vmin=vmin, vmax=vmax)
 
     # Plot vertical lines
-    tf_ax = fig.axes[0]
+    tf_ax = fig.axes[-2]
     if not vlines_times and (tfr_plotjoint.times[0] != 0 and tfr_plotjoint.times[-1] != 0):
         vlines_times = [0]
     if vlines_times:
@@ -603,7 +603,7 @@ def tfr_plotjoint_picks(tfr, plot_baseline=(None, 0), bline_mode=None, plot_xlim
     mask_params = dict(marker='o', markerfacecolor='white', markeredgecolor='k', linewidth=0, markersize=4, alpha=0.6)
 
     # Get topo axes and overwrite topoplots
-    topo_axes = fig.axes[1:-1]
+    topo_axes = fig.axes[:-2]
     for i, (ax, timefreq) in enumerate(zip(topo_axes, timefreqs)):
         ax.clear()
         topomap_kw = dict(ch_type='mag', tmin=timefreq[0], tmax=timefreq[0], fmin=timefreq[1], fmax=timefreq[1], mask=masks[i], mask_params=mask_params, colorbar=False, show=display_figs)
@@ -1177,7 +1177,7 @@ def global_connectivity(data_dict, categories, save_fig, fig_path, n_lines, hemi
 
 
 def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsaverage, source_estimation, save_fig, fig_path, fname, pick_ori=None,
-            surface='pial', hemi='split', views='lateral', alpha=0.75, mask_negatives=False, time_label='auto', save_vid=True, positive_cbar=None, clim=None):
+            surface='pial', hemi='split', views='lateral', alpha=0.75, colormap='hot', mask_negatives=False, time_label='auto', save_vid=True, positive_cbar=None, clim=None):
 
     # Close all plot figures
     try:
@@ -1240,10 +1240,7 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
         else:
             bg_img = None
 
-        # Set backend
-        # matplotlib.use('Qt5Agg')
-
-        fig = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, initial_time=initial_time_plot, clim=clim, bg_img=bg_img)
+        fig = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, initial_time=initial_time_plot, clim=clim, colormap=colormap, bg_img=bg_img)
         if save_fig:
             if force_fsaverage:
                 fname += '_fsaverage'
@@ -1255,7 +1252,7 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
             save.fig(fig=fig, path=fig_path, fname=fname)
 
         # 3D plot
-        brain = stc.plot_3d(src=src, subject=subject, subjects_dir=subjects_dir, hemi=hemi, views=views, clim=clim,
+        brain = stc.plot_3d(src=src, subject=subject, subjects_dir=subjects_dir, hemi=hemi, views=views, clim=clim, colormap=colormap,
                             initial_time=initial_time_plot, size=(1000, 500), time_label=time_label, brain_kwargs=dict(surf=surface, alpha=alpha))
 
         if save_fig:
@@ -1276,7 +1273,7 @@ def sources(stc, src, subject, subjects_dir, initial_time, surf_vol, force_fsave
     # 3D plot
     elif surf_vol == 'surface':
 
-        brain = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, hemi=hemi, clim=clim, initial_time=initial_time_plot, views=views, size=(1000, 500),
+        brain = stc.plot(src=src, subject=subject, subjects_dir=subjects_dir, hemi=hemi, clim=clim, colormap=colormap, initial_time=initial_time_plot, views=views, size=(1000, 500),
                          brain_kwargs=dict(surf=surface, alpha=alpha))
 
         if save_fig:
@@ -1475,7 +1472,7 @@ def plot_trf_features(grand_avg,
                                     topomap_args={'vlim':vlims_topo, 'axes': axs_topos, 'size': 3, 'sensors': False},
                                     show=False)
         else:
-            grand_avg[coeff].plot(axes=ax_frp, titles='', window_title='', xlim=xlim, ylim=joint_ylims, show=False)
+            grand_avg[coeff].plot(axes=ax_frp, titles='', window_title='', xlim=xlim, ylim=joint_ylims_plot, units='A.U.', show=False)
 
         # clean axis
         ax_frp.set_xlabel([])
@@ -1537,7 +1534,7 @@ def plot_trf_features(grand_avg,
             ax_frp.set_ylabel('')
             if plot_total_sig_chs:
                 ax_tfce_twin.set_yticklabels([])
-                ax_tfce_twin.set_ylabel([])
+                ax_tfce_twin.set_ylabel('')
 
         times = grand_avg[coeff].times
         ix_plot = np.argmin(np.abs(time_plot - times))
