@@ -87,13 +87,13 @@ plot_edge = 0.15
 
 # Plot
 initial_time = 0.1
-difference_initial_time = 0.38
+difference_initial_time = 0.3
 positive_cbar = None  # None for free determination, False to include negative values
-plot_individuals = True
+plot_individuals = False
 plot_ga = True
 
 # Permutations test
-run_permutations_GA = True
+run_permutations_GA = False
 run_permutations_diff = True
 desired_tval = 0.01
 p_threshold = 0.05
@@ -631,12 +631,12 @@ for param in param_values.keys():
                     fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
                     brain = plot_general.sources(stc=GA_stc_diff_sig, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0,
                                                  surf_vol=surf_vol, time_label=time_label, force_fsaverage=force_fsaverage, source_estimation=source_estimation,
-                                                 views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=positive_cbar, pick_ori=pick_ori,
+                                                 views=['lat', 'med'], mask_negatives=mask_negatives, colormap='Greens', positive_cbar=positive_cbar, pick_ori=pick_ori,
                                                  save_vid=False, save_fig=save_fig, fig_path=fig_path_diff, fname=fname)
 
                 elif significance_mask is not None:
                     fname = f'Clus_t{t_thresh_name}_p{p_threshold}'
                     brain = plot_general.sources(stc=stc_all_cluster_vis, src=src_default, subject='fsaverage', subjects_dir=subjects_dir, initial_time=0,
                                                  surf_vol=surf_vol, time_label=time_label, force_fsaverage=force_fsaverage, source_estimation=source_estimation,
-                                                 views=['lat', 'med'], mask_negatives=mask_negatives, positive_cbar=positive_cbar, pick_ori=pick_ori,
+                                                 views=['lat', 'med'], mask_negatives=mask_negatives, colormap='Greens', positive_cbar=positive_cbar, pick_ori=pick_ori,
                                                  save_vid=False, save_fig=save_fig, fig_path=fig_path_diff, fname=fname)
