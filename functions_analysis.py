@@ -858,17 +858,6 @@ def parse_trf_to_evoked(subject, rf, meg_data, trf_params, meg_params, sub_idx, 
                                   plot_individuals=plot_individuals, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path)
         feature_index += 1
 
-        if isinstance(trf_params['input_features'], dict):
-            try:
-                for value in trf_params['input_features'][feature]:
-                    feature_value = f'{feature}-{value}'
-                    feature_evokeds = make_trf_evoked(subject=subject, rf=rf, meg_data=meg_data, feature_evokeds=feature_evokeds,
-                                              trf_params=trf_params, feature_index=feature_index, feature=feature_value, meg_params=meg_params,
-                                              plot_individuals=plot_individuals, display_figs=display_figs, save_fig=save_fig, fig_path=fig_path)
-                    feature_index += 1
-            except:
-                pass
-
     if trf_params['add_features']:
         if sub_idx == 0:
             feature_evokeds['+'.join(trf_params['add_features'])] = []
@@ -1228,7 +1217,7 @@ def run_permutations_test_tf(data, pval_threshold, t_thresh, min_sig_chs=0, n_pe
 
 
 
-def run_permutations_test(data, pval_threshold, t_thresh, adj_matrix=None, n_permutations=1024):
+def run_permutations_test(data, pval_threshold, t_thresh, adj_matrix=None, n_permutations=1024, seed=None):
 
     # Clusters out type
     if type(t_thresh) == dict:
@@ -1240,7 +1229,7 @@ def run_permutations_test(data, pval_threshold, t_thresh, adj_matrix=None, n_per
 
     # Permutations cluster test (TFCE if t_thresh as dict)
     t_tfce, clusters, p_tfce, H0 = permutation_cluster_1samp_test(X=data, threshold=t_thresh, n_permutations=n_permutations, adjacency=adj_matrix,
-                                                                  out_type=out_type, n_jobs=4)
+                                                                  out_type=out_type, seed=seed, n_jobs=4)
 
     # Make clusters mask
     if type(t_thresh) == dict:
