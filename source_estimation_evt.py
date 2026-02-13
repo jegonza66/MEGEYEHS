@@ -400,7 +400,7 @@ for param in param_values.keys():
                                    f"bline{trf_params['baseline']}_alpha{trf_params['alpha']}_std{trf_params['standarize']}/{meg_params['chs_id']}/").replace(":", "")
 
                 if meg_params['downsample'] is not None:
-                    trf_path = trf_path.replace(f"Band_{meg_params['band_id']}", f"Band_{meg_params['band_id']}_downsample_{meg_params['downsample']}")
+                    trf_path = trf_path.replace(f"Band_{meg_params['band_id']}", f"Band_{meg_params['band_id']}_down{meg_params['downsample']}")
 
                 trf_fig_path = trf_path.replace(paths().save_path(), paths().plots_path())
                 trf_fname = f'TRF_{subject.subject_id}.pkl'
