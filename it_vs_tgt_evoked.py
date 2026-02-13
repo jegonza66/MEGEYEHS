@@ -395,7 +395,7 @@ fig_path = paths().plots_path() + (f"TRF_{meg_params['data_type']}/Band_{meg_par
 
 # Change path to include downsampled data
 if meg_params['downsample'] is not None:
-    fig_path = fig_path.replace(f"Band_{meg_params['band_id']}", f"Band_{meg_params['band_id']}_downsample_{meg_params['downsample']}")
+    fig_path = fig_path.replace(f"Band_{meg_params['band_id']}", f"Band_{meg_params['band_id']}_down{meg_params['downsample']}")
 
 # Change path to include envelope power
 if trf_params['fit_power']:
