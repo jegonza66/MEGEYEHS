@@ -880,6 +880,8 @@ def connectome(subject, labels, adjacency_matrix, subject_code, save_fig=False, 
             if subject_code == 'fsaverage' and 'fsaverage' not in fname:
                 fname += '_fsaverage'
             save.fig(fig=fig, path=fig_path, fname=fname)
+    else:
+        print('No connections to plot.')
 
 
 def plot_con_matrix(subject, labels, adjacency_matrix, subject_code, n_ticks=5, save_fig=False, fig_path=None, fname='GA_matrix'):
@@ -1411,7 +1413,7 @@ def add_task_lines(y_text, fontsize=10, color='white', ax=None):
 def plot_trf_features(grand_avg,
                       clusters_mask=None,
                       plot_total_sig_chs=True,
-                      figsize=[22, 10],
+                      figsize=[14, 5],
                       time_topos=None,
                       top_topos=True,
                       xlim=None,
@@ -1431,12 +1433,12 @@ def plot_trf_features(grand_avg,
         xlim = [grand_avg[list(grand_avg.keys())[0]].times[0], grand_avg[list(grand_avg.keys())[0]].times[-1]]
 
     top_slide = 0.035
-    horizontal_jump = 1/(len(grand_avg.keys()))*0.98
-    width = 1/(len(grand_avg.keys()) + 2)
-    width_topo = 1/len(grand_avg.keys())/2
-    main_left = 0.033
-    tfce_topo_cb_width = 0.004
-    top_topo_width = 0.03
+    horizontal_space = 0.03
+    width = 1/(len(grand_avg.keys())*1.5)
+    width_topo = width/1.3
+    main_left = 0.05
+    tfce_topo_cb_width = 0.003
+    top_topo_width = width_topo/3
 
     fig = plt.figure(constrained_layout=False, figsize=figsize)
 
@@ -1445,19 +1447,19 @@ def plot_trf_features(grand_avg,
 
     jump = 0
     for i, coeff in enumerate(grand_avg.keys()):
-        left = main_left + jump * horizontal_jump
+        left = main_left + jump * (width + horizontal_space)
 
-        ax_frp = fig.add_axes((left, 0.47, width, 0.2))
-        ax_tfce = fig.add_axes((left, 0.27, width, 0.2))
-        ax_tfce_topo = fig.add_axes((left + (width - width_topo)/2, -0.015, width_topo, 0.25))
-        ax_tfce_topo_cb = fig.add_axes((left + width - tfce_topo_cb_width * 2, 0.035, 0.006, 0.145))
+        ax_frp = fig.add_axes((left, 0.55, width, 0.2))
+        ax_tfce = fig.add_axes((left, 0.35, width, 0.2))
+        ax_tfce_topo = fig.add_axes((left + (width - width_topo) / 2, 0.03, width_topo, 0.2))
+        ax_tfce_topo_cb = fig.add_axes((left + width - tfce_topo_cb_width * 2, 0.05, 0.006, 0.12))
 
         if top_topos:
             left -= 0.015
-            ax_topo1 = fig.add_axes((left, 0.75, top_topo_width, 0.07))
-            ax_topo2 = fig.add_axes((left + top_slide, 0.75, top_topo_width, 0.07))
-            ax_topo3 = fig.add_axes((left + top_slide * 2, 0.75, top_topo_width, 0.07))
-            ax_topo_cb = fig.add_axes((left + top_slide * 3, 0.75, 0.004, 0.09))
+            ax_topo1 = fig.add_axes((left, 0.75, top_topo_width, 0.05))
+            ax_topo2 = fig.add_axes((left + top_slide, 0.75, top_topo_width, 0.05))
+            ax_topo3 = fig.add_axes((left + top_slide * 2, 0.75, top_topo_width, 0.05))
+            ax_topo_cb = fig.add_axes((left + top_slide * 3, 0.75, 0.004, 0.07))
             axs_topos = [ax_topo1, ax_topo2, ax_topo3, ax_topo_cb]
 
         jump += 1
@@ -1475,7 +1477,7 @@ def plot_trf_features(grand_avg,
             grand_avg[coeff].plot(axes=ax_frp, titles='', window_title='', xlim=xlim, ylim=joint_ylims_plot, units='A.U.', show=False)
 
         # clean axis
-        ax_frp.set_xlabel([])
+        ax_frp.set_xlabel('')
         ax_frp.set_xticklabels([])
         ax_frp.set_title('')
         if top_topos:
@@ -1502,9 +1504,10 @@ def plot_trf_features(grand_avg,
 
         ax_frp.axvline(time_plot, ls="--", color="k", lw=1)
         ax_frp.axvline(0, ls="-", color="k", lw=.9)
-        ax_tfce.tick_params(axis='both', labelsize=12)
+        ax_frp.tick_params(axis='both', labelsize=10)
         ax_tfce.axvline(time_plot, ls="--", color="k", lw=1)
         ax_tfce.axvline(0, ls="-", color="k", lw=.9)
+        ax_tfce.tick_params(axis='both', labelsize=10)
 
         # Greys
         greys_cmap = plt.cm.get_cmap('Greys')
@@ -1512,7 +1515,6 @@ def plot_trf_features(grand_avg,
         # Adjust the luminance values to make the colormap darker
         colors_plot[:, :3] *= 0.6  # Multiply RGB values by 0.7 to darken them
         custom_cmap = colors.ListedColormap(colors_plot)
-        # title = 'TFCE p-value'# with alpha level={pval_threshold}'
         grand_avg[coeff].plot_image(cmap='RdBu_r', mask=clusters_mask[coeff], mask_style='mask', mask_alpha=0.5,
                                 titles=None, axes=ax_tfce, show=False, xlim=xlim, mask_cmap=custom_cmap, colorbar=False)
 
@@ -1520,8 +1522,10 @@ def plot_trf_features(grand_avg,
             total_sig_chs = clusters_mask[coeff].sum(axis=0)
             ax_tfce_twin = ax_tfce.twinx()
             ax_tfce_twin.plot(grand_avg[coeff].times,total_sig_chs, color='black')
-            ax_tfce_twin.set_ylabel('Significant Channels')
-            ax_tfce_twin.set_ylim(-5, max_sig_chs)
+            # ax_tfce_twin.set_ylabel('Significant Channels')
+            # ax_tfce_twin.set_ylim(-5, max_sig_chs)
+            ax_tfce_twin.set_yticks([])
+            ax_tfce_twin.set_ylim(ax_tfce.get_ylim())
             ax_tfce_twin.tick_params(axis='y', labelsize=8)
 
         # clean tfce axis
@@ -1559,11 +1563,12 @@ def plot_trf_features(grand_avg,
 
         # Set feature title
         ax_tfce_topo.set_title(coeff, fontsize=12)
-        ax_tfce_topo_cb.set_title(f'A.U.', fontsize=12)  # title
+        ax_tfce_topo_cb.set_title(f'A.U.', fontsize=8)  # title
         ax_tfce_topo.set_xlabel("%s ms" % round(time_plot, 2))
         ax_tfce_topo.title.set_size(10)
 
         ax_frp.set_title('')
+
     ch = fig.get_children()
     for ax in ch:
         childs = ax.get_children()
@@ -1574,14 +1579,13 @@ def plot_trf_features(grand_avg,
 
     if save_fig:
         if not fname:
-            fname = 'GA_features'
+            fname = 'GA_features_multirow'
         save.fig(fig=fig, path=fig_path, fname=fname)
 
     return fig
 
 
 def ve_evoked(evoked_ve, envelope, key, trf_params, ve_params, peak_index, tmin, tmax, subject_id, save_fig, ve_fig_path_trf, ve_fig_path):
-
     fig, axes = plt.subplots(2, 1, figsize=(12, 8))
 
     # Plot evoked response
