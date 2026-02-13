@@ -494,6 +494,9 @@ def make_mtrf_input(input_arrays, var_name, subject, meg_data, evt_dur, cond_tri
             input_array[evt_idxs] = np.where((metadata_sup[var_name_2].fillna(0).to_numpy() == value_2), 1, 0)
         elif var_name_2 == 'item' or var_name_2 == 'fix_target':
             input_array[evt_idxs] = np.where((metadata_sup[var_name_2].fillna(0).to_numpy() != 0), 1, 0)
+        elif var_name_2 == 'n_fix_norm':
+            metadata_sup['n_fix_norm'] = metadata_sup.groupby(['screen', 'trial'])['n_fix'].transform(lambda x: x / x.max())
+            input_array[evt_idxs] = metadata_sup['n_fix_norm'].to_numpy()
         else:
             input_array[evt_idxs] = metadata_sup[var_name_2].to_numpy()
     else:
