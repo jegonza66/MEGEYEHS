@@ -8,7 +8,7 @@ import save
 import matplotlib.pyplot as plt
 import numpy as np
 
-save_fig = False
+save_fig = True
 exp_info = setup.exp_info()
 
 cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
@@ -27,6 +27,9 @@ all_response_times_end = pd.DataFrame()
 
 all_acc = {1: [], 2: [], 4: []}
 all_response_times = {1: [], 2: [], 4: []}
+
+# Dictionary to store trials with target fixations on both screens
+trials_with_both_tgt_fix = {}
 
 for subject_code in exp_info.subjects_ids:
 
@@ -48,6 +51,10 @@ for subject_code in exp_info.subjects_ids:
     rt = pd.DataFrame(subject.rt)
     corr_ans = pd.DataFrame(subject.corr_ans)
     trial_mss = pd.DataFrame(subject.bh_data['Nstim'])
+
+    # Add subject identifier to fixations and saccades for proper grouping later
+    fixations['subject'] = subject.subject_id
+    saccades['subject'] = subject.subject_id
 
     cross1_fixations = fixations.loc[fixations['screen'] == 'cross1']
     ms_fixations = fixations.loc[fixations['screen'] == 'ms']
@@ -103,6 +110,88 @@ for subject_code in exp_info.subjects_ids:
     all_response_times[2].append(rt2_mean)
     all_response_times[4].append(rt4_mean)
 
+    # Check trials with target fixations on both ms and vs screens
+    # Filter only trials where target is present
+    fixations_tgt_pres = fixations[fixations['target_pres'] == 1].copy()
+    
+    # Initialize storage for this subject
+    trials_with_both_tgt_fix[subject.subject_id] = {}
+    
+    for mss in [1, 2, 4]:
+        # Initialize storage for this MSS
+        trials_with_both_tgt_fix[subject.subject_id][mss] = {}
+        
+        # Loop through correct (1) and incorrect (0) trials
+        for correct in [0, 1]:
+            # Get fixations for this MSS, target present, and correctness
+            fix_mss = fixations_tgt_pres[(fixations_tgt_pres['mss'] == mss) & (fixations_tgt_pres['correct'] == correct)]
+            
+            # Get total number of unique target present trials for this MSS and correctness from fixations
+            total_tgt_pres_trials = len(fix_mss['trial'].unique())
+            
+            # Get trials with target fixations on ms screen
+            trials_with_tgt_fix_ms = set(
+                fix_mss[(fix_mss['screen'] == 'ms') & (fix_mss['fix_target'] == 1)]['trial'].unique()
+            )
+            
+            # Get trials with target fixations on vs screen
+            trials_with_tgt_fix_vs = set(
+                fix_mss[(fix_mss['screen'] == 'vs') & (fix_mss['fix_target'] == 1)]['trial'].unique()
+            )
+            
+            # Find trials with target fixations on BOTH screens
+            trials_with_both = trials_with_tgt_fix_ms.intersection(trials_with_tgt_fix_vs)
+            
+            # Store results
+            correct_label = 'correct' if correct == 1 else 'incorrect'
+            trials_with_both_tgt_fix[subject.subject_id][mss][correct_label] = {
+                'total_tgt_pres': total_tgt_pres_trials,
+                'both_screens': len(trials_with_both),
+                'ms_only': len(trials_with_tgt_fix_ms - trials_with_tgt_fix_vs),
+                'vs_only': len(trials_with_tgt_fix_vs - trials_with_tgt_fix_ms),
+                'ms_total': len(trials_with_tgt_fix_ms),
+                'vs_total': len(trials_with_tgt_fix_vs),
+                'percentage_both': (len(trials_with_both) / total_tgt_pres_trials * 100) if total_tgt_pres_trials > 0 else 0
+            }
+            
+            print(f'  MSS {mss} ({correct_label}): {len(trials_with_both)}/{total_tgt_pres_trials} trials ({trials_with_both_tgt_fix[subject.subject_id][mss][correct_label]["percentage_both"]:.1f}%) have target fixations on BOTH ms and vs')
+            print(f'    - MS only: {trials_with_both_tgt_fix[subject.subject_id][mss][correct_label]["ms_only"]}, VS only: {trials_with_both_tgt_fix[subject.subject_id][mss][correct_label]["vs_only"]}')
+
+# Print summary statistics across all subjects
+print('\n' + '='*80)
+print('SUMMARY: Trials with Target Fixations on BOTH MS and VS Screens')
+print('='*80)
+
+for mss in [1, 2, 4]:
+    print(f'\n{"="*80}')
+    print(f'MSS {mss}:')
+    print(f'{"="*80}')
+
+    for correct_label in ['correct', 'incorrect']:
+        print(f'\n  {correct_label.upper()} TRIALS:')
+        total_both = []
+        total_tgt_pres = []
+        percentages = []
+        ms_only_list = []
+        vs_only_list = []
+
+        for subject_id, data in trials_with_both_tgt_fix.items():
+            total_both.append(data[mss][correct_label]['both_screens'])
+            total_tgt_pres.append(data[mss][correct_label]['total_tgt_pres'])
+            percentages.append(data[mss][correct_label]['percentage_both'])
+            ms_only_list.append(data[mss][correct_label]['ms_only'])
+            vs_only_list.append(data[mss][correct_label]['vs_only'])
+
+        print(f'    Average across subjects: {np.mean(total_both):.1f}/{np.mean(total_tgt_pres):.1f} trials ({np.mean(percentages):.1f}% ± {np.std(percentages):.1f}%)')
+        print(f'    Range: {np.min(percentages):.1f}% - {np.max(percentages):.1f}%')
+        print(f'    Average MS only: {np.mean(ms_only_list):.1f} ± {np.std(ms_only_list):.1f}')
+        print(f'    Average VS only: {np.mean(vs_only_list):.1f} ± {np.std(vs_only_list):.1f}')
+
+        # Total across all subjects
+        print(f'    Total across all subjects: {sum(total_both)}/{sum(total_tgt_pres)} trials ({sum(total_both)/sum(total_tgt_pres)*100:.1f}%)' if sum(total_tgt_pres) > 0 else '    Total across all subjects: 0/0 trials (0.0%)')
+
+print('\n' + '='*80)
+
 # Define all subjects class instance
 subjects = setup.all_subjects(all_fixations, all_saccades, all_bh_data, all_rt.values, all_corr_ans.values, all_mss)
 
@@ -125,6 +214,117 @@ if save_fig:
     save_path = paths().plots_path() + 'Preprocessing/' + subjects.subject_id + '/'
     fname = f'{subjects.subject_id} Multipanel'
     save.fig(fig=fig, path=save_path, fname=fname)
+
+
+## New plots: Fixations per epoch by MSS, Fixation duration by MSS, Saccade amplitude by MSS
+
+# 1. Number of fixations per epoch (trial) by MSS
+print('\nPlotting fixations per epoch by MSS')
+fig_fix_per_trial, axs_fpt = plt.subplots(1, 3, figsize=(15, 5), sharey=True)
+fig_fix_per_trial.suptitle('Fixations per Trial by MSS', fontsize=18)
+
+for idx, mss in enumerate([1, 2, 4]):
+    # Get fixations for this MSS
+    fixations_mss = all_fixations[all_fixations['mss'] == mss]
+
+    # Count fixations per trial for each subject separately
+    # Group by both subject and trial to get fixations per individual trial
+    if 'subject' in fixations_mss.columns:
+        fixations_per_trial = fixations_mss.groupby(['subject', 'trial']).size()
+    else:
+        # If no subject column, create a unique identifier from index patterns
+        fixations_per_trial = fixations_mss.groupby(['trial']).size()
+
+    # Plot histogram
+    axs_fpt[idx].hist(fixations_per_trial, bins=30, edgecolor='black',
+                      linewidth=0.8, density=True, stacked=True, alpha=0.7)
+    axs_fpt[idx].set_title(f'MSS = {mss}')
+    axs_fpt[idx].set_xlabel('Fixations per trial')
+    if idx == 0:
+        axs_fpt[idx].set_ylabel('Density')
+
+    # Add statistics
+    mean_fix = fixations_per_trial.mean()
+    std_fix = fixations_per_trial.std()
+    # median_fix = fixations_per_trial.median()
+    axs_fpt[idx].axvline(mean_fix, color='red', linestyle='--', linewidth=2,
+                         label=f'Mean: {mean_fix:.1f}±{std_fix:.1f}')
+    # axs_fpt[idx].axvline(median_fix, color='orange', linestyle='--', linewidth=2,
+    #                      label=f'Median: {median_fix:.1f}')
+    axs_fpt[idx].legend()
+
+fig_fix_per_trial.tight_layout()
+
+if save_fig:
+    save_path = paths().plots_path() + 'Preprocessing/All_Subjects/'
+    fname = 'Fixations per trial by MSS'
+    save.fig(fig=fig_fix_per_trial, path=save_path, fname=fname)
+
+
+# 2. Fixation duration distributions by MSS
+print('Plotting fixation duration distributions by MSS')
+fig_fix_dur, axs_fd = plt.subplots(1, 3, figsize=(15, 5), sharey=True)
+fig_fix_dur.suptitle('Fixation Duration Distribution by MSS', fontsize=18)
+
+for idx, mss in enumerate([1, 2, 4]):
+    # Get fixation durations for this MSS
+    fixations_mss = all_fixations[all_fixations['mss'] == mss]
+    fix_durations = fixations_mss['duration']
+
+    # Plot histogram
+    axs_fd[idx].hist(fix_durations, bins=100, range=(0, 2), edgecolor='black',
+                     linewidth=0.3, density=True, stacked=True, alpha=0.7)
+    axs_fd[idx].set_title(f'MSS = {mss}')
+    axs_fd[idx].set_xlabel('Duration (s)')
+    if idx == 0:
+        axs_fd[idx].set_ylabel('Density')
+
+    # Add statistics
+    mean_dur = fix_durations.mean()
+    std_dur = fix_durations.std()
+    axs_fd[idx].axvline(mean_dur, color='red', linestyle='--', linewidth=2,
+                        label=f'Mean: {mean_dur:.3f}±{std_dur:.3f}s')
+    axs_fd[idx].legend()
+
+fig_fix_dur.tight_layout()
+
+if save_fig:
+    save_path = paths().plots_path() + 'Preprocessing/All_Subjects/'
+    fname = 'Fixation duration by MSS'
+    save.fig(fig=fig_fix_dur, path=save_path, fname=fname)
+
+
+# 3. Saccade amplitude distributions by MSS
+print('Plotting saccade amplitude distributions by MSS')
+fig_sac_amp, axs_sa = plt.subplots(1, 3, figsize=(15, 5), sharey=True)
+fig_sac_amp.suptitle('Saccade Amplitude Distribution by MSS', fontsize=18)
+
+for idx, mss in enumerate([1, 2, 4]):
+    # Get saccade amplitudes for this MSS
+    saccades_mss = all_saccades[all_saccades['mss'] == mss]
+    sac_amplitudes = saccades_mss['amp']
+
+    # Plot histogram
+    axs_sa[idx].hist(sac_amplitudes, bins=100, edgecolor='black',
+                     linewidth=0.3, density=True, stacked=True, alpha=0.7)
+    axs_sa[idx].set_title(f'MSS = {mss}')
+    axs_sa[idx].set_xlabel('Amplitude (deg)')
+    if idx == 0:
+        axs_sa[idx].set_ylabel('Density')
+
+    # Add statistics
+    mean_amp = sac_amplitudes.mean()
+    std_amp = sac_amplitudes.std()
+    axs_sa[idx].axvline(mean_amp, color='red', linestyle='--', linewidth=2,
+                        label=f'Mean: {mean_amp:.2f}±{std_amp:.2f}°')
+    axs_sa[idx].legend()
+
+fig_sac_amp.tight_layout()
+
+if save_fig:
+    save_path = paths().plots_path() + 'Preprocessing/All_Subjects/'
+    fname = 'Saccade amplitude by MSS'
+    save.fig(fig=fig_sac_amp, path=save_path, fname=fname)
 
 
 ## Fixation and saccade rates
