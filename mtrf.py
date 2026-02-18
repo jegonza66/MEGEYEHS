@@ -178,7 +178,7 @@ if run_permutations:
 else:
     clusters_mask = None
 
-joint_ylims = [dict(mag=[-6e13, 6e13]), dict(mag=[-2e13, 2e13]), dict(mag=[-2e13, 2e13]), dict(mag=[-2e13, 2e13]),  dict(mag=[-2e13, 2e13]), dict(mag=[-2e13, 2e13]), dict(mag=[-1.5e14, 1.5e14]),  dict(mag=[-5e13, 5e13]),  dict(mag=[-5e13, 5e13])]
+joint_ylims = [dict(mag=[-6e-2, 6e-2]), dict(mag=[-2e-2, 2e-2]), dict(mag=[-2e-2, 2e-2]), dict(mag=[-2e-2, 2e-2]),  dict(mag=[-2e-2, 2e-2]), dict(mag=[-2e-2, 2e-2]), dict(mag=[-1.5e-1, 1.5e-1]),  dict(mag=[-5e-2, 5e-2]),  dict(mag=[-5e-2, 5e-2])]
 
 # Plot features figure
 if isinstance(t_thresh, dict):

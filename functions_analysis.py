@@ -813,7 +813,7 @@ def make_trf_evoked(subject, rf, meg_data, trf_params, meg_params, feature_index
 
     # Plot
     if plot_individuals:
-        fig = subj_evoked.plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(trf_params['tmin'], trf_params['tmax']), titles=feature)
+        fig = subj_evoked.plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(trf_params['tmin'], trf_params['tmax']), titles=feature, unit=False)
         fig.suptitle(f'{feature}')
 
         if save_fig:
@@ -889,7 +889,7 @@ def trf_grand_average(feature_evokeds, trf_params, meg_params, display_figs=Fals
         grand_avg[feature] = mne.grand_average(feature_evokeds[feature], interpolate_bads=True)
 
         # Plot
-        fig = grand_avg[feature].plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(trf_params['tmin'], trf_params['tmax']), titles=feature)
+        fig = grand_avg[feature].plot(spatial_colors=True, gfp=True, show=display_figs, xlim=(trf_params['tmin'], trf_params['tmax']), titles=feature, unit=False)
 
         if save_fig:
             # Save

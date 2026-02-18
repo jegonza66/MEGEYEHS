@@ -1470,11 +1470,12 @@ def plot_trf_features(grand_avg,
         else:
             joint_ylims_plot = joint_ylims
         if top_topos:
-            grand_avg[coeff].plot_joint(title="", ts_args={'xlim': xlim, 'ylim': joint_ylims_plot, 'axes': ax_frp, 'titles': dict(eeg=''), 'window_title': '', 'units': 'A.U.'},
-                                    topomap_args={'vlim':vlims_topo, 'axes': axs_topos, 'size': 3, 'sensors': False},
-                                    show=False)
+            grand_avg[coeff].plot_joint(title="",
+                                        ts_args={'xlim': xlim, 'ylim': joint_ylims_plot, 'axes': ax_frp, 'titles': dict(eeg=''), 'window_title': '', 'units': 'A.U.', 'unit': False},
+                                        topomap_args={'vlim': vlims_topo, 'axes': axs_topos, 'size': 3, 'sensors': False},
+                                        show=False)
         else:
-            grand_avg[coeff].plot(axes=ax_frp, titles='', window_title='', xlim=xlim, ylim=joint_ylims_plot, units='A.U.', show=False)
+            grand_avg[coeff].plot(axes=ax_frp, titles='', window_title='', xlim=xlim, ylim=joint_ylims_plot, units='A.U.', show=False, unit=False)
 
         # clean axis
         ax_frp.set_xlabel('')
