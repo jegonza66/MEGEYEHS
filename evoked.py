@@ -1,4 +1,5 @@
 import load
+import save
 import os
 import mne
 import matplotlib.pyplot as plt
@@ -26,7 +27,7 @@ else:
 use_ica_data = True
 band_id = None
 # Id
-epoch_id = 'sac_emap'
+epoch_id = 'it_fix_vs+tgt_fix_vs'
 # Pick MEG chs (Select channels or set picks = 'mag')
 chs_id = 'mag'
 # Plot eye movements
@@ -38,14 +39,15 @@ reject = None
 evt_dur = None
 
 # Windows durations
-dur, cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
-if 'vs' in epoch_id:
+cross1_dur, cross2_dur, mss_duration, vs_dur = functions_general.get_duration()
+if 'vs' in epoch_id and 'fix' not in epoch_id:
     trial_dur = vs_dur[mss]  # Edit this to determine the minimum visual search duration for the trial selection (this will only affect vs epoching)
 else:
     trial_dur = None
 
 # Get time windows from epoch_id name
 map = dict(tgt_fix={'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3, 0.6)},
+           it_fix_vs={'tmin': -0.2, 'tmax': 0.5, 'plot_xlim': (-0.15, 0.45)},
            sac_emap={'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.3, 2.5)},
            hl_start={'tmin': -3, 'tmax': 35, 'plot_xlim': (-2.5, 33)})
 tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=mss, plot_edge=0, map=map)
@@ -53,9 +55,6 @@ tmin, tmax, plot_xlim = functions_general.get_time_lims(epoch_id=epoch_id, mss=m
 # Baseline
 baseline, plot_baseline = functions_general.get_baseline_duration(epoch_id=epoch_id, mss=mss, tmin=tmin, tmax=tmax, cross1_dur=cross1_dur,
                                                                   mss_duration=mss_duration, cross2_dur=cross2_dur)
-# Hardcode
-tmin, tmax, plot_xlim = -0.5, 3, (-0.5, 3)
-baseline = (-0.5, 0)
 
 # Data type
 if use_ica_data:
@@ -175,7 +174,20 @@ grand_avg_misc = grand_avg.copy().pick('misc')
 fname = f'Grand_average_{chs_id}'
 plot_general.evoked(evoked_meg=grand_avg_meg, evoked_misc=grand_avg_misc, picks=picks,
                     plot_gaze=plot_gaze, plot_xlim=plot_xlim, display_figs=display_figs,
-                    save_fig=save_fig, fig_path=evoked_fig_path, fname=fname)
+                    save_fig=save_fig, fig_path=evoked_fig_path, fname=fname, ticksize=18)
+
+
+# Plot topographies
+topo_times = [grand_avg_meg.times[grand_avg_meg._data.std(axis=0).argmax()]]
+fig_topo = grand_avg_meg.plot_topomap(times=topo_times, cmap='coolwarm', show=display_figs, vlim=(-75, 75), size=2)
+# Increase colorbar font size (last axis is the colorbar in MNE topomap figures)
+cbar_ax = fig_topo.axes[-1]
+cbar_ax.tick_params(labelsize=18)
+if cbar_ax.get_ylabel():
+    cbar_ax.yaxis.label.set_size(18)
+if save_fig:
+    fname = f'Grand_average_topomap_{chs_id}'
+    save.fig(fig=fig_topo, path=evoked_fig_path, fname=fname)
 
 # Plot Saccades frontal channels
 if 'sac' in epoch_id:
