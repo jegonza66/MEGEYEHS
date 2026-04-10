@@ -497,7 +497,7 @@ def get_baseline_duration(epoch_id, mss, tmin, tmax, mss_duration=2, cross1_dur=
         elif 'ms' in epoch_id:
             baseline = (-cross1_dur, 0)
         elif 'cross2' in epoch_id and mss:
-            baseline = (-mss_duration[mss] - cross2_dur, -mss_duration[mss])
+            baseline = (-mss_duration[mss] - cross1_dur, -mss_duration[mss])
         elif 'vsend' in epoch_id:
             baseline = (tmax -cross1_dur, tmax)
         elif 'vs' in epoch_id:
@@ -805,3 +805,25 @@ def read_region_labels_csv(csv_path, parcellation='aparc.a2009s'):
         region_labels[macro_region].append(brain_region)
 
     return region_labels
+
+
+def largest_cluster_pval(significant_pvalues, significant_clusters):
+    """Get the p-value of the largest cluster (most elements).
+
+    Parameters
+    ----------
+    significant_pvalues : list
+        List of p-values corresponding to significant clusters.
+    significant_clusters : list
+        List of cluster boolean arrays.
+
+    Returns
+    -------
+    float or None
+        The p-value of the largest cluster, or None if no clusters.
+    """
+    if not significant_clusters or not significant_pvalues:
+        return None
+    cluster_sizes = [np.sum(c) for c in significant_clusters]
+    largest_idx = np.argmax(cluster_sizes)
+    return significant_pvalues[largest_idx]
