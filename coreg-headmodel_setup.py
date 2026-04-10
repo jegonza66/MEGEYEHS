@@ -21,7 +21,7 @@ force_fsaverage = False
 ico = 4
 spacing = 5.
 pick_ori = None
-high_freq = True
+high_freq = False
 depth = None
 
 # Define Subjects_dir as Freesurfer output folder
