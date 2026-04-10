@@ -26,27 +26,27 @@ else:
 
 #-----  Parameters -----#
 trial_params = {'corrans': None,
-                'tgtpres': True,
+                'tgtpres': None,
                 'mss': None,
                 'evtdur': None,
                 }
 
 meg_params = {'chs_id': 'mag',
-              'band_id': (0.1, 40),
+              'band_id': 'Alpha',
               'data_type': 'ICA',
               'downsample': 300
               }
 
 # TRF parameters
-trf_params = {'input_features': {'it_fix_vs+tgt_fix_vs': ['correct', 'n_fix', 'duration'],
-                                 'tgt_fix_vs': ['correct'], # 'n_fix', 'duration', {'fix_vs': ['item', 'fix_target']} 'pupil'? 'distance'?, 'mss'?,
-                                 'sac_vs': None, # duration , avg_vel
-                                 'blue': None,
-                                 'red': None  # Select features (events)
+trf_params = {'input_features': {'it_fix_ms+tgt_fix_ms': ['correct', 'mss2', 'mss4'],
+                                 # 'tgt_fix_ms': ['correct', 'mss2', 'mss4'], # 'n_fix', 'duration', {'fix_vs': ['item', 'fix_target']} 'pupil'? 'distance'?, 'mss'?,
+                                 'sac_ms': None, # duration , avg_vel
+                                 #'blue': None,
+                                 #'red': None  # Select features (events)
                                  },
               'add_features': None,
               'standarize': True,
-              'fit_power': False,
+              'fit_power': True,
               'alpha': 1000,
               'tmin': -0.2,
               'tmax': 0.5,
@@ -131,7 +131,7 @@ for sub_idx, subject_code in enumerate(exp_info.subjects_ids):
         # Load subject object
         subject = load.preproc_subject(exp_info=exp_info, subject_code=subject_code)
     # Load MEG data
-    meg_data = load.meg(subject=subject, meg_params=meg_params)
+    meg_data = load.meg(subject=subject, meg_params=meg_params, save_data=True)
 
     picks = functions_general.pick_chs(chs_id=meg_params['chs_id'], info=meg_data.info)
     meg_sub = meg_data.copy().pick(picks)
