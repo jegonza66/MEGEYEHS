@@ -43,7 +43,7 @@ def epochs(subject, epochs, picks, order=None, overlay=None, combine='mean', sig
                 save.fig(fig=fig, path=fig_path, fname=fname)
 
 
-def evoked(evoked_meg, evoked_misc, picks, plot_gaze=False, fig=None,
+def evoked(evoked_meg, evoked_misc, picks, plot_gaze=False, fig=None, fontsize=22, ticksize=22,
            axes=None, plot_xlim='tight', plot_ylim=None, display_figs=False, save_fig=True, fig_path=None, fname=None):
     '''
     Plot evoked response with mne.Evoked.plot() method. Option to plot gaze data on subplot.
@@ -63,6 +63,13 @@ def evoked(evoked_meg, evoked_misc, picks, plot_gaze=False, fig=None,
 
     :return: None
     '''
+
+    if fontsize:
+        params = {'axes.titlesize': fontsize}
+        plt.rcParams.update(params)
+    if ticksize:
+        params = {'axes.labelsize': ticksize, 'legend.fontsize': ticksize, 'xtick.labelsize': ticksize, 'ytick.labelsize': ticksize}
+        plt.rcParams.update(params)
 
     # Sanity check
     if save_fig and (not fname or not fig_path):
@@ -525,7 +532,7 @@ def tfr_plotjoint(tfr, plot_baseline=None, bline_mode=None, plot_xlim=(None, Non
 
 def tfr_plotjoint_picks(tfr, plot_baseline=(None, 0), bline_mode=None, plot_xlim=(None, None), timefreqs=None, image_args=None, clusters_mask=None,
                         plot_max=True, plot_min=True, vmin=None, vmax=None, chs_id='mag', vlines_times=None, cmap='bwr',
-                        display_figs=False, save_fig=False, trf_fig_path=None, fname=None, fontsize=None, ticksize=None):
+                        display_figs=False, save_fig=False, trf_fig_path=None, title=None, fname=None, fontsize=None, ticksize=None):
     # Sanity check
     if save_fig and (not fname or not trf_fig_path):
         raise ValueError('Please provide path and filename to save figure. Else, set save_fig to false.')
@@ -553,10 +560,11 @@ def tfr_plotjoint_picks(tfr, plot_baseline=(None, 0), bline_mode=None, plot_xlim
         timefreqs = functions_analysis.get_plot_tf(tfr=tfr_plotjoint, plot_xlim=plot_xlim, plot_max=plot_max, plot_min=plot_min)
 
     # Title
-    if fname:
-        title = f'{fname.split("_")[1]}_{bline_mode}'
-    else:
-        title = f'{bline_mode}'
+    if not title:
+        if fname:
+            title = f'{fname.split("_")[1]}_{bline_mode}'
+        else:
+            title = f'{bline_mode}'
 
     # Get min and max from all topoplots and use in TF plot aswell
     if vmin == None or vmax == None:
@@ -1546,7 +1554,7 @@ def plot_trf_features(grand_avg,
 
         coeff_data = grand_avg[coeff].get_data()
         topo, cm = mne.viz.plot_topomap(
-            coeff_data[:, ix_plot], pos=grand_avg[coeff].info, axes=ax_tfce_topo, show=False, vlim=vlims_tfce_topo,  # vlim=(-max_coef, max_coef)
+            coeff_data[:, ix_plot], pos=grand_avg[coeff].info, axes=ax_tfce_topo, show=False, vlim=vlims_tfce_topo, ch_type='mag',  # vlim=(-max_coef, max_coef)
             mask=clusters_mask[coeff][:, ix_plot], mask_params=dict(marker='o', markerfacecolor='w', markeredgecolor='grey',
                                                              linewidth=0, markersize=2), contours=4, cmap='RdBu_r')
         if vlims_tfce_topo[0] and vlims_tfce_topo[1]:
@@ -1555,17 +1563,12 @@ def plot_trf_features(grand_avg,
             v1 = (coeff_data[:, ix_plot].min(), coeff_data[:, ix_plot].max())
         clb = fig.colorbar(topo, cax=ax_tfce_topo_cb, ticks=v1)
 
-        # Define the formatting function
-        def format_ticks(value, pos):
-            return f'{value * 1e6:.1f}'
-
-        clb.ax.yaxis.set_major_formatter(FuncFormatter(format_ticks))
         clb.ax.yaxis.set_tick_params(labelsize=7)  # Adjust font size here
 
         # Set feature title
         ax_tfce_topo.set_title(coeff, fontsize=12)
         ax_tfce_topo_cb.set_title(f'A.U.', fontsize=8)  # title
-        ax_tfce_topo.set_xlabel("%s ms" % round(time_plot, 2))
+        ax_tfce_topo.set_xlabel("%s s" % round(time_plot, 2))
         ax_tfce_topo.title.set_size(10)
 
         ax_frp.set_title('')
