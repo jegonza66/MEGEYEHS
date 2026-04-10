@@ -20,7 +20,7 @@ import copy
 exp_info = setup.exp_info()
 
 #----- Save data and display figures -----#
-save_data = True
+save_data = False
 save_fig = True
 display_figs = False
 plot_individuals = False
@@ -33,23 +33,23 @@ else:
 use_ica_data = True
 
 # Trial selection and filters parameters. A field with 2 values will compute the difference between the conditions specified
-trial_params = {'epoch_id': 'it_fix_ms+tgt_fix_ms',  # 'it_sac_ms+tgt_sac_ms', 'it_sac_vs+tgt_sac_vs', 'it_sac_vs', 'tgt_fix_vs', 'sac_emap', 'hl_start'
-                'corrans': [True, False],
+trial_params = {'epoch_id': 'cross2',  # 'it_sac_ms+tgt_sac_ms', 'it_sac_vs+tgt_sac_vs', 'it_sac_vs', 'tgt_fix_vs', 'sac_emap', 'hl_start'
+                'corrans': None,
                 'tgtpres': None,
-                'mss': None,
+                'mss': [1, 2, 4],
                 'reject': None,
                 'evtdur': None,
-                'rel_sac': 'prev'
+                'rel_sac': None
                 }
 run_comparison = True
 
 # Select channels
-chs_ids = ['parietal', 'occipital', 'parietal_occipital']  # region_hemisphere
+chs_ids = ['parietal_occipital']  # region_hemisphere
 
 # Power time frequency params
 l_freq = 1
 h_freq = 40
-run_itc = True
+run_itc = False
 plot_edge = 0.15
 
 # Plots parameters
@@ -74,9 +74,9 @@ return_average_tfr = True
 output = 'power'
 
 # Permutations cluster test parameters
-run_permutations_ga = True
+run_permutations_ga = False
 run_permutations_dif = True
-n_permutations = 1024
+n_permutations = 5120
 degrees_of_freedom = len(exp_info.subjects_ids) - 1
 desired_tval = 0.01
 t_thresh = scipy.stats.t.ppf(1 - desired_tval / 2, df=degrees_of_freedom)
@@ -134,15 +134,16 @@ for param in param_values.keys():
 
         # Get time windows from epoch_id name
         map = {'ms': {'tmin': -cross1_dur, 'tmax': mss_duration[run_params['mss']], 'plot_xlim': (-cross1_dur + plot_edge, mss_duration[run_params['mss']] - plot_edge)},
-                   'fix_vs': {'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
-                   'tgt_fix_ms': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
-                   'it_sac_ms+tgt_sac_ms': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.4 + plot_edge, 0.4 - plot_edge)},
-                   'it_sac_ms': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.4 + plot_edge, 0.4 - plot_edge)},
-                   'it_sac_vs+tgt_sac_vs': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.4 + plot_edge, 0.4 - plot_edge)},
-                   'it_sac_vs': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.4 + plot_edge, 0.4 - plot_edge)},
-                   'tgt_fix_vs': {'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
-                   'sac_emap': {'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.3, 2.5)},
-                   'hl_start': {'tmin': -3, 'tmax': 35, 'plot_xlim': (-2.5, 33)}}
+               'cross2': {'tmin': -cross1_dur -mss_duration[run_params['mss']], 'tmax': 1, 'plot_xlim': (-1, 1 - plot_edge)},
+               'fix_vs': {'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
+               'tgt_fix_ms': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
+               'it_sac_ms+tgt_sac_ms': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.4 + plot_edge, 0.4 - plot_edge)},
+               'it_sac_ms': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.4 + plot_edge, 0.4 - plot_edge)},
+               'it_sac_vs+tgt_sac_vs': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.4 + plot_edge, 0.4 - plot_edge)},
+               'it_sac_vs': {'tmin': -0.4, 'tmax': 0.4, 'plot_xlim': (-0.4 + plot_edge, 0.4 - plot_edge)},
+               'tgt_fix_vs': {'tmin': -0.3, 'tmax': 0.6, 'plot_xlim': (-0.3 + plot_edge, 0.6 - plot_edge)},
+               'sac_emap': {'tmin': -0.5, 'tmax': 3, 'plot_xlim': (-0.3, 2.5)},
+               'hl_start': {'tmin': -3, 'tmax': 35, 'plot_xlim': (-2.5, 33)}}
         run_params['tmin'], run_params['tmax'], plot_xlim = functions_general.get_time_lims(epoch_id=run_params['epoch_id'], mss=run_params['mss'],
                                                                                             plot_edge=plot_edge, map=map)
 
@@ -269,7 +270,7 @@ for param in param_values.keys():
 
                             # If file contains desired frequencies, Load
                             if l_freq_file <= l_freq and h_freq_file >= h_freq:
-                                power = mne.time_frequency.read_tfrs(file)[0]
+                                power = mne.time_frequency.read_tfrs(file)
 
                                 # Crop to desired frequencies
                                 power = power.crop(fmin=l_freq, fmax=h_freq)
@@ -289,7 +290,7 @@ for param in param_values.keys():
 
                                 # If file contains desired frequencies, Load
                                 if l_freq_file <= l_freq and h_freq_file >= h_freq:
-                                    itc = mne.time_frequency.read_tfrs(file)[0]
+                                    itc = mne.time_frequency.read_tfrs(file)
 
                                     # Crop to desired frequencies
                                     itc = itc.crop(fmin=l_freq, fmax=h_freq)
@@ -421,8 +422,8 @@ for param in param_values.keys():
                     min_sig_chs = len(picks) * significant_channels
 
                     # Run clusters permutations test
-                    clusters_mask, clusters_mask_plot, significant_pvalues = functions_analysis.run_permutations_test_tf(data=permutations_test_data_array, pval_threshold=pval_threshold,
-                                                                                                   t_thresh=pval_threshold, n_permutations=n_permutations, min_sig_chs=min_sig_chs)
+                    clusters_mask, clusters_mask_plot, significant_pvalues, significant_clusters = functions_analysis.run_permutations_test_tf(data=permutations_test_data_array, pval_threshold=pval_threshold,
+                                                                                                      t_thresh=pval_threshold, n_permutations=n_permutations, min_sig_chs=min_sig_chs)
 
                     # Define image args to plot mask
                     image_args = {'mask': clusters_mask_plot, 'mask_style': 'contour'}
@@ -440,11 +441,17 @@ for param in param_values.keys():
                         fname = f'GA_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
 
                 #--------- Plots ---------#
+                # Build title with p-value of largest cluster
+                if run_permutations_ga and significant_pvalues:
+                    plot_title = f'{title}_{bline_mode}_pval_{functions_general.largest_cluster_pval(significant_pvalues, significant_clusters)}'
+                else:
+                    plot_title = f'{title}_{bline_mode}'
+
                 # Power Plotjoint
                 plot_general.tfr_plotjoint_picks(tfr=grand_avg, plot_baseline=run_params['plot_baseline'], bline_mode=ga_plot_bline_mode, vlines_times=vlines_times,
                                                  timefreqs=timefreqs_joint, image_args=image_args, clusters_mask=clusters_mask, chs_id=chs_id, plot_xlim=plot_xlim,
                                                  plot_max=plot_max, plot_min=plot_min, vmin=vmin_power, vmax=vmax_power, display_figs=display_figs, save_fig=save_fig,
-                                                 trf_fig_path=trf_fig_path, fname=fname, fontsize=22, ticksize=22)
+                                                 title=plot_title, trf_fig_path=trf_fig_path, fname=fname, fontsize=22, ticksize=22)
 
                 # Plot Power time-frequency in time scalde axes
                 fname = f'GA_{title}_tf_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
@@ -498,11 +505,11 @@ for param in param_values.keys():
             # Compute subjects difference
             power_data_dif = []
             for i in range(len(power_data[param][comparison[0]])):
-                power_data_dif.append(power_data[param][comparison[0]][i] - power_data[param][comparison[1]][i])
+                power_data_dif.append(power_data[param][comparison[0]][i].crop(tmin=plot_xlim[0], tmax=plot_xlim[1]) - power_data[param][comparison[1]][i].crop(tmin=plot_xlim[0], tmax=plot_xlim[1]))
             if run_itc:
                 itc_data_dif = []
                 for i in range(len(itc_data[param][comparison[0]])):
-                    itc_data_dif.append(itc_data[param][comparison[0]][i] - itc_data[param][comparison[1]][i])
+                    itc_data_dif.append(itc_data[param][comparison[0]][i].crop(tmin=plot_xlim[0], tmax=plot_xlim[1]) - itc_data[param][comparison[1]][i].crop(tmin=plot_xlim[0], tmax=plot_xlim[1]))
 
             # To use subjects difference
             grand_avg_power_dif = mne.grand_average(power_data_dif)
@@ -537,60 +544,42 @@ for param in param_values.keys():
 
                         # Get channel adjacency
                         ch_adjacency_sparse = functions_general.get_channel_adjacency(info=grand_avg.info, ch_type='mag', picks='mag')
-                        # Clusters out type
-                        if type(t_thresh) == dict:
-                            out_type = 'indices'
-                        else:
-                            out_type = 'mask'
 
-                        # Permutations cluster test (TFCE if t_thresh as dict)
-                        t_tfce, clusters, p_tfce, H0 = permutation_cluster_1samp_test(X=permutations_test_data_array, threshold=t_thresh, n_permutations=n_permutations,
-                                                                                      out_type=out_type, n_jobs=4)
+                        # Define minimum significant channels to show on TF plot
+                        min_sig_chs = len(picks) * significant_channels
 
-                        # Make clusters mask
-                        if type(t_thresh) == dict:
-                            # If TFCE use p-vaues of voxels directly
-                            p_tfce = p_tfce.reshape(permutations_test_data_array.shape[-2:])  # Reshape to data's shape
-                            clusters_mask_plot = p_tfce < pval_threshold
-                            clusters_mask = None
-
-                            # Cluster contour
-                            image_args = {'mask': clusters_mask_plot, 'mask_style': 'contour'}
-                        else:
-                            # Get significant clusters
-                            good_clusters_idx = np.where(p_tfce < pval_threshold)[0]
-                            significant_clusters = [clusters[idx] for idx in good_clusters_idx]
-
-                            # Reshape to data's shape by adding all clusters into one bool array
-                            clusters_mask = np.zeros(permutations_test_data_array[0].shape)
-                            if len(significant_clusters):
-                                for significant_cluster in significant_clusters:
-                                    clusters_mask += significant_cluster
-                                    clusters_mask_plot = clusters_mask.sum(axis=-1) > len(picks) * significant_channels
-                                    clusters_mask_plot = clusters_mask_plot.astype(bool)
-
-                                # Cluster contour
-                                image_args = {'mask': clusters_mask_plot, 'mask_style': 'contour'}
-                            else:
-                                image_args = None
+                        # Run clusters permutations test
+                        clusters_mask, clusters_mask_plot, significant_pvalues, significant_clusters = functions_analysis.run_permutations_test_tf(data=permutations_test_data_array,
+                                                                                                                             pval_threshold=pval_threshold,
+                                                                                                                             t_thresh=pval_threshold,
+                                                                                                                             n_permutations=n_permutations,
+                                                                                                                             min_sig_chs=min_sig_chs, seed=42)
+                        # Define image args to plot mask
+                        image_args = {'mask': clusters_mask_plot, 'mask_style': 'contour'}
 
                         if isinstance(t_thresh, dict):
-                            fname = f'GA_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_tTFCE_pval{pval_threshold}_chs{significant_channels}'
+                            fname = f'GA_{title}_{comparison[0]}-{comparison[1]}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_tTFCE_pval{pval_threshold}_chs{significant_channels}'
                         else:
-                            fname = f'GA_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_t{round(t_thresh, 2)}_pval{pval_threshold}_chs{significant_channels}'
+                            fname = f'GA_{title}_{comparison[0]}-{comparison[1]}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}_t{round(t_thresh, 2)}_pval{pval_threshold}_chs{significant_channels}'
                     else:
                         image_args = None
                         clusters_mask = None
                         if isinstance(t_thresh, dict):
-                            fname = f'GA_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+                            fname = f'GA_{title}_{comparison[0]}-{comparison[1]}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
                         else:
-                            fname = f'GA_{title}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
+                            fname = f'GA_{title}_{comparison[0]}-{comparison[1]}_plotjoint_{chs_id}_{bline_mode}_{l_freq}_{h_freq}'
 
                     # --------- Plots ---------#
+                    # Build title with p-value of largest cluster
+                    if run_permutations_dif and significant_pvalues:
+                        plot_title = f'{title}_{comparison[0]}-{comparison[1]}_{bline_mode}_pval_{functions_general.largest_cluster_pval(significant_pvalues, significant_clusters)}'
+                    else:
+                        plot_title = f'{title}_{comparison[0]}-{comparison[1]}_{bline_mode}'
+
                     # Power Plotjoint
                     plot_general.tfr_plotjoint_picks(tfr=grand_avg, plot_baseline=None, bline_mode=bline_mode, vlines_times=vlines_times, timefreqs=timefreqs_joint,
                                                      image_args=image_args, clusters_mask=clusters_mask, chs_id=chs_id, plot_xlim=plot_xlim, plot_max=plot_max, plot_min=plot_min,
-                                                     vmin=vmin_power, vmax=vmax_power, display_figs=display_figs, save_fig=save_fig, trf_fig_path=tfr_fig_path_dif, fname=fname)
+                                                     title=plot_title, vmin=vmin_power, vmax=vmax_power, display_figs=display_figs, save_fig=save_fig, trf_fig_path=tfr_fig_path_dif, fname=fname)
 
 
 # ----- Broadband power mss figure -----#
