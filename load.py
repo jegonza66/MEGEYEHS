@@ -1,12 +1,29 @@
 from paths import paths
 import setup
 import os
+import sys
 import pathlib
 import pickle
 import mne
 import functions_general
 import glob
 import pandas as pd
+
+# Compatibility shim: MNE ≥1.6 moved several internal modules from
+# mne.io.* → mne._fiff.*. Objects pickled with older MNE still reference
+# the old paths, so register aliases so pickle.load() can resolve them.
+_MNE_MODULE_ALIASES = {
+    'mne.io.meas_info': 'mne._fiff.meas_info',
+    'mne.io._digitization': 'mne._fiff._digitization',
+    'mne.io.pick': 'mne._fiff.pick',
+}
+for _old, _new in _MNE_MODULE_ALIASES.items():
+    if _old not in sys.modules:
+        try:
+            __import__(_new)
+            sys.modules[_old] = sys.modules[_new]
+        except ImportError:
+            pass  # older MNE where the old path still exists natively
 
 
 def config(path, fname):
@@ -180,14 +197,18 @@ def downsampled_data(subject, sfreq, band_id=None, method='iir', preload=False, 
         print(f'No previous downsampled data found for subject {subject.subject_id} in band {band_id}.\n'
               f'Downsampleing data...')
 
-        ds_data = filtered_data(subject=subject, band_id=band_id, save_data=save_data,
-                                 method=method)
+        if band_id is not None:
+            ds_data = filtered_data(subject=subject, band_id=band_id, save_data=save_data,
+                                     method=method)
+        else:
+            # No filtering needed, just load ICA data directly
+            ds_data = ica_data(subject=subject, preload=True)
 
         print(f'Downsampling data to {sfreq} Hz')
         ds_data.resample(sfreq)
 
         if save_data:
-            print('Saving filtered data')
+            print('Saving downsampled data')
             # Save MEG
             os.makedirs(ds_path, exist_ok=True)
             ds_data.save(ds_path + ds_meg_data_fname, overwrite=True)
@@ -220,7 +241,10 @@ def filtered_data(subject, band_id, method='iir', use_ica_data=True, preload=Fal
             meg_data = subject.load_preproc_meg_data(preload=True)
 
         l_freq, h_freq = functions_general.get_freq_band(band_id)
-        if method:
+        if l_freq is None and h_freq is None:
+            # No filtering needed
+            filtered_data = meg_data
+        elif method:
             filtered_data = meg_data.filter(l_freq=l_freq, h_freq=h_freq, method=method)
         else:
             filtered_data = meg_data.filter(l_freq=l_freq, h_freq=h_freq)
@@ -282,7 +306,7 @@ def time_frequency_range(file_path, l_freq, h_freq):
 
             # If file contains desired frequencies, Load
             if l_freq_file <= l_freq and h_freq_file >= h_freq:
-                time_frequency = mne.time_frequency.read_tfrs(file)[0]
+                time_frequency = mne.time_frequency.read_tfrs(file)
 
                 # Crop to desired frequencies
                 time_frequency = time_frequency.crop(fmin=l_freq, fmax=h_freq)
