@@ -1174,7 +1174,7 @@ def run_source_permutations_test(src, stc, source_data, subject, exp_info, save_
     return stc_all_cluster_vis, significant_voxels, significance_mask, t_thresh_name, time_label, p_threshold
 
 
-def run_permutations_test_tf(data, pval_threshold, t_thresh, min_sig_chs=0, n_permutations=1024):
+def run_permutations_test_tf(data, pval_threshold, t_thresh, min_sig_chs=0, n_permutations=5120, seed=42, stat_fun=None):
 
     # Clusters out type
     if type(t_thresh) == dict:
@@ -1183,10 +1183,11 @@ def run_permutations_test_tf(data, pval_threshold, t_thresh, min_sig_chs=0, n_pe
         out_type = 'mask'
 
     significant_pvalues = None
+    significant_clusters = []
 
     # Permutations cluster test (TFCE if t_thresh as dict)
-    t_tfce, clusters, p_tfce, H0 = permutation_cluster_1samp_test(X=data, threshold=t_thresh, n_permutations=n_permutations,
-                                                                  out_type=out_type, n_jobs=4)
+    t_tfce, clusters, p_tfce, H0 = permutation_cluster_1samp_test(X=data, threshold=t_thresh, n_permutations=n_permutations, seed=seed,
+                                                                  out_type=out_type, n_jobs=4, stat_fun=stat_fun)
 
     # Make clusters mask
     if type(t_thresh) == dict:
@@ -1216,11 +1217,11 @@ def run_permutations_test_tf(data, pval_threshold, t_thresh, min_sig_chs=0, n_pe
         else:
             clusters_mask_plot = None
 
-    return clusters_mask, clusters_mask_plot, significant_pvalues
+    return clusters_mask, clusters_mask_plot, significant_pvalues, significant_clusters
 
 
 
-def run_permutations_test(data, pval_threshold, t_thresh, adj_matrix=None, n_permutations=1024, seed=None):
+def run_permutations_test(data, pval_threshold, t_thresh, adj_matrix=None, n_permutations=1024, seed=42):
 
     # Clusters out type
     if type(t_thresh) == dict:
