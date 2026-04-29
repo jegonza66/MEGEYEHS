@@ -41,7 +41,7 @@ meg_params = {'chs_id': 'mag',
               'filter_sensors': True,
               'filter_method': 'iir',
               'data_type': 'ICA',
-              'downsample': 300
+              'downsample': None
               }
 
 # TRF parameters
@@ -86,15 +86,15 @@ bline_mode_ga = 'mean'
 plot_edge = 0.15
 
 # Plot
-initial_time = 0.1
-difference_initial_time = 0.3
+initial_time = 0.095
+difference_initial_time = 0.37
 positive_cbar = None  # None for free determination, False to include negative values
 plot_individuals = False
 plot_ga = True
 
 # Permutations test
 run_permutations_GA = False
-run_permutations_diff = True
+run_permutations_diff = False
 desired_tval = 0.01
 p_threshold = 0.05
 mask_negatives = False
