@@ -75,7 +75,7 @@ for subject_code in exp_info.subjects_ids:
     # Get time windows from epoch_id name
     tmin, tmax = -0.05, 0.1
     # Specific run path for loading evoked data
-    run_path = f'/Band_None/{epoch_id}_mssNone_Corr_None_tgt_None_{tmin}_{tmax}_bline({tmin}, 0)/'
+    run_path = f'/Band_None/{epoch_id}_mssNone_CorrNone_tgtNone_tdurNone_evtdurNone_{tmin}_{tmax}_bline({tmin}, 0)/'
     # load evoked data path
     epochs_save_path = paths().save_path() + f'Epochs_RAW/' + run_path
     evoked_save_path = paths().save_path() + f'Evoked_RAW/' + run_path
