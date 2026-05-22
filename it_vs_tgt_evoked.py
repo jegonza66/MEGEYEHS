@@ -664,7 +664,7 @@ import plot_general
 import matplotlib.pyplot as plt
 from scipy.signal import hilbert
 import scipy
-from mne.stats import permutation_cluster_test
+from mne.stats import permutation_cluster_1samp_test
 import itertools
 
 # Load experiment info
@@ -683,9 +683,9 @@ else:
 
 #----- Parameters -----#
 # Trial selection
-trial_params = {'epoch_id': 'it_fix_vs+tgt_fix_vs',  # use'+' to mix conditions (red+blue)
-                'corrans': None,
-                'tgtpres': None,
+trial_params = {'epoch_id': ['tgt_fix_vs', 'it_fix_vs_sub'],  # use'+' to mix conditions (red+blue)
+                'corrans': True,
+                'tgtpres': True,
                 'mss': None,
                 'reject': None,  # None to use default {'mag': 5e-12} / False for no rejection / 'subject' to use subjects predetermined rejection value
                 'evtdur': None,
@@ -737,8 +737,6 @@ bline_mode_ga = 'mean'
 plot_edge = 0.15
 
 # Plot
-initial_time = 0.1
-difference_initial_time = 0.3
 positive_cbar = None  # None for free determination, False to include negative values
 plot_individuals = False
 plot_ga = True
@@ -1199,7 +1197,7 @@ else:
 
 
 # TFCE test
-n_permutations = 2048
+n_permutations = 5120
 degrees_of_freedom = len(exp_info.subjects_ids) - 1
 desired_tval = 0.01
 t_thresh = scipy.stats.t.ppf(1 - desired_tval / 2, df=degrees_of_freedom)
@@ -1211,11 +1209,11 @@ pval_threshold = 0.05
 used_voxels_mm = src_default[0]['rr'][src_default[0]['inuse'].astype(bool)] * 1000
 
 # Plot
-selected_box = {0: {'x': (-10, 10), 'y': (-90, -75), 'z': (0, 15)}}
+selected_box = {0: {'x': (34, 54), 'y': (-50, -30), 'z': (9, 29)}}
 
-titles = ['V1']
+titles = ['P3']
 
-fontsize = 30
+fontsize = 20
 
 for j in selected_box.keys():
     # Get voxels in box
@@ -1225,18 +1223,17 @@ for j in selected_box.keys():
 
     # Get selected voxels id
     selected_voxels = src_default[0]['vertno'][voxel_idx]
+    fig, axs = plt.subplots(figsize=(9, 5))
 
     for param in param_values.keys():
         if len(param_values[param]) > 1 and run_comparison:
-
-            fig, axs = plt.subplots(nrows=len(param_values[param]), figsize=(10, 9))
-            test_data = []
-
             for i, comparison in enumerate(list(itertools.combinations(param_values[param], 2))):
 
                 if all(isinstance(element, int) for element in comparison):
                     comparison = sorted(comparison, reverse=True)
 
+                # Get subjects difference
+                stcs_diff = []
                 for value in comparison:
                     # Get data for every subject in the selected voxels
                     voxels_data = []
@@ -1251,43 +1248,45 @@ for j in selected_box.keys():
                     # Average over voxels
                     subects_data = voxels_data.mean(axis=2)
 
-                    test_data.append(subects_data)
+                    stcs_diff.append(subects_data)
 
                     # Extract mean and std over subjects
                     ga_data = subects_data.mean(axis=0)
                     ga_std = subects_data.std(axis=0) / np.sqrt(len(subects_data)) # Dividir por sqrt(len(subjects))
 
                     # Plot
-                    axs[i].plot(stc.times, ga_data, label=value)
-                    axs[i].fill_between(x=stc.times, y1=ga_data - ga_std, y2=ga_data + ga_std, alpha=0.4)
+                    axs.plot(stc.times, ga_data, label=value)
+                    axs.fill_between(x=stc.times, y1=ga_data - ga_std, y2=ga_data + ga_std, alpha=0.4)
+
+                test_data = stcs_diff[0] - stcs_diff[1]
 
                 # TFCE test
-                t_tfce, clusters, p_tfce, H0 = permutation_cluster_test(X=test_data, threshold=t_thresh, n_permutations=n_permutations)
+                t_tfce, clusters, p_tfce, H0 = permutation_cluster_1samp_test(X=test_data, threshold=t_thresh, n_permutations=n_permutations, seed=42)
                 good_clusters_idx = np.where(p_tfce < pval_threshold)[0]
                 significant_clusters = [clusters[c][0] for c in good_clusters_idx]
 
                 # Plot significant clusters
-                bar_height = axs[i].get_ylim()[1]
+                bar_height = axs.get_ylim()[1]
                 if len(significant_clusters):
                     for cluster in significant_clusters:
-                        axs[i].hlines(y=bar_height, xmin=stc.times[cluster[0]], xmax=stc.times[cluster[-1]], color='gray', alpha=0.7)
+                        axs.hlines(y=bar_height, xmin=stc.times[cluster[0]], xmax=stc.times[cluster[-1]], color='gray', alpha=0.7)
 
                 # Legend
-                handles, labels = axs[i].get_legend_handles_labels()
+                handles, labels = axs.get_legend_handles_labels()
                 by_label = dict(zip(labels, handles))
-                axs[i].legend(by_label.values(), by_label.keys(), loc='upper left', fontsize=fontsize)
+                axs.legend(by_label.values(), by_label.keys(), loc='upper left', fontsize=fontsize)
 
                 # Set labels
-                axs[i].set_xlabel('time (s)', fontsize=fontsize)
-                axs[i].set_ylabel('Activation', fontsize=fontsize)
-                axs[i].xaxis.set_tick_params(labelsize=fontsize)
-                axs[i].yaxis.set_tick_params(labelsize=fontsize)
+                axs.set_xlabel('time (s)', fontsize=fontsize)
+                axs.set_ylabel('Activation', fontsize=fontsize)
+                axs.xaxis.set_tick_params(labelsize=fontsize)
+                axs.yaxis.set_tick_params(labelsize=fontsize)
 
                 # Title
-                axs[i].set_title(f'{comparison}' + str(p_tfce[good_clusters_idx]), fontsize=fontsize)
+                axs.set_title(f'{comparison}' + str(p_tfce[good_clusters_idx]), fontsize=fontsize)
 
                 # Remove blank space before and after
-                axs[i].set_xlim(-0.2, 0.5)
+                axs.set_xlim(-0.2, 0.5)
 
             # Title
             fig.suptitle(f'{titles[j]}\n{str(selected_box[j])}\n(t_thres: {round(t_thresh, 2)} - p_thresh: {pval_threshold}', fontsize=fontsize)
